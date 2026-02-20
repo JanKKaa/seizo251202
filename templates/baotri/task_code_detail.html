@@ -1,0 +1,257 @@
+<!-- filepath: c:\seizo0\trang_chu\templates\baotri\task_code_detail.html -->
+{% extends "trang_chu/base.html" %}
+{% load humanize %}
+
+{% block title %}コード: {{ task_code.code }}{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">管理番号: {{ task_code.code }}</h1>
+<a href="{% url 'task_code_list' %}" class="btn btn-secondary mb-3">
+    <i class="fas fa-arrow-left"></i> 一覧に戻る
+</a>
+
+<!-- Thông tin nhiệm vụ -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">製品情報</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>製品名:</strong> {{ task.name }}</p>
+                <p><strong>コード:</strong> {{ task.code }}</p>
+                <p><strong>機械番号:</strong> {{ task.machine_count }}</p>
+                <p><strong>材料:</strong> {{ task.material }}</p>
+                <p><strong>メンテナンス頻度:</strong> {{ task.maintenance_frequency }}</p>
+                <p><strong>作成日時:</strong> {{ task.created_at|date:"Y-m-d H:i" }}</p>
+            </div>
+        </div>
+
+                <!-- Phần xác nhận của người quản lý -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-header py-2">
+                        <h6 class="m-0 font-weight-bold text-primary">上司確認</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        {% if task_code.counter_total %}
+                            <div class="mt-2 text-blue-bold font-weight-bold">
+                                <i class="fas fa-calculator"></i> 金型ショット総数: <span class="text-primary">{{ task_code.counter_total|intcomma }}</span>
+                            </div>
+                        {% else %}
+                            <div class="mt-2 text-muted">総数データなし</div>
+                        {% endif %}
+                        <br>
+                        {% if task_code.is_confirmed_by_supervisor and task_code.supervisor_stamp %}
+                            <img src="{{ task_code.supervisor_stamp.url }}" alt="承認印" style="height:80px;">
+                            <div class="mt-2 text-blue-bold font-weight-bold">
+                                {{ task_code.supervisor.last_name|default:task_code.supervisor.username }} が {{ task_code.supervisor_confirmed_at|date:"Y-m-d H:i" }} に確認済み
+                                <br>
+                                <strong>コメント:</strong> {{ task_code.supervisor_comment|linebreaksbr }}
+                            </div>
+                            {% if user.is_superuser %}
+                                <form method="post" action="{% url 'remove_supervisor_confirm' task_code.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger btn-sm mt-2" onclick="return confirm('本当に承認を解除しますか？')">承認を解除・印影を変更</button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'confirm_task_code' task_code.id %}" class="btn btn-success btn-lg">内容を確認し、承認する</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+     
+
+
+    </div>
+
+    <!-- Hình ảnh nhiệm vụ -->
+    <div class="col-md-6">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">製品写真</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <!-- Ảnh khuôn (chỉ ảnh này có zoom) -->
+                        {% if task.task_image %}
+                        <img src="{{ task.task_image.url }}" alt="Hình Ảnh Nhiệm Vụ" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 200px; object-fit: cover;">
+                        {% else %}
+                        <p>写真なし</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hình ảnh sản phẩm -->
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">金型写真</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <!-- Ảnh sản phẩm (chỉ ảnh này có zoom) -->
+                        {% if task.product_image %}
+                        <img src="{{ task.product_image.url }}" alt="Hình Ảnh Sản Phẩm" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 200px; object-fit: cover;">
+                        {% else %}
+                        <p>写真なし</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+
+
+        </div>
+    </div>
+</div>
+
+<!-- Kết quả bảo trì -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">メンテナンスの結果</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm">
+                <thead class="thead-light">
+    <tr>
+        <th class="small text-center font-weight-bold" style="width: 2%;">No.</th>
+        <th class="small text-center font-weight-bold" style="width: 10%;">項目</th>
+        <th class="small text-center font-weight-bold" style="width: 25%;">説明</th>
+        <th class="small text-center font-weight-bold" style="width: 10%;">参考写真</th>
+        <th class="small text-center font-weight-bold" style="width: 10%;">実際の写真</th>
+        <th class="small text-center font-weight-bold" style="width: 5%;">入力データ</th>
+        <th class="small text-center font-weight-bold" style="width: 5%;">担当者</th>
+        <th class="small text-center font-weight-bold" style="width: 5%;">確認</th>
+        
+        <th class="small text-center font-weight-bold" style="width: 15%;">備考</th>
+    </tr>
+</thead>
+<tbody>
+    {% for detail in task_code_details %}
+    <tr>
+        <td class="small text-center">{{ detail.detail.order }}</td>
+        <td class="small" style="font-size:1.0rem; font-weight:bold;">{{ detail.detail.item }}</td>
+        <td class="small" style="font-size:1.0rem;">{{ detail.detail.description }}</td>
+        <td class="small text-center">
+            {% if detail.detail.reference_image %}
+            <img src="{{ detail.detail.reference_image.url }}" alt="参考写真" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 100px; object-fit: cover;">
+            {% endif %}
+        </td>
+        <td class="small text-center">
+            {% if detail.actual_image %}
+            <img src="{{ detail.actual_image.url }}" alt="実際の写真" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 100px; object-fit: cover;">
+            {% endif %}
+        </td>
+        <td class="small text-center">{{ detail.actual_size }}</td>
+        <td class="small text-center">{{ detail.maintainer.last_name|default:detail.maintainer.username }}</td>
+        <td class="small text-center">{% if detail.is_confirmed %}✔{% endif %}</td>
+        
+        <td class="small">{{ detail.note }}</td>
+    </tr>
+    {% endfor %}
+</tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    .zoom-image {
+      cursor: zoom-in;
+      transition: box-shadow 0.2s;
+    }
+    .zoom-image:hover {
+      box-shadow: 0 0 10px #007bff;
+      opacity: 0.85;
+    }
+    .zoom-img-popup-xla {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      z-index: 99999;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 24px #000;
+      padding: 8px;
+      animation: xla-zoom-in 0.15s;
+    }
+    @keyframes xla-zoom-in {
+      from { transform: translate(-50%, -50%) scale(0.7);}
+      to { transform: translate(-50%, -50%) scale(1);}
+    }
+    .zoom-img-overlay-xla {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 99998;
+    }   
+
+
+    .badge-success, .badge-danger {
+    font-size: 1.0rem;
+    padding: 0.5em 0.8em;
+    }
+
+    td.text-center {
+    font-size: 1.0rem;
+    }
+
+    td.text-blue-bold {
+    color: #0056b3;
+    font-weight: bold;
+    }
+
+    
+  </style>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('click', function(event) {
+      if (event.target.classList.contains('zoom-image')) {
+        // Xóa popup cũ nếu có
+        document.querySelectorAll('.zoom-img-popup-xla, .zoom-img-overlay-xla').forEach(e => e.remove());
+        // Lấy kích thước thực tế của ảnh
+        const img = event.target;
+        const rect = img.getBoundingClientRect();
+        // Tạo overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'zoom-img-overlay-xla';
+        document.body.appendChild(overlay);
+        // Tạo ảnh phóng to
+        const bigImg = document.createElement('img');
+        bigImg.src = img.src;
+        bigImg.className = 'zoom-img-popup-xla';
+        // Gấp đôi kích thước hiện tại nhưng không vượt quá 90vw/vh
+        bigImg.style.width = Math.min(rect.width * 4, window.innerWidth * 0.9) + 'px';
+        bigImg.style.height = Math.min(rect.height * 4, window.innerHeight * 0.9) + 'px';
+        document.body.appendChild(bigImg);
+        // Đóng khi click overlay hoặc nhấn ESC
+        function closeZoom() {
+          overlay.remove();
+          bigImg.remove();
+          document.removeEventListener('keydown', escHandler);
+        }
+        overlay.addEventListener('click', closeZoom);
+        function escHandler(e) {
+          if (e.key === 'Escape') closeZoom();
+        }
+        document.addEventListener('keydown', escHandler);
+      }
+    });
+  });
+  </script>
+  
+
+{% endblock %}
+
+
+
+

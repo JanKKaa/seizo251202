@@ -1,0 +1,22 @@
+{% extends "learn/base_learn.html" %}
+{% block title %}コース詳細{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h2 class="text-primary font-weight-bold">{{ course.title }}</h2>
+        <p>{{ course.description }}</p>
+        <p>
+            <strong>期間:</strong>
+            {% if course.start_date %}{{ course.start_date }}{% endif %}
+            {% if course.end_date %} ～ {{ course.end_date }}{% endif %}
+        </p>
+        {% if course.external_url %}
+        <p>
+            <a href="{{ course.external_url }}" target="_blank" class="btn btn-outline-info btn-sm">外部サイトを見る</a>
+        </p>
+        {% endif %}
+        <a href="{% url 'learn:enroll_course' course.id %}" class="btn btn-success">このコースを受講する</a>
+    </div>
+</div>
+{% endblock %}

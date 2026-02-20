@@ -1,0 +1,123 @@
+{% extends "iot/base_iot.html" %}
+{% load form_extras %}
+{% block title %}Thiết bị{% endblock %}
+{% block content %}
+<h5 class="mb-3">Danh sách thiết bị <span class="text-muted">({{ total }})</span></h5>
+
+<form method="get" class="row gy-2 gx-2 align-items-end mb-3">
+  <div class="col-12 col-md-3">
+    <label class="form-label mb-1">Tìm kiếm</label>
+    <input type="text" name="q" value="{{ form.q.value }}" class="form-control form-control-sm" placeholder="address / name / condname">
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label mb-1">Trạng thái</label>
+    {{ form.status|add_class:"form-select form-select-sm" }}
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label mb-1">Kích hoạt</label>
+    {{ form.active|add_class:"form-select form-select-sm" }}
+  </div>
+  <div class="col-6 col-md-2">
+    <button class="btn btn-sm btn-primary w-100">Lọc</button>
+  </div>
+  <div class="col-6 col-md-2">
+    <a href="{% url 'iot:device_list' %}" class="btn btn-sm btn-outline-secondary w-100">Reset</a>
+  </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-sm table-hover align-middle table-bordered bg-white">
+  <thead class="table-light">
+    <tr class="text-center">
+      <th>#</th>
+      <th>Address</th>
+      <th>Name (RT)</th>
+      <th>Cond (RT)</th>
+      <th>Status</th>
+      <th>Shot (RT)</th>
+      <th>Active</th>
+      <th>Shot Total(DB)</th>
+      <th>Last Update(DB)</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in page_obj %}
+    <tr>
+      <td class="text-center">{{ forloop.counter }}</td>
+      <td class="fw-semibold"><a href="{% url 'iot:device_detail' m.pk %}">{{ m.address }}</a></td>
+      <td class="truncate">
+        {{ m.rt_name }}
+        {% if m.name and m.name != m.rt_name %}
+          <span class="badge text-bg-warning text-dark ms-1">DB: {{ m.name }}</span>
+        {% endif %}
+      </td>
+      <td class="truncate">
+        {{ m.rt_condname }}
+        {% if m.condname and m.condname != m.rt_condname %}
+          <span class="badge text-bg-info ms-1">DB: {{ m.condname }}</span>
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if m.rt_runtime_status_code == 'production' %}
+          <span class="badge text-bg-success badge-status">PROD</span>
+        {% elif m.rt_runtime_status_code == 'alarm' %}
+          <span class="badge text-bg-danger badge-status">ALARM</span>
+        {% elif m.rt_runtime_status_code == 'offline' %}
+          <span class="badge text-bg-secondary badge-status">OFF</span>
+        {% elif m.rt_runtime_status_code == 'arrange' %}
+          <span class="badge text-bg-warning text-dark badge-status">SETUP</span>
+        {% else %}
+          <span class="badge text-bg-secondary badge-status">{{ m.rt_runtime_status_code|default:"-" }}</span>
+        {% endif %}
+      </td>
+      <td class="text-end">
+        {% if m.rt_shotno != None %}{{ m.rt_shotno }}{% else %}-{% endif %}
+      </td>
+      <td class="text-center">
+        <button type="button"
+                class="btn btn-sm toggle-active-btn {% if m.active %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                data-id="{{ m.pk }}">
+          {% if m.active %}ON{% else %}OFF{% endif %}
+        </button>
+      </td>
+      <td class="text-end">{{ m.shot_total }}</td>
+      <td class="text-nowrap small">{{ m.last_update|date:"Y-m-d H:i" }}</td>
+      <td class="text-center">
+        <div class="btn-group btn-group-sm">
+          <a class="btn btn-outline-primary" href="{% url 'iot:device_update' m.pk %}">Sửa</a>
+          <a class="btn btn-outline-danger" href="{% url 'iot:device_delete' m.pk %}">Xóa</a>
+        </div>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="10" class="text-center text-muted py-4">Không có thiết bị.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<!-- (giữ nguyên phân trang & script toggle) -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.toggle-active-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    fetch(`/iot/devices/${btn.dataset.id}/toggle/`, {
+      method:'POST',
+      headers:{'X-CSRFToken': getCookie('csrftoken')}
+    }).then(r=>r.json()).then(d=>{
+      if(d.ok){
+        btn.classList.toggle('btn-success', d.active);
+        btn.classList.toggle('btn-outline-secondary', !d.active);
+        btn.textContent = d.active ? 'ON':'OFF';
+      }
+    });
+  });
+});
+function getCookie(n) {
+  let v = document.cookie.split(';').map(x=>x.trim()).find(x=>x.startsWith(n+'='));
+  return v ? decodeURIComponent(v.split('=')[1]) : '';
+}
+</script>
+{% endblock %}

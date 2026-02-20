@@ -1,0 +1,491 @@
+.screen2-bg {
+  background: linear-gradient(180deg, #f7fafd 0%, #eef4ff 45%, #ffffff 100%);
+  color: #1a1f36;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(15, 51, 118, 0.08);
+  padding: 14px 12px 16px;
+  position: relative;
+  overflow: hidden;
+  min-height: var(--center-height);
+  height: var(--center-height);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.screen2-bg .dashboard-layout-inner {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.screen2-bg .screen2-columns {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  min-height: 0;
+}
+
+/* Cột KPI không chừa padding bên trong – chiếm 40% chiều ngang */
+.screen2-bg .screen2-column--kpi {
+  flex: 0 0 25%;
+  max-width: 25%;
+  min-width: 0;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cột center ăn phần còn lại */
+.screen2-bg .screen2-column--center {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.screen2-bg .screen2-column {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.screen2-bg #center-area .card-body {
+  min-height: 260px;
+  padding: 1.35rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen2-bg #center-area .plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+}
+
+.screen2-bg #center-area .plan-item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.screen2-bg #center-area .plan-item .badge {
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(33, 95, 206, 0.08);
+  border: 1px solid rgba(33, 95, 206, 0.18);
+  color: #0f3a8e;
+  border-radius: 0.75rem;
+}
+
+.screen2-bg #center-area .machine-section-title {
+  font-size: 1.25rem;
+}
+
+.screen2-bg #center-area .machine-section-title .badge {
+  letter-spacing: 0.2px;
+}
+
+.screen2-bg .heading-screen2 {
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+}
+
+.screen2-bg h4,
+.screen2-bg .fw-bold,
+.screen2-bg .card-header strong {
+  color: #0f3a8e;
+}
+
+.screen2-bg .row.g-3 > [class*="col-"] {
+  display: flex;
+  align-items: stretch;
+}
+
+.screen2-bg .card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(31, 78, 162, 0.12);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  overflow: hidden;
+}
+
+.screen2-bg .card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(31, 78, 162, 0.22);
+}
+
+.screen2-bg .card-header {
+  background: linear-gradient(135deg, rgba(33, 95, 206, 0.15), rgba(33, 95, 206, 0.45));
+  border-bottom: none;
+  color: #0f3476;
+  padding: 0.5rem 0.65rem;
+}
+
+.screen2-bg .card-body {
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.55rem 0.6rem;
+}
+
+.screen2-bg .kpi-event-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.screen2-bg .kpi-event-card .card-body {
+  flex: 1 1 auto;
+  padding: 0.55rem 0.6rem;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(33, 95, 206, 0.5) transparent;
+}
+
+.screen2-bg .kpi-event-card .card-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.screen2-bg .kpi-event-card .card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.screen2-bg .kpi-event-card .card-body::-webkit-scrollbar-thumb {
+  background: rgba(33, 95, 206, 0.4);
+  border-radius: 12px;
+}
+
+.screen2-bg .list-group-item {
+  border: none;
+  border-bottom: 1px dotted rgba(33, 95, 206, 0.25);
+  margin-bottom: 0.3rem;
+  padding: 0.6rem 0.5rem;
+}
+
+.screen2-bg .list-group-item:last-child {
+  border-bottom: none;
+}
+
+.screen2-bg .list-group-item .fw-bold {
+  font-size: 0.96rem;
+  letter-spacing: 0.01em;
+}
+
+.screen2-bg .list-group-item .text-muted {
+  color: rgba(15, 39, 94, 0.72) !important;
+}
+
+.screen2-bg .list-group-item[data-empty] {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(15, 58, 142, 0.05),
+    rgba(15, 58, 142, 0.05) 12px,
+    rgba(255, 255, 255, 0.35) 12px,
+    rgba(255, 255, 255, 0.35) 24px
+  );
+  border-radius: 10px;
+  border: 1px dashed rgba(33, 95, 206, 0.35);
+}
+
+.screen2-bg .kpi-event-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(226, 238, 255, 0.96));
+  border: 1px solid rgba(96, 149, 242, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 16px 32px -18px rgba(38, 76, 143, 0.28);
+  backdrop-filter: blur(12px);
+  color: #0f3476;
+}
+
+.screen2-bg .kpi-event-card .card-header {
+  background: linear-gradient(135deg, rgba(79, 140, 239, 0.22), rgba(52, 112, 214, 0.32));
+  border-bottom: 1px solid rgba(79, 140, 239, 0.2);
+  color: #0f2f6d;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  padding: 0.5rem 0.65rem;
+}
+
+.screen2-bg .kpi-event-card .card-body {
+  background: transparent;
+}
+
+.screen2-bg .kpi-event-card .list-group-item {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(116, 163, 241, 0.22);
+  color: #0f3476;
+  border-radius: 14px;
+  margin-bottom: 0.55rem;
+  padding: 0.85rem 0.9rem;
+  box-shadow: 0 10px 22px -16px rgba(39, 76, 143, 0.35);
+}
+
+.screen2-bg .kpi-detail-chips {
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.screen2-bg .kpi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.16rem 0.44rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.012em;
+  background: rgba(236, 243, 255, 0.92);
+  color: #0f3b82;
+  box-shadow: 0 4px 10px -10px rgba(28, 72, 138, 0.28);
+}
+
+.screen2-bg .kpi-chip i {
+  font-size: 0.78em;
+}
+
+.screen2-bg .chip-title {
+  flex: 1 1 auto;
+  min-width: 70px !important;
+  justify-content: center;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.2rem;
+}
+
+.screen2-bg .chip-material {
+  flex: 1 1 auto;
+  min-width: 110px !important;
+  justify-content: center;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.2rem;
+}
+
+.screen2-bg .chip-result,
+.screen2-bg .chip-result.danger,
+.screen2-bg .chip-time {
+  padding: 0.22rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+.screen2-bg .vision-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.screen2-bg .vision-item__header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.screen2-bg .vision-item__detail-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.screen2-bg .vision-item__chips-column {
+  display: grid;
+  grid-template-rows: repeat(1, minmax(0, auto));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(90px, 1fr);
+  gap: 0.1rem 0.1rem;
+  align-items: center;
+  justify-items: stretch;
+}
+
+.screen2-bg .vision-item__chips-column .kpi-chip {
+  padding: 0.2rem 0.52rem;
+  font-size: 0.68rem;
+  justify-content: center;
+}
+
+.screen2-bg .vision-item__media,
+.screen2-bg .vision-item__media img,
+.screen2-bg .vision-item__visual {
+  display: none;
+}
+
+.chatwork-popup {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(31, 78, 162, 0.18);
+  border: 1px solid #e3eaf7;
+  animation: fadeIn 0.4s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(40px);}
+  to { opacity: 1; transform: translateY(0);}
+}
+
+.chatwork-popup-content { padding: 1rem 1.0rem; }
+.chatwork-popup-header { font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem; color: #0f3a8e;}
+.chatwork-popup-body { font-size: 0.8rem; margin-bottom: 0.4rem; }
+.chatwork-popup-footer { font-size: 0.7rem; color: #888;}
+
+
+/* ===== KPI2 TRONG CỘT KPI (2 CARD FULL RỘNG, CHIA CAO) ===== */
+
+/* Cột KPI là flex-column, chứa 2 dashboard-kpi-area (top/bottom) */
+.screen2-bg .screen2-column--kpi {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mỗi area KPI trong cột KPI full bề ngang, là flex-column để card bên trong căng hết */
+.screen2-bg .screen2-column--kpi .dashboard-kpi-area {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card TOP: chiều cao cố định – CHỈNH TẠI ĐÂY */
+.screen2-bg .screen2-column--kpi #dashboard-left-2 {
+  flex: 0 0 190px;   /* ví dụ: 190px; đổi 160 / 200 / 220 tùy ý */
+}
+
+/* Card BOTTOM: ăn hết phần chiều cao còn lại */
+.screen2-bg .screen2-column--kpi .dashboard-kpi-area:last-of-type {
+  flex: 1 1 auto;
+}
+
+/* Bỏ ảnh hưởng min-height:100% global, cho card căng đúng vùng của nó */
+.screen2-bg .screen2-column--kpi .kpi-event-card {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Body trong card KPI2 tự cuộn nếu nội dung dài */
+.screen2-bg .screen2-column--kpi .kpi-event-card .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Nếu HTML card dưới còn class mt-2 thì giảm / bỏ margin-top cho sát nhau hơn */
+.screen2-bg .screen2-column--kpi .dashboard-kpi-area.mt-2 {
+  margin-top: 4px;   /* hoặc 0 nếu muốn dính sát */
+}
+
+/* ===== KPI2: 2 BẢNG FULL CỘT KPI ===== */
+
+/* Cột KPI đã là flex-column (ở trên), dùng để chia trên/dưới */
+.screen2-bg .screen2-column--kpi {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panel chung cho bảng trên + dưới */
+.screen2-bg .screen2-column--kpi .kpi2-panel {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(226,238,255,0.96));
+  border: 1px solid rgba(96,149,242,0.28);
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(31,78,162,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Bảng TRÊN: chiều cao cố định – chỉnh tại đây */
+.screen2-bg .screen2-column--kpi .kpi2-panel--top {
+  flex: 0 0 190px;      /* ĐỔI 160 / 200 / 220px theo ý */
+  margin-bottom: 4px;
+}
+
+/* Bảng DƯỚI: ăn hết phần còn lại */
+.screen2-bg .screen2-column--kpi .kpi2-panel--bottom {
+  flex: 1 1 auto;
+}
+
+/* Header của panel */
+.screen2-bg .screen2-column--kpi .kpi2-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.6rem;
+  background: linear-gradient(135deg, rgba(79,140,239,0.22), rgba(52,112,214,0.32));
+  color: #0f2f6d;
+  font-size: 0.7rem;
+}
+
+.screen2-bg .screen2-column--kpi .kpi2-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.screen2-bg .screen2-column--kpi .kpi2-panel-title i {
+  font-size: 0.7rem;
+}
+
+.screen2-bg .screen2-column--kpi .kpi2-panel-updated {
+  font-size: 0.5rem;
+  color: rgba(255,255,255,0.9);
+}
+
+/* Body: table cuộn khi thiếu chỗ */
+.screen2-bg .screen2-column--kpi .kpi2-panel-body {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0.4rem 0.55rem;
+  background: rgba(255,255,255,0.92);
+  overflow-y: auto;
+}
+
+/* Bảng luôn full bề ngang, font nhỏ hơn chút */
+.screen2-bg .screen2-column--kpi .kpi2-table {
+  width: 100%;
+  margin-bottom: 0;
+  font-size: 0.6rem;
+}
+
+/* ===== KPI2: THU NHỎ KÍCH THƯỚC CHỮ ===== */
+
+/* Header nhỏ hơn một chút */
+.screen2-bg .screen2-column--kpi .kpi2-panel-header {
+  font-size: 0.55rem;          /* mặc định ~12px */
+  padding: 0.1rem 0.2rem;
+}
+
+.screen2-bg .screen2-column--kpi .kpi2-panel-title span {
+  font-size: 0.55rem;
+}
+
+/* Bảng trong KPI2: chữ nhỏ + padding gọn lại */
+.screen2-bg .screen2-column--kpi .kpi2-table {
+  font-size: 0.55rem;          /* nhỏ hơn trước (0.8rem) */
+}
+
+.screen2-bg .screen2-column--kpi .kpi2-table th,
+.screen2-bg .screen2-column--kpi .kpi2-table td {
+  padding: 0.15rem 0.25rem;
+}

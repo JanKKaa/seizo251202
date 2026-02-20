@@ -1,0 +1,80 @@
+<!-- filepath: /c:/Users/Shin/seizo0/topbar_app/templates/topbar_app/inbox.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}受信トレイ{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">受信トレイ</h1>
+<div class="row">
+    <div class="col-lg-3">
+        <div class="list-group">
+            <a href="{% url 'phe_duyet:send_message' %}" class="list-group-item list-group-item-action">
+                <i class="fas fa-paper-plane"></i> メッセージを送信
+            </a>
+            <a href="{% url 'phe_duyet:inbox' %}" class="list-group-item list-group-item-action active">
+                <i class="fas fa-inbox"></i> 受信トレイ
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">受信メッセージ</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for message in received_messages %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ message.subject }}</h5>
+                            <small>{{ message.timestamp }}</small>
+                        </div>
+                        <p class="mb-1">{{ message.body|truncatewords:20 }}</p>
+                        <small>送信者: {{ message.sender.username }}</small>
+                        <form method="post" action="{% url 'phe_duyet:delete_message' message.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm float-right">削除</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <p class="text-center">メッセージがありません。</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">送信メッセージ</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for message in sent_messages %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ message.subject }}</h5>
+                            <small>{{ message.timestamp }}</small>
+                        </div>
+                        <p class="mb-1">{{ message.body|truncatewords:20 }}</p>
+                        <small>宛先: {{ message.recipient.username }}</small>
+                        <form method="post" action="{% url 'phe_duyet:delete_message' message.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm float-right">削除</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <p class="text-center">メッセージがありません。</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% load static %}
+<link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
+<link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'js/sb-admin-2.min.js' %}"></script>

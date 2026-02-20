@@ -1,0 +1,105 @@
+<!-- filepath: c:\Users\Shin\Downloads\seizo0 250325\seizo0\trang_chu\templates\mente\add_product.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}製品を追加{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">製品を追加</h1>
+
+
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">  <!-- ファイルアップロードをサポートするためにenctypeを追加 -->
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <tbody>
+                        <tr>
+                            <th class="small text-right align-middle" style="width: 30%;">製品名</th>
+                            <td>{{ form.name }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">製品コード</th>
+                            <td>{{ form.code }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">機械数</th>
+                            <td>{{ form.machine_count }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">取数</th>
+                            <td>{{ form.quantity }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">材料</th>
+                            <td>{{ form.material }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">メンテナンス頻度</th>
+                            <td>{{ form.maintenance_frequency }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">製品画像</th>
+                            <td>{{ form.product_image }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">金型画像</th>
+                            <td>{{ form.mold_image }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <a href="{% url 'mente_index' %}" class="btn btn-secondary">キャンセル</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 製品一覧を表示 -->
+<h2 class="h4 mb-4 text-gray-800">製品一覧</h2>
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm">
+                <thead class="thead-light">
+                    <tr>
+                        <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
+                        <th class="small text-center font-weight-bold" style="width: 20%;">製品名</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">製品コード</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">機械数</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">取数</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">材料</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">メンテナンス頻度</th>
+                        <th class="small text-center font-weight-bold" style="width: 25%;">作成者</th>
+                        <th class="small text-center font-weight-bold" style="width: 25%;">作成日時</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td class="small text-center">{{ forloop.counter }}</td>
+                        <td class="small">
+                            <a href="{% url 'checksheet' product.id %}" class="text-primary">{{ product.name }}</a>
+                        </td>
+                        <td class="small text-center">{{ product.code }}</td>
+                        <td class="small text-center">{{ product.machine_count }}</td>
+                        <td class="small text-center">{{ product.quantity }}</td>
+                        <td class="small text-center">{{ product.material }}</td>
+                        <td class="small text-center">{{ product.maintenance_frequency }}</td>
+                        <td class="small">{{ product.creator.first_name }}{{ product.creator.last_name }}</td>
+                        <td class="small text-center">{{ product.created_at|date:"Y/m/d H:i" }}</td>
+                        <td class="small text-center">
+                            <a href="{% url 'delete_product' product.id %}" class="btn btn-danger btn-sm" onclick="return confirm('この製品を削除してもよろしいですか？');">削除</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

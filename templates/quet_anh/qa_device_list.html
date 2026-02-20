@@ -1,0 +1,66 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}デバイス一覧{% endblock %}
+
+{% block content %}
+{% if success_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ success_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="container mt-4">
+    <h2 class="mb-4">機械一覧</h2>
+    <div class="mb-3">
+        <a href="{% url 'add_qa_device' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> 新しい機械を追加
+        </a>
+    </div>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-center">No.</th>
+                            <th class="text-center">機械番号</th>
+                            <th class="text-center">材料名</th>
+                            <th class="text-center">製品名</th>
+                            <th class="text-center">混合率</th>
+                            <th class="text-center">画像とQR比較一致率(%)</th>
+                            <th class="text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in device_list %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.material }}</td>
+                            <td>{{ item.product }}</td>
+                            <td class="text-center">{{ item.ratio }}</td>
+                            <td class="text-center">
+                                {{ item.compare_ratio|default_if_none:"80"|floatformat:1 }}%
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'edit_qa_device' item.id %}" class="btn btn-info btn-sm">編集</a>
+                                <form method="post" action="{% url 'delete_qa_device' item.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当に削除しますか？');">削除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <a href="{% url 'index_qa' %}" class="btn btn-secondary mt-2">メインページに戻る</a>
+</div>
+{% endblock %}

@@ -1,0 +1,187 @@
+<style>
+  .dashboard-kpi-area {
+    display:block;
+    transform: scale(0.7);        /* thu nhỏ toàn bộ KPI */
+    transform-origin: top left;   /* co từ góc trên trái */
+  }
+
+  .kpi-row {
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .small-box {
+    flex: 1 1 90px;      /* nhỏ hơn */
+    min-width: 90px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 8px;     /* padding nhỏ lại */
+    border-radius:8px;
+
+    background: linear-gradient(155deg, rgba(32,56,96,0.9), rgba(18,35,70,0.92));
+    border:1px solid rgba(255,255,255,.32);
+    color:#f8fbff;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px -8px rgba(0,0,0,.3);
+    transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+
+  .small-box .inner h3 {
+    margin:0;
+    font-size:1.2rem;    /* trước 1.5rem */
+    font-weight:800;
+    letter-spacing:.01rem;
+    color:#ffffff;
+  }
+
+  .small-box .inner p {
+    margin:2px 0 0;
+    font-size:2.9rem;
+    color:rgba(255,255,255,.88);
+  }
+
+  .small-box .icon {
+    font-size:1.5rem;    /* icon nhỏ lại */
+    color:#ffffff;
+  }
+
+  .small-box:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px -10px rgba(0,0,0,.38);
+    border-color: rgba(255,255,255,.42);
+  }
+  .small-box.text-center { text-align:left; }
+
+  #last-update-label {
+    display:inline-block;
+    margin-top:6px;
+    background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
+    border:1px solid rgba(255,255,255,.3);
+    color:#fff;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 3px 10px -8px rgba(0,0,0,.28);
+    border-radius:8px;
+    padding:3px 6px;
+    font-size:.75rem;
+  }
+
+  /* Màu nhấn giữ nguyên */
+  #box-total   { border-color: rgba(135,206,250,.4); }
+  #box-production { border-color: rgba(144,238,144,.4); }
+  #box-stop    { border-color: rgba(255,165,0,.4); }
+  #box-arrange { border-color: rgba(173,216,230,.4); }
+  #box-alarm   { border-color: rgba(255,99,71,.45); }
+  #box-offline { border-color: rgba(211,211,211,.4); }
+
+  #box-total    { background: linear-gradient(145deg, #58b8ff, #0d74d2); border-color: rgba(80,180,255,.65); }
+  #box-production{ background: linear-gradient(145deg, #4cd97b, #159b4a); border-color: rgba(76,217,123,.7); }
+  #box-stop     { background: linear-gradient(145deg, #ffb347, #ff7e29); border-color: rgba(255,179,71,.75); }
+  #box-arrange  { background: linear-gradient(145deg, #ab8cff, #6b4bff); border-color: rgba(171,140,255,.7); }
+  #box-alarm    { background: linear-gradient(145deg, #ff6b81, #d6263d); border-color: rgba(255,107,129,.78); }
+  #box-offline  { background: linear-gradient(145deg, #9ca7b6, #5f6a78); border-color: rgba(156,167,182,.7); }
+
+  #box-total .icon      { color: rgba(80,180,255,.65); }
+  #box-production .icon { color:rgba(76,217,123,.7); }
+  #box-stop .icon       { color:rgba(255,179,71,.75); }
+  #box-arrange .icon    { color: rgba(171,140,255,.7); }
+  #box-alarm .icon      { color: rgba(255,107,129,.78); }
+  #box-offline .icon    { color: rgba(156,167,182,.7); }
+</style>
+
+<div class="dashboard-kpi-area" id="dashboard-left" aria-live="polite">
+  <div class="kpi-row">
+    <div id="box-total" class="small-box text-center">
+      <div class="inner">
+        <h3 id="kpi-total">0</h3>
+        <p>総台数</p>
+      </div>
+      <div class="icon"><i class="fas fa-server"></i></div>
+    </div>
+
+    <div id="box-production" class="small-box text-center">
+      <div class="inner">
+        <h3 id="kpi-production">0</h3>
+        <p>稼働</p>
+      </div>
+      <div class="icon"><i class="fas fa-play"></i></div>
+    </div>
+
+    <div id="box-stop" class="small-box text-center">
+      <div class="inner">
+        <h3 id="kpi-stop">0</h3>
+        <p>停止</p>
+      </div>
+      <div class="icon"><i class="fas fa-pause"></i></div>
+    </div>
+
+    <div id="box-arrange" class="small-box text-center">
+      <div class="inner">
+        <h3 id="kpi-arrange">0</h3>
+        <p>段取り</p>
+      </div>
+      <div class="icon"><i class="fas fa-tools"></i></div>
+    </div>
+
+    <div id="box-alarm" class="small-box text-center">
+      <div class="inner">
+        <h3 id="kpi-alarm">0</h3>
+        <p>アラーム</p>
+      </div>
+      <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+    </div>
+
+    
+  </div>
+
+<span id="glass-clock" style="
+  border-radius: 10px;
+  padding: 1px 10px;
+  font-size: 1.0rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0px;
+  margin-top: 10px;
+  box-shadow: 0 4px 12px -8px rgba(0,0,0,.28);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.22);
+  transition: background 0.8s, color 0.8s;
+">
+  <i class="fas fa-clock"></i>
+  <span id="realtime-clock">--:--:--</span>
+</span>
+  
+</div>
+
+<script>
+const glassColors = [
+  {bg: 'linear-gradient(135deg, rgba(58,123,213,0.45), rgba(0,210,255,0.32))', color: '#fff'},
+  {bg: 'linear-gradient(135deg, rgba(32,56,96,0.55), rgba(18,35,70,0.42))', color: '#e3f1fa'},
+  {bg: 'linear-gradient(135deg, rgba(76,217,123,0.38), rgba(34,193,195,0.32))', color: '#fff'},
+  {bg: 'linear-gradient(135deg, rgba(255,179,71,0.38), rgba(255,107,129,0.32))', color: '#fff8e3'},
+  {bg: 'linear-gradient(135deg, rgba(171,140,255,0.38), rgba(131,96,195,0.32))', color: '#f3e9ff'},
+  {bg: 'linear-gradient(135deg, rgba(255,107,129,0.38), rgba(255,255,255,0.22))', color: '#fff'},
+  {bg: 'linear-gradient(135deg, rgba(156,167,182,0.38), rgba(233,233,233,0.32))', color: '#222'},
+  {bg: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(32,56,96,0.22))', color: '#409bd4'},
+  {bg: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,179,71,0.22))', color: '#ff922b'},
+  {bg: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(76,217,123,0.22))', color: '#34d058'},
+  {bg: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(171,140,255,0.22))', color: '#8b58f9'},
+  {bg: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,107,129,0.22))', color: '#c91d2e'},
+  // ... bạn có thể thêm nhiều màu glass đẹp khác
+];
+function updateClock() {
+  const now = new Date();
+  const hh = now.getHours();
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('realtime-clock').textContent = `${String(hh).padStart(2, '0')}:${mm}:${ss}`;
+  // Chọn màu theo giờ (24 màu, lặp lại nếu thiếu)
+  const idx = hh % glassColors.length;
+  const clock = document.getElementById('glass-clock');
+  clock.style.background = glassColors[idx].bg;
+  clock.style.color = glassColors[idx].color;
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>

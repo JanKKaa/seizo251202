@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+{% load humanize %}
+{% load static %}
+<head>
+    <meta charset="UTF-8">
+    <title>注文詳細 {{ ngay|date:"Y-m-d" }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .card-header { font-size: 1.15rem; }
+        .table th, .table td { vertical-align: middle; }
+        .section-title { font-size: 1.3rem; font-weight: bold; color: #007bff; margin-bottom: 1.5rem; }
+        .card { box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .address-label { font-size: 1rem; font-weight: bold; color: #fff; padding: 0.3em 0.8em; border-radius: 1em; }
+        .address-honsya { background: #618ebec2; }
+        .address-koujika { background: #5fd37a; }
+    </style>
+</head>
+<body>
+<br>
+
+<div class="container mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0 section-title">
+            <i class="fas fa-utensils"></i> 注文詳細: {{ ngay|date:"Y年m月d日" }}
+        </h3>
+        <a href="{% url 'menu:order_kanri' %}?month={{ ngay|date:"Y-m" }}" class="btn btn-outline-secondary d-print-none">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+    </div>
+
+    <!-- Chèn ngay dưới tiêu đề ngày -->
+    <div class="mb-3 p-2 border rounded bg-white d-print-none">
+      <div class="mb-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">Ctrl+P / 印刷</button>
+        {% if printed_flag %}
+          <span class="badge badge-info ml-2">印刷完了</span>
+        {% else %}
+          <span class="badge badge-secondary ml-2">未印刷</span>
+        {% endif %}
+      </div>
+      {% if fax_status and fax_status.sent %}
+        <span class="badge badge-success mr-2">FAX送信済み</span>
+        <small class="text-muted mr-3">
+          {{ fax_status.sent_at|date:"Y/m/d H:i" }}{% if fax_status.user %} / {{ fax_status.user.username }}{% endif %}
+        </small>
+        <form method="post" action="{% url 'menu:fax_unset' year=ngay|date:'Y' month=ngay|date:'m' day=ngay|date:'d' %}" style="display:inline;">
+          {% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm">解除</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'menu:fax_set' year=ngay|date:'Y' month=ngay|date:'m' day=ngay|date:'d' %}" style="display:inline;">
+          {% csrf_token %}
+          <button id="btnFaxSet" class="btn btn-warning btn-sm" {% if not printed_flag %}disabled title="先に印刷してください"{% endif %}>送信済み記録</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="row">
+        {% with day_summary=order_groups.0.summary kyakusama_summary=order_groups.3.summary night_summary=order_groups.1.summary koujika_summary=order_groups.2.summary %}
+            {# Gộp nhóm 日勤 và 客様, cộng số lượng món trùng tên #}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header address-honsya">
+                        日勤（昼間）＋客様
+                        <span class="address-label address-honsya ml-2">本社 配達</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-bordered mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th style="width:65%">料理名</th>
+                                    <th style="width:35%">合計数量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {# Tạo một dict tạm để gộp số lượng #}
+                                {% for mon in day_summary.values %}
+                                    {% with ten=mon.ten %}
+                                        {% if kyakusama_summary.ten %}
+                                            {% with total=mon.so_luong|add:kyakusama_summary.ten.so_luong %}
+                                                <tr>
+                                                    <td>{{ ten }}</td>
+                                                    <td class="text-center">{{ total|intcomma }}</td>
+                                                </tr>
+                                            {% endwith %}
+                                        {% else %}
+                                            <tr>
+                                                <td>{{ ten }}</td>
+                                                <td class="text-center">{{ mon.so_luong|intcomma }}</td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endfor %}
+                                {# Các món chỉ có ở 客様 #}
+                                {% for mon in kyakusama_summary.values %}
+                                    {% if not day_summary.mon.ten %}
+                                        <tr>
+                                            <td>{{ mon.ten }}</td>
+                                            <td class="text-center">{{ mon.so_luong|intcomma }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not day_summary and not kyakusama_summary %}
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted">データがありません</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {# Nhóm 夜勤 #}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header address-honsya">
+                        夜勤（夜間）
+                        <span class="address-label address-honsya ml-2">本社 配達</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-bordered mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th style="width:65%">料理名</th>
+                                    <th style="width:35%">合計数量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mon in night_summary.values %}
+                                <tr>
+                                    <td>{{ mon.ten }}</td>
+                                    <td class="text-center">{{ mon.so_luong|intcomma }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted">データがありません</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {# Nhóm 工作課 #}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header address-koujika">
+                        工作課
+                        <span class="address-label address-koujika ml-2">金型工場 配達</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-bordered mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th style="width:65%">料理名</th>
+                                    <th style="width:35%">合計数量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mon in koujika_summary.values %}
+                                <tr>
+                                    <td>{{ mon.ten }}</td>
+                                    <td class="text-center">{{ mon.so_luong|intcomma }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted">データがありません</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endwith %}
+    </div>
+</div>
+
+<br>
+
+<!-- Thông tin công ty căn phải dưới cùng -->
+<div class="d-flex flex-column align-items-end mt-5 mb-3" style="width:100%; margin-left:-50px;">
+    <img src="{% static 'img/logo1.png' %}" alt="Company Logo" style="height:60px;">
+    <span style="font-size:1.2rem; font-weight:600; color:#333; margin-top:4px;">株式会社ハヤシテクノ</span>
+    <span style="font-size:1.2rem; font-weight:600; color:#333; margin-top:4px;">お間い合わせ ☎TEL.0265-79-8701</span>
+    <span style="font-size:1.2rem; font-weight:600; color:#333;">〒399-4601　長野県上伊那郡箕輪町中箕輪10800-119</span>
+</div>
+
+<!-- Font Awesome for icons -->
+<script src="https://kit.fontawesome.com/8c3b9b8e7a.js" crossorigin="anonymous"></script>
+<script>
+(function(){
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  window.addEventListener('afterprint', function(){
+    const url = "{% url 'menu:fax_mark_printed' year=ngay|date:'Y' month=ngay|date:'m' day=ngay|date:'d' %}";
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(()=> location.reload()).catch(()=> location.reload());
+  });
+})();
+</script>
+</body>
+</html>

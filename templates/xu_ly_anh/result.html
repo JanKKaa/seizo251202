@@ -1,0 +1,98 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block title %}検査結果一覧{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">検査結果一覧</h2>
+    {% if message %}
+      <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+
+    <form method="get" class="mb-3">
+        <div class="row align-items-end">
+            <div class="col-md-4 mb-2">
+                <label for="keyword" class="form-label mb-0"><strong>検索：</strong></label>
+                <input type="text" class="form-control" id="keyword" name="keyword" value="{{ keyword|default_if_none:'' }}" placeholder="デバイス名、材料名、作業者名..." onchange="this.form.submit()">
+            </div>
+            <div class="col-md-3 mb-2">
+                <label for="date" class="form-label mb-0"><strong>日付で絞り込み：</strong></label>
+                <input type="date" class="form-control" id="date" name="date" value="{{ date|default_if_none:'' }}" onchange="this.form.submit()">
+            </div>
+            <div class="col-md-2 mb-2 d-flex align-items-end">
+                <a href="{% url 'result_list' %}" class="btn btn-secondary w-100">クリア</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">#</th>
+                    <th class="text-center">アップロード画像</th>
+                    <th class="text-center">機械番号</th>
+                    <th class="text-center">材料名</th>
+                    <th class="text-center">製品名</th>
+                    <th class="text-center">混合率</th>
+                    <th class="text-center">スキャンデータ</th>
+                    <th class="text-center">結果</th>
+                    <th class="text-center">日時</th>
+                    <th class="text-center">作業者</th>
+                    <th class="text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in results %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td class="text-center">
+                        {% if item.image %}
+                            <img src="{{ item.image.url }}" alt="アップロード画像" class="img-fluid" style="max-width:120px;">
+                        {% endif %}
+                    </td>
+                    <td>{{ item.machine.name }}</td>
+                    <td>{{ item.machine.material }}</td>
+                    <td>{{ item.machine.product }}</td>
+                    <td class="text-center">{{ item.machine.ratio }}</td>
+                    <td>
+                        <pre style="background:#f8f9fa;padding:10px;max-height:120px;overflow:auto;">{{ item.data }}</pre>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge {% if item.result == 'Trùng khớp' %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if item.result == 'Trùng khớp' %}
+                                一致
+                            {% else %}
+                                不一致
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <small class="text-muted">{{ item.created_at|date:"Y/m/d H:i" }}</small>
+                    </td>
+                    <td class="text-center">
+                        {% if item.user and item.user.first_name %}
+                            {{ item.user.first_name }} {{ item.user.last_name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <form method="post" action="{% url 'delete_result' item.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当にこの画像とデータを削除しますか？');">削除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center text-muted">結果がありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a href="{% url 'index_xla' %}" class="btn btn-primary mt-3">処理ページに戻る</a>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+<!-- filepath: /c:/Users/Shin/seizo0/trang_chu/templates/500.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サーバーエラー</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+    <style>
+        body, html {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="container text-center">
+        <h1 class="display-1">500</h1>
+        <p class="lead">サーバーエラー</p>
+        <a href="{% url 'index' %}" class="btn btn-primary">ホームページに戻る</a>
+    </div>
+</body>
+</html>

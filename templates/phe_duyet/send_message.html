@@ -1,0 +1,13 @@
+<!-- filepath: /c:/Users/Shin/seizo0/trang_chu/templates/phe_duyet/send_message.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}メッセージを送信{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">メッセージを送信</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">送信</button>
+</form>
+{% endblock %}

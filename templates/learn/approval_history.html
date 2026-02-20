@@ -1,0 +1,50 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\approval_history.html -->
+{% extends "learn/base_learn.html" %}
+{% block title %}承認履歴{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-3">承認履歴</h2>
+    <div class="mb-3">
+        <strong>社員番号:</strong> {{ enrollment.user.username }}<br>
+        <strong>氏名:</strong> {{ enrollment.user.ten|default:enrollment.user.get_full_name }}<br>
+        <strong>コース:</strong> {{ enrollment.course.title }}
+    </div>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>日時</th>
+                <th>操作</th>
+                <th>担当者</th>
+                <th>コメント</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for history in histories %}
+            <tr>
+                <td>{{ history.acted_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ history.get_action_display }}</td>
+                <td>{{ history.acted_by.get_full_name|default:history.acted_by.username }}</td>
+                <td>{{ history.comment }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center">履歴がありません。</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'learn:course_list' %}" class="btn btn-secondary">戻る</a>
+</div>
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

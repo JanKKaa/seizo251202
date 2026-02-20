@@ -1,0 +1,206 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<!-- CSS: 元の画像のスタイルとクリック時のズーム効果の設定 -->
+<style>
+  /* 元の画像 */
+  .zoom-image {
+    cursor: pointer;
+    display: block;
+    margin: 0 auto;
+  }
+  /* 元の画像のコンテナ */
+  .zoom-container {
+    position: relative;
+    display: inline-block;
+    text-align: center;
+  }
+  /* ズームされた画像 */
+  .enlarged-image {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    max-width: 90%;
+    max-height: 90%;
+    transform: translate(-50%, -50%);
+    z-index: 1050;
+    box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5);
+    border: 3px solid #fff;
+  }
+  /* 暗い背景のオーバーレイ */
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1040;
+  }
+  /* 記事のレイアウト */
+  .article-content {
+    line-height: 1.6;
+    font-size: 1.1rem;
+  }
+  .article-title {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  .article-meta {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 2rem;
+  }
+  .article-image {
+    margin-bottom: 2rem;
+  }
+</style>
+
+<div class="container mt-5">
+  <!-- 記事のタイトル -->
+  <div class="row mb-4">
+    <div class="col text-left">
+      <!-- 下線効果付きのタイトル -->
+      <h1 class="article-title">{{ article.title }}</h1>
+      <style>
+        .article-title {
+          font-size: 3.5rem;
+          font-weight: bold;
+          position: relative;
+          display: inline-block;
+          margin-bottom: 1.5rem;
+        }
+        .article-title::after {
+          content: "";
+          display: block;
+          width: 100%;
+          height: 2px;
+          background: #007bff; /* 青い下線 */
+          margin-top: 5px;
+        }
+      </style>
+    </div>
+  </div>
+  <div class="col text-right">
+    <br>
+    <!-- 右揃えの著者名 -->
+    <p class="article-meta">{{ article.author.last_name }} {{ article.author.first_name }} によって {{ article.created_at }} に投稿されました</p>
+    <style>
+      .article-meta {
+        font-size: 0.9rem;
+        color: gray;
+        text-align: right; /* テキストを右揃え */
+      }
+    </style>
+  </div>
+  
+  <!-- 1カラムレイアウト: 記事の内容 -->
+  <div class="row">
+    <div class="col-md-12 article-content">
+      <div class="zoom-container">
+        {% if image4 %}
+        <img src="{{ image4.image.url }}" alt="Image 4" class="img-fluid rounded shadow-sm zoom-image">
+        <br>
+        {% endif %}
+      </div>
+      <br>
+      <p>{{ article.content|linebreaksbr }}</p>
+      <br>
+      <br>
+      {% if article.subtitle1 %}
+      <h3 class="styled-title">{{ article.subtitle1 }}</h3>
+      <style>
+        .styled-title {
+          font-size: 2rem;
+          font-weight: bold;
+          text-align: left; /* Aligns text to the left */
+          padding: 10px 20px;
+          border-left: 5px solid #007bff; /* Adds a blue bar on the left */
+          color: #000; /* Black text */
+          background-color: #f8f9fa; /* Light background */
+        }
+      </style>
+      <div class="zoom-container">
+        {% if image1 %}
+        <img src="{{ image1.image.url }}" alt="Image 1" class="img-fluid rounded shadow-sm zoom-image">
+        {% endif %}
+      </div>
+      <p>{{ article.subcontent1|linebreaksbr }}</p>
+      {% endif %}
+      <br>
+      {% if article.subtitle2 %}
+      
+      <h3 class="styled-title">{{ article.subtitle2 }}</h3>
+      <style>
+        .styled-title {
+          font-size: 2rem;
+          font-weight: bold;
+          text-align: left; /* Aligns text to the left */
+          padding: 10px 20px;
+          border-left: 5px solid #007bff; /* Adds a blue bar on the left */
+          color: #000; /* Black text */
+          background-color: #f8f9fa; /* Light background */
+        }
+      </style>
+      <div class="zoom-container">
+        {% if image2 %}
+        <img src="{{ image2.image.url }}" alt="Image 2" class="img-fluid rounded shadow-sm zoom-image">
+        {% endif %}
+      </div>
+      <p>{{ article.subcontent2|linebreaksbr }}</p>
+      {% endif %}
+      <br>
+      {% if article.subtitle3 %}
+      
+      <h3 class="styled-title">{{ article.subtitle3 }}</h3>
+      <style>
+        .styled-title {
+          font-size: 2rem;
+          font-weight: bold;
+          text-align: left; /* Aligns text to the left */
+          padding: 10px 20px;
+          border-left: 5px solid #007bff; /* Adds a blue bar on the left */
+          color: #000; /* Black text */
+          background-color: #f8f9fa; /* Light background */
+        }
+      </style>
+      <div class="zoom-container">
+        {% if image3 %}
+        <img src="{{ image3.image.url }}" alt="Image 3" class="img-fluid rounded shadow-sm zoom-image">
+        {% endif %}
+      </div>
+      <p>{{ article.subcontent3|linebreaksbr }}</p>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- 戻るボタン -->
+  <div class="text-center mt-4">
+    <a href="{% url 'index' %}" class="btn btn-secondary btn-lg">
+      <i class="fas fa-arrow-left"></i> 戻る
+    </a>
+  </div>
+</div>
+
+<!-- JavaScript: クリック時にオーバーレイとズーム画像を作成 -->
+<script>
+  document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('zoom-image')) {
+      const img = event.target;
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      document.body.appendChild(overlay);
+
+      const enlargedImg = document.createElement('img');
+      enlargedImg.src = img.src;
+      enlargedImg.className = 'enlarged-image';
+      document.body.appendChild(enlargedImg);
+
+      overlay.addEventListener('click', function() {
+        document.body.removeChild(overlay);
+        document.body.removeChild(enlargedImg);
+      });
+    }
+  });
+</script>
+{% endblock %}

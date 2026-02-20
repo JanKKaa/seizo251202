@@ -1,0 +1,13 @@
+<!-- filepath: c:\seizo0\trang_chu\templates\baotri\error.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}Lỗi{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger mt-4" role="alert">
+    <h4 class="alert-heading">エアー発生!</h4>
+    <p>{{ message }}</p>
+    <hr>
+    <a href="{% url 'baotri_index' %}" class="btn btn-primary">ホームページ</a>
+</div>
+{% endblock %}

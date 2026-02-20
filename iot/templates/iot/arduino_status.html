@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Arduino Pin Status Realtime</title>
+    <style>
+        .pin-box { display: inline-block; width: 80px; height: 80px; margin: 8px; text-align: center; border-radius: 8px; font-size: 1.2em; }
+        .on { background: #4caf50; color: #fff; }
+        .off { background: #f44336; color: #fff; }
+    </style>
+</head>
+<body>
+    <h2>Arduino Pin Status ({{ address }})</h2>
+    <div id="pins"></div>
+    <div id="timestamp"></div>
+    <script>
+        const address = "{{ address }}";
+        function fetchStatus() {
+            fetch(`/arduino/status/?address=${address}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        let html = '';
+                        for (const [pin, val] of Object.entries(data.pins)) {
+                            html += `<div class="pin-box ${val == 1 ? 'on' : 'off'}">${pin}<br>${val == 1 ? 'ON' : 'OFF'}</div>`;
+                        }
+                        document.getElementById('pins').innerHTML = html;
+                        document.getElementById('timestamp').innerText = "Last update: " + data.timestamp;
+                    } else {
+                        document.getElementById('pins').innerHTML = '<span style="color:red;">No data</span>';
+                    }
+                });
+        }
+        setInterval(fetchStatus, 1000); // Poll mỗi 1 giây
+        fetchStatus();
+    </script>
+</body>
+</html>

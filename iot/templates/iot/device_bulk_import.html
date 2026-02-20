@@ -1,0 +1,23 @@
+{% extends "iot/base_iot.html" %}
+{% block title %}Import CSV{% endblock %}
+{% block content %}
+<h5 class="mb-3">Import thiết bị từ CSV</h5>
+<div class="alert alert-info py-2">
+  Cột bắt buộc: address,name,condname,status,active (UTF-8). active: 1/0 hoặc true/false.
+</div>
+<form method="post" enctype="multipart/form-data" class="card shadow-sm p-3">
+  {% csrf_token %}
+  <div class="mb-3">
+    <input type="file" name="file" accept=".csv" class="form-control" required>
+  </div>
+  <button class="btn btn-primary btn-sm">Upload</button>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'device_list' %}">Hủy</a>
+</form>
+<details class="mt-4">
+  <summary class="small text-muted">Ví dụ CSV</summary>
+  <pre class="small mb-0">address,name,condname,status,active
+192.168.10.10,Máy 01,COND_A,production,1
+192.168.10.11,Máy 02,COND_B,stop,0
+</pre>
+</details>
+{% endblock %}

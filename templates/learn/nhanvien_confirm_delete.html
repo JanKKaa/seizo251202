@@ -1,0 +1,26 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\nhanvien_confirm_delete.html -->
+{% extends "learn/base_learn.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <h3 class="mb-4">社員情報の削除</h3>
+        <p>本当に社員 <strong>{{ nhanvien.ten }}</strong> ({{ nhanvien.ma_so }}) を削除してもよろしいですか？</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">削除</button>
+            <a href="{% url 'learn:nhanvien_list' %}" class="btn btn-secondary">キャンセル</a>
+        </form>
+    </div>
+</div>
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

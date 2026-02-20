@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ショット管理</title>
+    <style>
+        body { font-family: "Segoe UI", sans-serif; background:#f5f7fb; margin:0; padding:32px; color:#1f2a44; }
+        h1 { margin:0 0 12px; font-size:26px; }
+        section { background:#fff; border-radius:14px; padding:22px; box-shadow:0 10px 24px rgba(31,42,68,0.1); margin-bottom:28px; }
+        table { width:100%; border-collapse:collapse; margin-top:12px; }
+        th, td { border:1px solid #e0e6f1; padding:10px 12px; text-align:center; }
+        th { background:#e9f1ff; font-weight:600; color:#2456a4; }
+        tbody tr:nth-child(even) { background:#f7faff; }
+        .note { font-size:13px; color:#7283a4; margin-top:10px; }
+        .badge { display:inline-block; padding:4px 10px; border-radius:20px; background:#f0f5ff; color:#1c49a3; font-size:12px; }
+        .toggle-btn {
+            margin-top: 16px;
+            padding: 8px 18px;
+            border-radius: 20px;
+            border: none;
+            background: #1c49a3;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: opacity .2s ease;
+        }
+        .toggle-btn:hover { opacity: 0.88; }
+    </style>
+</head>
+<body>
+    {% extends "trang_chu/base.html" %}
+    {% load humanize %}
+
+    {% block title %}ショット管理{% endblock %}
+
+    {% block extra_head %}
+    <style>
+        .shot-report-wrapper{font-family:"Segoe UI",sans-serif;background:#f5f7fb;padding:24px;color:#1f2a44;}
+        .card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 10px 24px rgba(31,42,68,0.1);margin-bottom:24px;}
+        .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+        .card-header h1{font-size:24px;margin:0;}
+        .badge{padding:4px 10px;border-radius:20px;background:#f0f5ff;color:#1c49a3;font-size:12px;}
+        .table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;}
+        .table th,.table td{border:1px solid #e0e6f1;padding:6px 8px;text-align:center;}
+        .table thead{background:#e9f1ff;color:#2456a4;}
+        .table tbody tr:nth-child(even){background:#f7faff;}
+        .table td.analysis{text-align:left;}
+        .note{font-size:12px;color:#7283a4;margin-top:6px;}
+        .empty-row{padding:12px;text-align:center;color:#7283a4;}
+        .chart-controls{display:flex;align-items:center;gap:8px;margin-top:10px;}
+        .chart-controls label{font-weight:600;color:#1c49a3;font-size:13px;}
+        .chart-controls select{padding:5px 8px;border:1px solid #c8d3eb;border-radius:6px;font-size:12px;}
+        .chart-comment{margin-top:10px;font-size:13px;font-weight:600;color:#1f3f7f;}
+        .split-layout{display:flex;gap:18px;align-items:flex-start;margin-top:12px;}
+        .split-layout .chart-pane,
+        .split-layout .table-pane{flex:1 1 50%;min-width:0;}
+        .chart-pane canvas{width:100%!important;height:220px!important;}
+        .table-pane .table{margin-top:6px;font-size:11px;}
+        .table-pane .table th,.table-pane .table td{padding:4px 6px;}
+        .table-pane .table tbody{display:block;max-height:240px;overflow:auto;}
+        .table-pane .table thead,
+        .table-pane .table tbody tr{display:table;width:100%;table-layout:fixed;}
+        .toggle-btn{margin-bottom:8px;padding:6px 12px;border-radius:16px;border:none;background:#1c49a3;color:#fff;font-size:12px;cursor:pointer;transition:opacity .2s ease;}
+        .toggle-btn:hover{opacity:.88;}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% endblock %}
+
+    {% block content %}
+    <div class="shot-report-wrapper">
+        <section class="card">
+            <div class="card-header">
+                <h1>直近メンテ間ショット数</h1>
+                <!-- Nút trở về trang index -->
+                <a href="{% url 'baotri_index' %}" class="btn btn-secondary mb-3">
+                    <i class="fas fa-arrow-left"></i> 戻る
+                </a>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>製品名</th>
+                        <th>最新コード</th>
+                        <th>最新日時</th>
+                        <th>最新カウンター</th>
+                        <th>前回コード</th>
+                        <th>前回日時</th>
+                        <th>前回カウンター</th>
+                        <th>ショット差分</th>
+                        <th>平均差分(全期間)</th>
+                        <th>コメント</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in latest_rows %}
+                    <tr>
+                        <td>{{ row.task.name }}</td>
+                        <td>{{ row.latest.code }}</td>
+                        <td>{{ row.latest.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{% if row.latest.counter_total %}{{ row.latest.counter_total|intcomma }}{% else %}-{% endif %}</td>
+                        <td>{% if row.previous %}{{ row.previous.code }}{% else %}-{% endif %}</td>
+                        <td>{% if row.previous %}{{ row.previous.created_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                        <td>{% if row.previous and row.previous.counter_total %}{{ row.previous.counter_total|intcomma }}{% else %}-{% endif %}</td>
+                        <td>{% if row.shot_diff %}{{ row.shot_diff|intcomma }}{% else %}-{% endif %}</td>
+                        <td>{% if row.average_interval %}{{ row.average_interval|intcomma }}{% else %}-{% endif %}</td>
+                        <td class="analysis">{{ row.analysis }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="10" class="empty-row">有効なデータがありません。</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="note">※カウンター値が欠損している場合でも直近データとして表示します。</p>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h1>月別平均ショット差分</h1>
+                <span class="badge">製品 × 月集計</span>
+            </div>
+
+            <div class="chart-controls">
+                <label for="productSelector">製品選択:</label>
+                <select id="productSelector"></select>
+            </div>
+
+            <div class="chart-comment" id="chartComment"></div>
+
+            <div class="split-layout">
+                <div class="chart-pane">
+                    <canvas id="monthlyShotChart"></canvas>
+                </div>
+                <div class="table-pane">
+                    <button type="button" id="toggleMonthlyTable" class="toggle-btn">一覧を非表示</button>
+                    <div id="monthlyTableWrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>製品名</th>
+                                    <th>月</th>
+                                    <th>平均ショット</th>
+                                    <th>対象メンテ回数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in monthly_rows %}
+                                <tr>
+                                    <td>{{ row.task.name }}</td>
+                                    <td>{{ row.month }}</td>
+                                    <td>{{ row.average|intcomma }}</td>
+                                    <td>{{ row.samples }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="empty-row">集計可能なデータがありません。</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="note">信頼できる連続データのみで平均を計算しています。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function() {
+            const labels = JSON.parse('{{ chart_labels|default:"[]"|safe }}');
+            const datasetMap = JSON.parse('{{ chart_dataset_map|default:"{}"|safe }}');
+            const commentMap = JSON.parse('{{ chart_comments|default:"{}"|safe }}');
+            const selector = document.getElementById('productSelector');
+            const canvas = document.getElementById('monthlyShotChart');
+            const commentBox = document.getElementById('chartComment');
+
+            const products = Object.keys(datasetMap);
+            if (!labels.length || !products.length) {
+                canvas.style.display = 'none';
+                if (selector) selector.disabled = true;
+                if (commentBox) commentBox.style.display = 'none';
+                return;
+            }
+
+            products.forEach((name, idx) => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                if (idx === 0) option.selected = true;
+                selector.appendChild(option);
+            });
+
+            const ctx = canvas.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: selector.value,
+                        data: datasetMap[selector.value],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.15)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#1d4ed8',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: ctx => ` ${Number(ctx.parsed.y).toLocaleString('ja-JP')} ショット`
+                            }
+                        }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                    scales: {
+                        y: {
+                            title: { display: true, text: '平均ショット数' },
+                            ticks: { callback: value => Number(value).toLocaleString('ja-JP') }
+                        },
+                        x: { title: { display: true, text: '月' } }
+                    }
+                }
+            });
+
+            const updateComment = () => {
+                if (!commentBox) return;
+                const selected = selector.value;
+                commentBox.textContent = commentMap[selected] || "コメントはありません。";
+            };
+            updateComment();
+
+            selector.addEventListener('change', () => {
+                const selected = selector.value;
+                chart.data.datasets[0].label = selected;
+                chart.data.datasets[0].data = datasetMap[selected] || [];
+                chart.update();
+                updateComment();
+            });
+
+            const tableWrapper = document.getElementById('monthlyTableWrapper');
+            const toggleBtn = document.getElementById('toggleMonthlyTable');
+            if (toggleBtn && tableWrapper) {
+                toggleBtn.addEventListener('click', () => {
+                    const hidden = tableWrapper.style.display === 'none';
+                    tableWrapper.style.display = hidden ? 'block' : 'none';
+                    toggleBtn.textContent = hidden ? '一覧を非表示' : '一覧を表示';
+                });
+            }
+        })();
+    </script>
+    {% endblock %}
+</body>
+</html>

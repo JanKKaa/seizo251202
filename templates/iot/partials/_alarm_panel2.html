@@ -1,0 +1,59 @@
+
+
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\iot\partials\_alarm_panel2.html -->
+<div class="dashboard-alarm-area">
+  <div class="fw-bold mb-2 text-danger" style="font-size:1.2rem;">
+    <i class="bi bi-exclamation-diamond"></i> 特別警告・点検リスト
+  </div>
+  <div class="special-alarm-list">
+    {% if urgent_maintenance_list %}
+      {% for m in urgent_maintenance_list %}
+        <div class="alert alert-danger d-flex align-items-center mb-2">
+          <i class="bi bi-tools me-2"></i>
+          <span class="me-3">{{ m.machine_name }}</span>
+          <span class="badge bg-danger me-2">要緊急保全</span>
+          <span class="small text-muted"><i class="bi bi-clock"></i> {{ m.detected_time|date:"H:i" }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-success text-center mb-0">
+        <i class="bi bi-check-circle"></i> 緊急保全が必要な機械はありません。
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="mt-4">
+    <div class="fw-bold mb-2 text-primary" style="font-size:1.1rem;">
+      <i class="bi bi-clipboard-data"></i> アラーム種類別統計
+    </div>
+    <div class="row">
+      {% for stat in alarm_type_stats %}
+        <div class="col-6 col-md-4 mb-2">
+          <div class="border rounded p-2 d-flex align-items-center">
+            <span class="me-2">{{ stat.type_name }}</span>
+            <span class="badge bg-info">{{ stat.count }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <div class="fw-bold mb-2 text-secondary" style="font-size:1.1rem;">
+      <i class="bi bi-clock-history"></i> 最近の保全履歴
+    </div>
+    <ul class="list-group">
+      {% for h in recent_maintenance_history %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-box"></i> {{ h.mold_name }} 
+            <span class="text-muted small">({{ h.maintainer }})</span>
+          </span>
+          <span class="small text-muted"><i class="bi bi-clock"></i> {{ h.time|date:"m/d H:i" }}</span>
+        </li>
+      {% empty %}
+        <li class="list-group-item text-center text-muted">履歴データがありません。</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>

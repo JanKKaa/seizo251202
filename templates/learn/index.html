@@ -1,0 +1,656 @@
+{% extends "learn/base_learn.html" %}
+{% load static %}
+
+{% block title %}ダッシュボード{% endblock %}
+
+{% block content %}
+<!-- Thông báo nổi bật nếu có -->
+{% if messages %}
+    <div class="container mt-4">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} text-center fs-5 fw-bold" style="z-index:9999;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+<style>
+    body {
+        background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+        min-height: 100vh;
+    }
+    .bg-shapes {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    .shape, .icon-shape {
+        position: absolute;
+        opacity: 0.22;
+        pointer-events: none;
+    }
+    /* Hình học động phạm vi toàn màn hình, hiệu ứng riêng biệt */
+    .shape.circle1 {
+        width: 180px; height: 180px;
+        background: radial-gradient(circle at 30% 30%, #43cea2 70%, #185a9d 100%);
+        border-radius: 50%;
+        top: 8%; left: 10%;
+        animation: moveCircle1 18s ease-in-out infinite alternate;
+        animation-delay: 0s;
+    }
+    .shape.circle2 {
+        width: 120px; height: 120px;
+        background: radial-gradient(circle at 70% 70%, #f7971e 60%, #ffd200 100%);
+        border-radius: 50%;
+        top: 65%; left: 80%;
+        animation: moveCircle2 22s cubic-bezier(.68,-0.55,.27,1.55) infinite alternate;
+        animation-delay: 2s;
+    }
+    .shape.triangle {
+        width: 0; height: 0;
+        border-left: 90px solid transparent;
+        border-right: 90px solid transparent;
+        border-bottom: 160px solid #007bff;
+        top: 60%; left: 12%;
+        opacity: 0.16;
+        animation: moveTriangle 20s linear infinite alternate;
+        animation-delay: 1s;
+        transform: rotate(-12deg);
+    }
+    .shape.wave {
+        width: 320px; height: 80px;
+        background: linear-gradient(90deg, #fcb69f 0%, #a1c4fd 100%);
+        border-radius: 40px 40px 80px 80px / 40px 40px 80px 80px;
+        top: 20%; left: 60%;
+        opacity: 0.16;
+        animation: moveWave 24s ease-in-out infinite alternate;
+        animation-delay: 3s;
+    }
+    .shape.square {
+        width: 90px; height: 90px;
+        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        border-radius: 18px;
+        top: 80%; left: 35%;
+        animation: moveSquare 21s ease-in infinite alternate;
+        animation-delay: 4s;
+    }
+
+    /* Keyframes riêng biệt cho từng shape */
+    @keyframes moveCircle1 {
+        0%   { transform: translate(0, 0) scale(1);}
+        25%  { transform: translate(30vw, 10vh) scale(1.08);}
+        50%  { transform: translate(10vw, 30vh) scale(1.05);}
+        75%  { transform: translate(25vw, 20vh) scale(1.12);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveCircle2 {
+        0%   { transform: translate(0, 0) scale(1);}
+        30%  { transform: translate(-20vw, -15vh) scale(1.1);}
+        60%  { transform: translate(-10vw, 10vh) scale(0.95);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveTriangle {
+        0%   { transform: rotate(-12deg) translate(0, 0) scale(1);}
+        20%  { transform: rotate(8deg) translate(15vw, -10vh) scale(1.08);}
+        60%  { transform: rotate(-20deg) translate(10vw, 20vh) scale(1.12);}
+        100% { transform: rotate(-12deg) translate(0, 0) scale(1);}
+    }
+    @keyframes moveWave {
+        0%   { transform: translate(0, 0) scale(1);}
+        40%  { transform: translate(-25vw, 10vh) scale(1.05);}
+        80%  { transform: translate(-10vw, -15vh) scale(1.12);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveSquare {
+        0%   { transform: translate(0, 0) scale(1);}
+        25%  { transform: translate(10vw, -10vh) scale(1.05);}
+        50%  { transform: translate(20vw, 10vh) scale(1.1);}
+        75%  { transform: translate(5vw, 15vh) scale(0.98);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    /* Icon động */
+    .icon-shape {
+        font-size: 3.5rem;
+        color: #007bff;
+        opacity: 0.18;
+        animation: iconMove 12s linear infinite alternate;
+    }
+    .icon-book {
+        top: 18%; left: 35%;
+        color: #43cea2;
+        animation-delay: 0s;
+    }
+    .icon-graduation {
+        top: 70%; left: 60%;
+        color: #f7971e;
+        animation-delay: 2s;
+    }
+    .icon-lightbulb {
+        top: 40%; left: 80%;
+        color: #ffd200;
+        animation-delay: 4s;
+    }
+    .icon-pencil {
+        top: 55%; left: 25%;
+        color: #185a9d;
+        animation-delay: 6s;
+    }
+    .icon-users {
+        top: 30%; left: 60%;
+        color: #a1c4fd;
+        animation-delay: 8s;
+    }
+    /* Keyframes cho hiệu ứng */
+    @keyframes float {
+        0%   { transform: translateY(0) scale(1);}
+        100% { transform: translateY(-30px) scale(1.08);}
+    }
+    @keyframes floatRotate {
+        0%   { transform: rotate(-12deg) scale(1);}
+        100% { transform: rotate(8deg) scale(1.12);}
+    }
+    @keyframes floatSide {
+        0%   { transform: translateX(0) scale(1);}
+        100% { transform: translateX(-40px) scale(1.05);}
+    }
+    @keyframes iconMove {
+        0%   { transform: translateY(0) rotate(-8deg);}
+        100% { transform: translateY(-40px) rotate(12deg);}
+    }
+    /* Nội dung chính */
+    .dashboard-content {
+        position: relative;
+        z-index: 2;
+        min-height: 60vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding-top: 40px;
+        padding-bottom: 40px;
+    }
+    .glass-card {
+        background: linear-gradient(135deg, #185a9d 0%, #43cea2 100%);
+        border-radius: 18px;
+        box-shadow: 0 4px 16px 0 rgba(31,38,135,0.10);
+        padding: 32px 20px 28px 20px;
+        max-width: 500px;
+        width: 100%;
+        margin: 0 auto;
+        backdrop-filter: blur(2px);
+        border: 1px solid rgba(255,255,255,0.18);
+        text-align: center;
+        color: #185a9d; /* Đổi sang xanh dương đậm */
+    }
+    .glass-card h1 {
+        font-size: 2.1rem;
+        margin-bottom: 28px;
+        font-weight: 800;
+        color: #185a9d; /* Đổi sang xanh dương đậm */
+        letter-spacing: 1px;
+    }
+    .accordion-button,
+    .accordion-body,
+    .btn-custom {
+        background: transparent !important;
+        color: #185a9d !important; /* Đổi sang xanh dương đậm */
+        font-size: 1.18rem;
+        font-weight: 600;
+    }
+    .btn-custom {
+        border: 2px solid #185a9d;
+        margin: 10px 0;
+        padding: 18px 0;
+        border-radius: 12px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .btn-custom:hover {
+        background: #185a9d !important;
+        color: #fff !important;
+    }
+    .accordion-button i, .btn-custom i {
+        color: #185a9d !important;
+    }
+    .mt-3.text-muted {
+        color: #185a9d !important;
+        font-size: 1.1rem !important;
+        margin-top: 2.2rem !important;
+    }
+    /* Câu nói động lực phạm vi toàn màn hình, hiệu ứng riêng biệt */
+    .icon-quote {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        opacity: 0.95;
+        pointer-events: none;
+        width: max-content;
+        z-index: 1;
+    }
+    .icon-quote .icon-shape {
+        font-size: 3.5rem;
+        margin-bottom: 0.2em;
+    }
+    .icon-quote .quote-text {
+        font-size: 1.05rem;
+        background: rgba(255,255,255,0.8);
+        border-radius: 8px;
+        padding: 2px 12px;
+        margin-top: 2px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        white-space: nowrap;
+        font-weight: 600;
+        letter-spacing: 1px;
+        opacity: 0.95;
+        border-width: 2px;
+        border-style: solid;
+    }
+
+    /* Mỗi icon/câu nói một hiệu ứng và phạm vi khác nhau */
+    .icon-book      { left: 8vw;  top: 10vh; animation: moveBook 12s linear infinite alternate; }
+    .icon-graduation{ left: 70vw; top: 70vh; animation: moveGraduation 14s ease-in-out infinite alternate; }
+    .icon-lightbulb { left: 80vw; top: 20vh; animation: moveLightbulb 13s cubic-bezier(.68,-0.55,.27,1.55) infinite alternate; }
+    .icon-pencil    { left: 15vw; top: 60vh; animation: movePencil 11s ease-in infinite alternate; }
+    .icon-users     { left: 60vw; top: 35vh; animation: moveUsers 15s ease-in-out infinite alternate; }
+
+    /* Màu sắc riêng cho từng icon + quote */
+    .icon-book .icon-shape, .icon-book .quote-text        { color: #43cea2; border-color: #43cea2; }
+    .icon-graduation .icon-shape, .icon-graduation .quote-text  { color: #f7971e; border-color: #f7971e; }
+    .icon-lightbulb .icon-shape, .icon-lightbulb .quote-text   { color: #ffd200; border-color: #ffd200; }
+    .icon-pencil .icon-shape, .icon-pencil .quote-text      { color: #185a9d; border-color: #185a9d; }
+    .icon-users .icon-shape, .icon-users .quote-text       { color: #a1c4fd; border-color: #a1c4fd; }
+
+    /* Keyframes ngẫu nhiên cho từng icon/câu nói */
+    @keyframes moveBook {
+        0%   { transform: translate(0, 0) scale(1) rotate(-8deg);}
+        20%  { transform: translate(30vw, 10vh) scale(1.08) rotate(2deg);}
+        40%  { transform: translate(10vw, 30vh) scale(1.05) rotate(-4deg);}
+        60%  { transform: translate(25vw, 20vh) scale(1.12) rotate(6deg);}
+        100% { transform: translate(0, 0) scale(1) rotate(-8deg);}
+    }
+    @keyframes moveGraduation {
+        0%   { transform: translate(0, 0) scale(1);}
+        25%  { transform: translate(-20vw, -15vh) scale(1.1);}
+        50%  { transform: translate(-10vw, 10vh) scale(0.95);}
+        75%  { transform: translate(-25vw, 5vh) scale(1.05);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveLightbulb {
+        0%   { transform: translate(0, 0) scale(1) rotate(0);}
+        30%  { transform: translate(-15vw, 10vh) scale(1.08) rotate(10deg);}
+        60%  { transform: translate(-10vw, -15vh) scale(1.12) rotate(-8deg);}
+        100% { transform: translate(0, 0) scale(1) rotate(0);}
+    }
+    @keyframes movePencil {
+        0%   { transform: translate(0, 0) scale(1);}
+        20%  { transform: translate(10vw, -10vh) scale(1.05);}
+        50%  { transform: translate(20vw, 10vh) scale(1.1);}
+        80%  { transform: translate(5vw, 15vh) scale(0.98);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveUsers {
+        0%   { transform: translate(0, 0) scale(1);}
+        25%  { transform: translate(-10vw, 10vh) scale(1.08);}
+        50%  { transform: translate(15vw, -10vh) scale(1.03);}
+        75%  { transform: translate(-5vw, 5vh) scale(1.12);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    /* Nội dung chính */
+    .dashboard-content {
+        position: relative;
+        z-index: 2;
+        min-height: 60vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding-top: 40px;
+        padding-bottom: 40px;
+    }
+    .glass-card {
+        background: linear-gradient(135deg, #91b2f7ff 0%, #86f5d2ff 100%);
+        border-radius: 18px;
+        box-shadow: 0 4px 16px 0 rgba(31,38,135,0.10);
+        padding: 32px 20px 28px 20px;
+        max-width: 500px;
+        width: 100%;
+        margin: 0 auto;
+        backdrop-filter: blur(2px);
+        border: 1px solid rgba(255,255,255,0.18);
+        text-align: center;
+        color: #185a9d; /* Đổi sang xanh dương đậm */
+    }
+    .glass-card h1 {
+        font-size: 2.1rem;
+        margin-bottom: 28px;
+        font-weight: 800;
+        color: #185a9d; /* Đổi sang xanh dương đậm */
+        letter-spacing: 1px;
+    }
+    .accordion-button,
+    .accordion-body,
+    .btn-custom {
+        background: transparent !important;
+        color: #185a9d !important; /* Đổi sang xanh dương đậm */
+        font-size: 1.18rem;
+        font-weight: 600;
+    }
+    .btn-custom {
+        border: 2px solid #185a9d;
+        margin: 10px 0;
+        padding: 18px 0;
+        border-radius: 12px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .btn-custom:hover {
+        background: #185a9d !important;
+        color: #fff !important;
+    }
+    .accordion-button i, .btn-custom i {
+        color: #185a9d !important;
+    }
+    .mt-3.text-muted {
+        color: #185a9d !important;
+        font-size: 1.1rem !important;
+        margin-top: 2.2rem !important;
+    }
+    /* Câu nói động lực phạm vi toàn màn hình, hiệu ứng riêng biệt */
+    .icon-quote {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        opacity: 0.95;
+        pointer-events: none;
+        width: max-content;
+        z-index: 1;
+    }
+    .icon-quote .icon-shape {
+        font-size: 3.5rem;
+        margin-bottom: 0.2em;
+    }
+    .icon-quote .quote-text {
+        font-size: 1.05rem;
+        background: rgba(255,255,255,0.8);
+        border-radius: 8px;
+        padding: 2px 12px;
+        margin-top: 2px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        white-space: nowrap;
+        font-weight: 600;
+        letter-spacing: 1px;
+        opacity: 0.95;
+        border-width: 2px;
+        border-style: solid;
+    }
+
+    /* Các icon lớn thay cho shape nền */
+    .big-bg-icon {
+        position: absolute;
+        opacity: 0.13;
+        font-size: 11vw;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .icon-bg1 { left: 5vw;  top: 8vh;  color: #f3e62aff; animation: bgMove1 18s linear infinite alternate; }
+    .icon-bg2 { left: 70vw; top: 10vh; color: #ca9127ff; animation: bgMove2 22s ease-in-out infinite alternate; }
+    .icon-bg3 { left: 15vw; top: 65vh; color: #e44ab6ff; animation: bgMove3 20s cubic-bezier(.68,-0.55,.27,1.55) infinite alternate; }
+    .icon-bg4 { left: 80vw; top: 70vh; color: #37eb91ff; animation: bgMove4 24s linear infinite alternate; }
+    .icon-bg5 { left: 50vw; top: 40vh; color: #62cf53ff; animation: bgMove5 21s ease-in infinite alternate; }
+
+    @keyframes bgMove1 {
+        0%   { transform: translate(0, 0) scale(1);}
+        50%  { transform: translate(20vw, 10vh) scale(1.08);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes bgMove2 {
+        0%   { transform: translate(0, 0) scale(1);}
+        40%  { transform: translate(-15vw, 15vh) scale(1.1);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes bgMove3 {
+        0%   { transform: translate(0, 0) scale(1);}
+        60%  { transform: translate(10vw, -20vh) scale(1.12);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes bgMove4 {
+        0%   { transform: translate(0, 0) scale(1);}
+        30%  { transform: translate(-20vw, -10vh) scale(1.05);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes bgMove5 {
+        0%   { transform: translate(0, 0) scale(1);}
+        50%  { transform: translate(10vw, 10vh) scale(1.1);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+
+    .icon-industry    { left: 20vw; top: 15vh; animation: moveIndustry 16s linear infinite alternate; }
+    .icon-cogs        { left: 75vw; top: 25vh; animation: moveCogs 18s ease-in-out infinite alternate; }
+    .icon-check       { left: 30vw; top: 75vh; animation: moveCheck 17s cubic-bezier(.68,-0.55,.27,1.55) infinite alternate; }
+    .icon-tools       { left: 60vw; top: 60vh; animation: moveTools 19s linear infinite alternate; }
+    .icon-certificate { left: 45vw; top: 50vh; animation: moveCertificate 20s ease-in infinite alternate; }
+
+    .icon-industry .icon-shape, .icon-industry .quote-text         { color: #185a9d; border-color: #185a9d; }
+    .icon-cogs .icon-shape, .icon-cogs .quote-text                 { color: #f7971e; border-color: #f7971e; }
+    .icon-check .icon-shape, .icon-check .quote-text               { color: #43cea2; border-color: #43cea2; }
+    .icon-tools .icon-shape, .icon-tools .quote-text               { color: #ffd200; border-color: #ffd200; }
+    .icon-certificate .icon-shape, .icon-certificate .quote-text   { color: #a1c4fd; border-color: #a1c4fd; }
+
+    @keyframes moveIndustry {
+        0%   { transform: translate(0, 0) scale(1);}
+        50%  { transform: translate(18vw, 12vh) scale(1.08);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveCogs {
+        0%   { transform: translate(0, 0) scale(1);}
+        40%  { transform: translate(-12vw, 18vh) scale(1.1);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveCheck {
+        0%   { transform: translate(0, 0) scale(1);}
+        60%  { transform: translate(8vw, -18vh) scale(1.12);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveTools {
+        0%   { transform: translate(0, 0) scale(1);}
+        30%  { transform: translate(-15vw, -10vh) scale(1.05);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+    @keyframes moveCertificate {
+        0%   { transform: translate(0, 0) scale(1);}
+        50%  { transform: translate(10vw, 10vh) scale(1.1);}
+        100% { transform: translate(0, 0) scale(1);}
+    }
+
+    .dashboard-footer {
+        width: 100%;
+        margin-top: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        position: relative;
+    }
+   
+        /* ...existing CSS... */
+    .clock-box {
+        background: rgba(255,255,255,0.85);
+        border-radius: 12px;
+        padding: 8px 8px;
+        font-size: 2.0rem;
+        font-weight: 700;
+        color: #185a9d;
+        box-shadow: 0 2px 8px rgba(31,38,135,0.07);
+        margin-bottom: 12px;
+        letter-spacing: 2px;
+        min-width: 260px;
+        text-align: center;
+    }
+    .calendar-box {
+        background: rgba(255,255,255,0.85);
+        border-radius: 12px;
+        padding: 4px 3px;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #185a9d;
+        box-shadow: 0 2px 8px rgba(31,38,135,0.07);
+        text-align: center;
+        min-width: 260px;
+    }
+
+    .custom-link {
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: 0.2s;
+    }
+
+    .custom-link:hover {
+        background-color: #f0f8ff;
+        transform: translateX(4px);
+    }
+
+
+
+</style>
+<div class="bg-shapes">
+    <!-- Icon nền lớn liên quan đến sản xuất, QC, tay nghề, ISO -->
+    <i class="fas fa-industry big-bg-icon icon-bg1"></i>           <!-- Sản xuất -->
+    <i class="fas fa-cogs big-bg-icon icon-bg2"></i>               <!-- Máy móc, sản xuất -->
+    <i class="fas fa-check-circle big-bg-icon icon-bg3"></i>       <!-- QC -->
+    <i class="fas fa-tools big-bg-icon icon-bg4"></i>              <!-- Tay nghề -->
+    <i class="fas fa-certificate big-bg-icon icon-bg5"></i>        <!-- ISO, chứng chỉ -->
+    <!-- Các icon động kèm câu nói như cũ -->
+    <div class="icon-quote icon-book">
+        <i class="fas fa-book icon-shape"></i>
+        <span class="quote-text">「学び続ける者が成長する」</span>
+    </div>
+    <div class="icon-quote icon-graduation">
+        <i class="fas fa-clipboard-check icon-shape"></i>
+        <span class="quote-text">「品質は細部に宿る」</span>
+    </div>
+    <div class="icon-quote icon-lightbulb">
+        <i class="fas fa-tools icon-shape"></i>
+        <span class="quote-text">「技術は努力から生まれる」</span>
+    </div>
+    <div class="icon-quote icon-pencil">
+        <i class="fas fa-certificate icon-shape"></i>
+        <span class="quote-text">「IATFを通じて未来を築こう」</span>
+    </div>
+    <div class="icon-quote icon-users">
+        <i class="fas fa-users icon-shape"></i>
+        <span class="quote-text">「共に学び、共に成長しよう」</span>
+    </div>
+    <!-- Icon động lực mới liên quan sản xuất, QC, tay nghề, ISO -->
+    <div class="icon-quote icon-industry">
+        <i class="fas fa-industry icon-shape"></i>
+        <span class="quote-text">「現場で学び、現場で活かす」</span>
+    </div>
+    <div class="icon-quote icon-cogs">
+        <i class="fas fa-cogs icon-shape"></i>
+        <span class="quote-text">「改善は無限大」</span>
+    </div>
+    <div class="icon-quote icon-check">
+        <i class="fas fa-check-circle icon-shape"></i>
+        <span class="quote-text">「品質は細部に宿る」</span>
+    </div>
+    <div class="icon-quote icon-tools">
+        <i class="fas fa-tools icon-shape"></i>
+        <span class="quote-text">「技術は努力から生まれる」</span>
+    </div>
+    <div class="icon-quote icon-certificate">
+        <i class="fas fa-certificate icon-shape"></i>
+        <span class="quote-text">「ISOで未来を築こう」</span>
+    </div>
+</div>
+<div class="dashboard-overlay"></div>
+<div class="dashboard-content">
+    <div class="glass-card">
+        <h1>講習・研修ダッシュボード</h1>
+        <div class="accordion" id="mainAccordion">
+            <!-- 検定 
+            <div class="accordion-item mb-2">
+                <h2 class="accordion-header" id="headingKentei">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKentei" aria-expanded="true" aria-controls="collapseKentei">
+                        <i class="fas fa-certificate"></i> 検定
+                    </button>
+                </h2>
+                <div id="collapseKentei" class="accordion-collapse collapse" aria-labelledby="headingKentei" data-bs-parent="#mainAccordion">
+                    <div class="accordion-body btn-group-vertical">
+                        <a href="https://webdesk.jsa.or.jp/common/W10K0500/index/qc/" target="_blank" class="btn btn-custom"><i class="fas fa-flask"></i>QC検定</a>
+                        <a href="https://nagano-pma.jp/" target="_blank" class="btn btn-custom"><i class="fas fa-cogs"></i>プラスチック成形試験</a>
+                    </div>
+                </div>
+            </div> -->
+            <!-- 講習研修 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingKenshu">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKenshu" aria-expanded="false" aria-controls="collapseKenshu">
+                        <i class="fas fa-chalkboard-teacher"></i> 講習研修
+                    </button>
+                </h2>
+               <div id="collapseKenshu" class="accordion-collapse collapse" aria-labelledby="headingKenshu" data-bs-parent="#mainAccordion">
+                    <div class="accordion-body d-flex flex-column gap-2">
+
+                        <a href="https://www.opmia.jp/seminar/seminar_type/online"
+                        target="_blank"
+                        class="btn btn-light text-start shadow-sm custom-link">
+                            <i class="fas fa-school me-2 text-primary"></i>
+                            大阪府工業協会オンラインセミナー
+                        </a>
+
+                        <a href="https://www.insource.co.jp/bup/online-seminar.html"
+                        target="_blank"
+                        class="btn btn-light text-start shadow-sm custom-link">
+                            <i class="fas fa-video me-2 text-danger"></i>
+                            インソースオンラインセミナー
+                        </a>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3 text-muted" style="font-size:0.92rem;">
+            社内の成長と学びをサポートします
+        </div>
+    </div>
+   
+</div>
+ <!-- Thêm lịch và đồng hồ ở dưới cùng -->
+    <div class="dashboard-footer mt-4">
+        <div class="clock-box" id="clock-box">
+            --:--:--
+        </div>
+        <div class="calendar-box" id="calendar-box">
+            ----年--月--日 (---)
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateClockAndCalendar() {
+    const now = new Date();
+    // Đồng hồ
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('clock-box').textContent = `${h}:${m}:${s}`;
+    // Lịch
+    const y = now.getFullYear();
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const weekdayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const wd = weekdayNames[now.getDay()];
+    document.getElementById('calendar-box').textContent = `${y}年${mo}月${d}日 (${wd})`;
+}
+document.addEventListener('DOMContentLoaded', function() {
+    updateClockAndCalendar();
+    setInterval(updateClockAndCalendar, 1000);
+});
+</script>
+{% endblock %}

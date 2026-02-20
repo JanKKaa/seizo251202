@@ -1,0 +1,276 @@
+{% load static %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  /* Gadget weather card in header */
+  .header-gadget {
+    display:flex; align-items:center; gap:4px;                 /* trước 6px */
+    background: linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 8px;
+    padding: 2px 4px;                                          /* trước 3px 6px */
+    color:#fff !important;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 3px 8px -6px rgba(0,0,0,.28);
+  }
+  .header-gadget .icon {
+    font-size: .65rem; width: 16px; text-align:center;         /* nhỏ hơn chút */
+  }
+  .header-gadget .data {
+    display:flex; flex-direction:column; line-height:1.1;
+  }
+  .header-gadget .top {
+    display:flex; align-items:center; gap:4px; font-weight:700;
+  }
+  .header-gadget .temp { font-size:.65rem; }
+  .header-gadget .city { font-size:.55rem; }
+  .header-gadget .bottom {
+    display:flex; align-items:center; gap:4px; font-size:.72rem; opacity:.85; /* trước .78rem */
+  }
+  .header-gadget .sep { padding: 0 3px; }
+
+  .dashboard-header-title, .dashboard-header-title * {
+    text-shadow:0 1px 2px rgba(0,0,0,.35);
+    font-weight:700; letter-spacing:.03rem; white-space:nowrap;
+    font-size:.9rem;                                           /* thêm: thu nhỏ chữ tiêu đề */
+  }
+  .brand-logo img { height:20px; transition:.25s; }            /* trước 28px */
+  .brand-logo img:hover { transform:scale(0.7); }
+
+  /* Thu nhỏ trên màn hẹp */
+  @media (max-width: 900px) {
+    .dashboard-header-title { font-size:.8rem; }
+    .header-gadget { gap:3px; padding:2px 4px; font-size:.75rem; }
+    .header-gadget .city { display:none; }
+    .header-gadget .bottom { gap:3px; font-size:.7rem; }
+  }
+
+  .header-wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 6px; height: 44px; gap: 8px;                    /* giảm padding + height + gap */
+  }
+  .header-left { display: flex; align-items: center; gap: 6px; flex:1 1 auto; min-width:0; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex:0 0 auto; }
+
+  /* Nút header nhỏ gọn */
+  #switchScreenBtn,
+  #theme-toggle-btn {
+    --btn-h: 20px;
+    height: var(--btn-h);
+    padding: 1px 6px;
+    font-size: .5rem;
+    line-height: 1;
+    border-radius: 8px;
+
+    background: linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    border: 1px solid rgba(255,255,255,.35);
+    color: #fff;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 3px 8px -6px rgba(0,0,0,.28);
+    transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  #switchScreenBtn i,
+  #theme-toggle-btn i {
+    font-size: .75rem;
+  }
+
+
+
+  /* Trên màn rất hẹp, thu nhỏ thêm */
+  @media (max-width: 900px) {
+    #switchScreenBtn,
+    #theme-toggle-btn {
+      --btn-h: 20px;
+      padding: 1px 5px;
+      font-size: .45rem;
+      border-radius: 7px;
+      backdrop-filter: blur(5px);
+    }
+    #switchScreenBtn i,
+    #theme-toggle-btn i {
+      font-size: .65rem;
+    }
+  }
+
+  .brand-logo .logo-svg { height:30px; width:auto; transition:.25s; }
+  .brand-logo .logo-svg:hover { transform:scale(1); }
+
+  #switchScreenBtn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  }
+
+</style>
+
+<div class="header-wrap">
+  <!-- Trái: tiêu đề công ty -->
+  <div class="header-left">
+
+    <div class="dashboard-header-title">
+      
+      <span class="divider">  </span><span class="dept">製造部</span>
+      <span class="divider">｜</span><span class="sys">成形機管理システム</span>
+    </div>
+  </div>
+
+  <!-- Phải: gadget thời tiết + logo (sát phải) -->
+  <div class="header-right">
+    <div class="header-gadget" id="weatherGadget">
+      <span class="icon" id="wgIcon"><i class="fas fa-cloud-sun"></i></span>
+      <div class="data">       
+        <div class="bottom">
+          <span class="temp" id="wgTemp">--°C</span>
+          <span class="city" id="wgCity">Minowa, Nagano</span>
+          <span class="cond" id="wgCond">—</span>
+          <span class="sep">|</span>
+          <span class="hum" id="wgHum">湿度 --%</span>
+          <span class="sep">|</span>
+          <span class="wind" id="wgWind">風 -- m/s</span>
+          <span class="sep">|</span>
+          <span class="updated" id="wgUpdated">更新 --:--</span>
+        </div>
+      </div>
+    </div>
+    <div class="brand-logo">
+      <svg class="logo-svg" width="120" height="36" viewBox="0 0 1510 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.48438" width="173.952" height="331.967" fill="currentColor"/>
+      <rect x="527.661" width="173.952" height="331.967" fill="currentColor"/>
+      <rect x="991.534" width="173.952" height="331.967" fill="currentColor"/>
+      <rect x="177.437" y="138.424" width="350.224" height="29.5082" fill="currentColor"/>
+      <rect x="701.613" width="753.794" height="29.5082" fill="currentColor"/>
+      <path d="M10.4013 444V338.545H29.5046V383.189H78.37V338.545H97.5249V444H78.37V399.202H29.5046V444H10.4013ZM136.194 444H115.803L152.929 338.545H176.512L213.689 444H193.298L165.132 360.172H164.308L136.194 444ZM136.863 402.652H192.474V417.997H136.863V402.652ZM213.958 338.545H235.533L261.33 385.197H262.36L288.157 338.545H309.732L271.371 404.661V444H252.319V404.661L213.958 338.545ZM330.392 444H310.001L347.127 338.545H370.71L407.887 444H387.496L359.33 360.172H358.506L330.392 444ZM331.061 402.652H386.672V417.997H331.061V402.652ZM481.737 367.535C481.257 363.038 479.231 359.537 475.661 357.031C472.126 354.525 467.526 353.272 461.862 353.272C457.88 353.272 454.464 353.873 451.615 355.074C448.766 356.276 446.586 357.906 445.075 359.966C443.565 362.026 442.793 364.377 442.758 367.02C442.758 369.217 443.256 371.122 444.251 372.736C445.281 374.349 446.672 375.722 448.422 376.855C450.173 377.954 452.113 378.88 454.241 379.636C456.369 380.391 458.515 381.026 460.677 381.541L470.564 384.012C474.546 384.939 478.373 386.192 482.046 387.771C485.754 389.35 489.066 391.341 491.984 393.744C494.936 396.147 497.271 399.048 498.987 402.446C500.703 405.845 501.561 409.827 501.561 414.392C501.561 420.571 499.982 426.012 496.824 430.715C493.666 435.384 489.101 439.04 483.128 441.683C477.189 444.292 469.997 445.596 461.553 445.596C453.348 445.596 446.225 444.326 440.184 441.786C434.176 439.246 429.473 435.538 426.075 430.664C422.711 425.789 420.892 419.85 420.617 412.848H439.411C439.686 416.521 440.819 419.576 442.81 422.013C444.801 424.45 447.392 426.27 450.585 427.471C453.812 428.673 457.416 429.273 461.398 429.273C465.552 429.273 469.191 428.656 472.314 427.42C475.472 426.15 477.944 424.399 479.729 422.168C481.514 419.902 482.424 417.259 482.458 414.238C482.424 411.492 481.617 409.226 480.038 407.441C478.459 405.622 476.245 404.111 473.396 402.91C470.581 401.674 467.285 400.576 463.509 399.614L451.512 396.525C442.827 394.294 435.961 390.912 430.915 386.381C425.903 381.815 423.397 375.757 423.397 368.205C423.397 361.991 425.079 356.55 428.444 351.882C431.842 347.213 436.459 343.592 442.295 341.017C448.13 338.408 454.739 337.104 462.119 337.104C469.602 337.104 476.159 338.408 481.789 341.017C487.453 343.592 491.898 347.179 495.125 351.779C498.352 356.344 500.017 361.596 500.12 367.535H481.737ZM522.942 444V338.545H542.046V383.189H590.911V338.545H610.066V444H590.911V399.202H542.046V444H522.942ZM654.296 338.545V444H635.193V338.545H654.296ZM795.649 354.559V338.545H879.786V354.559H847.192V444H828.243V354.559H795.649ZM900.356 444V338.545H968.942V354.559H919.459V383.189H965.389V399.202H919.459V427.986H969.354V444H900.356ZM1083.05 374.126H1063.79C1063.24 370.968 1062.23 368.17 1060.75 365.733C1059.27 363.261 1057.44 361.167 1055.24 359.451C1053.04 357.735 1050.54 356.447 1047.72 355.589C1044.94 354.697 1041.94 354.25 1038.71 354.25C1032.98 354.25 1027.9 355.692 1023.47 358.576C1019.04 361.425 1015.58 365.613 1013.07 371.14C1010.56 376.632 1009.31 383.343 1009.31 391.273C1009.31 399.34 1010.56 406.137 1013.07 411.663C1015.61 417.156 1019.08 421.309 1023.47 424.124C1027.9 426.905 1032.96 428.295 1038.66 428.295C1041.82 428.295 1044.77 427.883 1047.52 427.059C1050.3 426.201 1052.79 424.948 1054.98 423.3C1057.21 421.653 1059.09 419.627 1060.6 417.224C1062.14 414.821 1063.21 412.075 1063.79 408.986L1083.05 409.089C1082.33 414.101 1080.76 418.804 1078.36 423.197C1075.99 427.591 1072.89 431.47 1069.04 434.835C1065.2 438.164 1060.7 440.773 1055.55 442.661C1050.4 444.515 1044.69 445.442 1038.4 445.442C1029.13 445.442 1020.86 443.296 1013.58 439.005C1006.31 434.714 1000.57 428.518 996.386 420.417C992.198 412.316 990.104 402.601 990.104 391.273C990.104 379.91 992.216 370.196 996.438 362.129C1000.66 354.027 1006.41 347.831 1013.69 343.54C1020.96 339.249 1029.2 337.104 1038.4 337.104C1044.27 337.104 1049.73 337.928 1054.78 339.575C1059.82 341.223 1064.32 343.643 1068.27 346.836C1072.22 349.994 1075.46 353.873 1078 358.473C1080.57 363.038 1082.26 368.256 1083.05 374.126ZM1104.89 444V338.545H1123.99V383.189H1172.86V338.545H1192.01V444H1172.86V399.202H1123.99V444H1104.89ZM1303.8 338.545V444H1286.81L1237.12 372.169H1236.24V444H1217.14V338.545H1234.24L1283.87 410.428H1284.8V338.545H1303.8ZM1423.2 391.273C1423.2 402.635 1421.07 412.367 1416.81 420.468C1412.59 428.535 1406.82 434.714 1399.51 439.005C1392.23 443.296 1383.98 445.442 1374.74 445.442C1365.51 445.442 1357.24 443.296 1349.92 439.005C1342.65 434.68 1336.88 428.484 1332.62 420.417C1328.4 412.316 1326.29 402.601 1326.29 391.273C1326.29 379.91 1328.4 370.196 1332.62 362.129C1336.88 354.027 1342.65 347.831 1349.92 343.54C1357.24 339.249 1365.51 337.104 1374.74 337.104C1383.98 337.104 1392.23 339.249 1399.51 343.54C1406.82 347.831 1412.59 354.027 1416.81 362.129C1421.07 370.196 1423.2 379.91 1423.2 391.273ZM1403.99 391.273C1403.99 383.274 1402.74 376.529 1400.23 371.037C1397.76 365.51 1394.33 361.339 1389.93 358.524C1385.54 355.675 1380.48 354.25 1374.74 354.25C1369.01 354.25 1363.95 355.675 1359.55 358.524C1355.16 361.339 1351.71 365.51 1349.2 371.037C1346.73 376.529 1345.5 383.274 1345.5 391.273C1345.5 399.271 1346.73 406.034 1349.2 411.56C1351.71 417.053 1355.16 421.224 1359.55 424.073C1363.95 426.888 1369.01 428.295 1374.74 428.295C1380.48 428.295 1385.54 426.888 1389.93 424.073C1394.33 421.224 1397.76 417.053 1400.23 411.56C1402.74 406.034 1403.99 399.271 1403.99 391.273Z" fill="currentColor"/>
+      </svg>
+    </div>
+    <button id="switchScreenBtn" class="btn btn-sm me-2" style="background:transparent;">
+      <img src="{% static 'img/G-TECH1.png' %}" alt="G-TECH" style="height:30px;width:auto;">
+    </button>
+
+   
+  </div>
+</div>
+
+
+
+<script>
+  const LAT = 35.989, LON = 137.981; // Minowa, Nagano
+  const CURRENT_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=Asia%2FTokyo`;
+  const HOURLY_URL  = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation,snowfall,weather_code&timezone=Asia%2FTokyo`;
+
+  const iconMap = (code) => {
+    const c = Number(code);
+    if (c===0) return 'fa-sun';
+    if ([1,2].includes(c)) return 'fa-cloud-sun';
+    if (c===3) return 'fa-cloud';
+    if ([45,48].includes(c)) return 'fa-smog';
+    if ([51,53,55,56,57,80,81,82].includes(c)) return 'fa-cloud-showers-heavy';
+    if ([61,63,65,66,67].includes(c)) return 'fa-cloud-rain';
+    if ([71,73,75,77,85,86].includes(c)) return 'fa-snowflake';
+    if ([95,96,99].includes(c)) return 'fa-bolt';
+    return 'fa-cloud-sun';
+  };
+  const descMap = (code) => {
+    const m = {
+      0:'快晴',1:'晴れ',2:'一時曇り',3:'曇り',
+      45:'霧',48:'霧氷',
+      51:'弱い霧雨',53:'霧雨',55:'強い霧雨',56:'弱い着氷霧雨',57:'強い着氷霧雨',
+      61:'弱い雨',63:'雨',65:'強い雨',66:'弱い着氷雨',67:'強い着氷霧雨',
+      71:'弱い雪',73:'雪',75:'強い雪',77:'雪結晶',
+      80:'にわか雨',81:'雨',82:'激しい雨',
+      85:'にわか雪',86:'激しい雪',
+      95:'雷雨',96:'雷雨(雹)',99:'激しい雷雨(雹)'
+    };
+    return m[Number(code)] ?? '—';
+  };
+
+  async function loadCurrent() {
+    try {
+      const r = await fetch(CURRENT_URL, { cache: 'no-store' });
+      const d = await r.json();
+      const cur = d.current || {};
+      const temp = Math.round(cur.temperature_2m ?? 0);
+      const hum = Math.round(cur.relative_humidity_2m ?? 0);
+      const wind = Math.round(cur.wind_speed_10m ?? 0);
+      const wcode = cur.weather_code ?? 3;
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      document.getElementById('wgTemp').textContent = `${temp}°C`;
+      document.getElementById('wgCity').textContent = 'Minowa, Nagano';
+      document.getElementById('wgCond').textContent = descMap(wcode);
+      document.getElementById('wgHum').textContent = `湿度 ${hum}%`;
+      document.getElementById('wgWind').textContent = `風 ${wind} m/s`;
+      document.getElementById('wgUpdated').textContent = `更新 ${time}`;
+      document.getElementById('wgIcon').innerHTML = `<i class="fas ${iconMap(wcode)}"></i>`;
+    } catch {
+      document.getElementById('wgCond').textContent = 'データ取得不可';
+    }
+  }
+
+  function nearestIndexTo1730Today(times) {
+    const JSToffset = 9 * 60 * 60 * 1000;
+    const now = new Date();
+    const target = new Date(now);
+    target.setHours(17,30,0,0);
+    let bestIdx = -1, bestDiff = Infinity;
+    for (let i=0;i<times.length;i++){
+      const t = new Date(times[i]);              // ISO -> Date (UTC)
+      const tJST = new Date(t.getTime() + JSToffset); // xem theo JST
+      if (tJST.getFullYear()===target.getFullYear() &&
+          tJST.getMonth()===target.getMonth() &&
+          tJST.getDate()===target.getDate()) {
+        const diff = Math.abs(tJST - target);
+        if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+      }
+    }
+    return bestIdx; // có thể là 17:00 hoặc 18:00 nếu không có 17:30
+  }
+
+  async function loadForecast1730() {
+    try {
+      const r = await fetch(HOURLY_URL, { cache: 'no-store' });
+      const d = await r.json();
+      const hourly = d.hourly || {};
+      const times = hourly.time || [];
+      let idx = nearestIndexTo1730Today(times);
+      if (idx === -1) throw new Error('今日の近傍時刻なし');
+
+      const temp = Math.round(hourly.temperature_2m[idx] ?? 0);
+      const rain = (hourly.precipitation[idx] ?? 0); // mm
+      const snow = (hourly.snowfall[idx] ?? 0);      // cm
+      const wcode = hourly.weather_code[idx] ?? 3;
+
+      // Nhãn thời gian thực tế từ API (hiển thị theo JST, HH:mm)
+      const t = new Date(times[idx]);
+      const tJST = new Date(t.getTime() + 9*60*60*1000);
+      const label = `今日 ${tJST.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+      const timeEl = document.querySelector('#forecast1730 .time');
+      const fcTemp = document.getElementById('fcTemp');
+      const fcRain = document.getElementById('fcRain');
+      const fcSnow = document.getElementById('fcSnow');
+      const fcCond = document.getElementById('fcCond');
+      if (!timeEl || !fcTemp || !fcRain || !fcSnow || !fcCond) return;
+
+      timeEl.textContent = label;
+      fcTemp.textContent = `${temp}°C`;
+      fcRain.textContent = `雨 ${rain} mm`;
+      fcSnow.textContent = `雪 ${snow} cm`;
+      fcCond.textContent = descMap(wcode);
+    } catch {
+      const timeEl = document.querySelector('#forecast1730 .time');
+      const fcCond = document.getElementById('fcCond');
+      if (timeEl) timeEl.textContent = '今日 17:30';
+      if (fcCond) fcCond.textContent = '予報取得不可';
+    }
+  }
+
+  function refreshAll(){
+    loadCurrent();       // thời tiết hiện tại
+    loadForecast1730();  // dự báo mốc gần 17:30 hôm nay
+  }
+  refreshAll();
+  setInterval(refreshAll, 5 * 60 * 1000); // cập nhật mỗi 5 phút
+</script>

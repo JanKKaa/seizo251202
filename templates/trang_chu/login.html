@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン</title>
+    {% load static %}
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="{% static 'css/custom.css' %}" rel="stylesheet">
+    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+    <style>
+        body, html {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gradient-primary">
+    <div class="container">
+        <!-- Outer Row -->
+        <div class="row justify-content-center">
+            <div class="col-xl-10 col-lg-12 col-md-9">
+                <div class="card o-hidden border-0 shadow-lg my-5">
+                    <div class="card-body p-0">
+                        <!-- Nested Row within Card Body -->
+                        <div class="row">
+                            <div class="col-lg-6 d-none d-lg-block bg-register-image">
+                                <img src="{% static 'img/logo1.png' %}" alt="Company Logo" class="img-fluid mx-auto d-block" style="max-width: 80%; margin-top: 20%;">
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="p-5">
+                                    <div class="text-center">
+                                        <h1 class="h4 text-gray-900 mb-4">お帰りなさい!</h1>
+                                    </div>
+                                    <form class="user" method="post" action="{% url 'login' %}">
+                                        {% csrf_token %}
+                                        <div class="form-group">
+                                            <input type="text" name="username" class="form-control form-control-user" placeholder="ユーザー名を入力...">
+                                        </div>
+                                        <div class="form-group position-relative">
+                                            <input type="password" name="password" id="password-input" class="form-control form-control-user" placeholder="パスワード">
+                                            <button type="button" class="btn btn-link position-absolute" style="top:8px; right:10px; color:#888;" tabindex="-1" onclick="togglePassword()">
+                                                <i class="fas fa-eye" id="toggle-password-icon"></i>
+                                            </button>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-user btn-block">
+                                            ログイン
+                                        </button>
+                                    </form>
+                                    <hr>
+                                    <div class="text-center">
+                                        <a class="small" href="#">パスワードをお忘れですか?</a>
+                                    </div>
+                                    <div class="text-center">
+                                        <a class="small" href="{% url 'register' %}">アカウントを作成する!</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+    <script>
+    function togglePassword() {
+        const input = document.getElementById('password-input');
+        const icon = document.getElementById('toggle-password-icon');
+        if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = "password";
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!-- filepath: c:\Users\Shin\Downloads\seizo0 250325\seizo0\trang_chu\templates\mente\checker.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}検査員リストの管理{% endblock %}
+
+{% block content %}
+{% if request.user.is_superuser %}
+<h1 class="h3 mb-4 text-gray-800">担当者の管理</h1>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">新しい担当者を追加</h6>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="checker_name">担当者:</label>
+                <input type="text" id="checker_name" name="checker_name" class="form-control" placeholder="検査員名を入力してください" required>
+            </div>
+            <button type="submit" class="btn btn-primary">追加</button>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">担当者リスト</h6>
+    </div>
+    <div class="card-body">
+        <ul class="list-group">
+            {% for checker in checkers %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ checker.name }}
+                <a href="{% url 'delete_checker' checker.id %}" class="btn btn-danger btn-sm" onclick="return confirm('この検査員を削除してもよろしいですか？');">削除</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% else %}
+<p class="text-danger">このページにアクセスする権限がありません。</p>
+{% endif %}
+{% endblock %}

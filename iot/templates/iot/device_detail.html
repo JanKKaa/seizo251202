@@ -1,0 +1,206 @@
+{% extends "iot/base_iot.html" %}
+{% block title %}Thiết bị {{ machine.address }}{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  #shotChart { max-height:300px; }
+  .chart-wrapper { position:relative; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h5 class="mb-3">Thiết bị: {{ machine.address }}</h5>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header py-2">Runtime (NET100)</div>
+      <div class="card-body small">
+        <p class="mb-1">Name (RT): <strong>{{ runtime_name }}</strong>
+          {% if name_diff %}<span class="badge text-bg-warning text-dark ms-1">DB: {{ machine.name }}</span>{% endif %}
+        </p>
+        <p class="mb-1">Cond (RT): <strong>{{ runtime_condname }}</strong>
+          {% if condname_diff %}<span class="badge text-bg-info ms-1">DB: {{ machine.condname }}</span>{% endif %}
+        </p>
+        <p class="mb-1">Trạng thái: <strong>{{ runtime.runtime_status_jp }}</strong>
+          {% if runtime.alarm_active %}<span class="badge text-bg-danger ms-2">ALARM</span>{% endif %}
+        </p>
+        <p class="mb-1">Shot hiện tại: <strong>{{ runtime.shotno|default:"-" }}</strong></p>
+        <p class="mb-1">Cycle time: <strong>{{ runtime.cycletime|default:"-" }}</strong></p>
+        <p class="mb-0">Offline: {% if runtime.offline %}<span class="text-danger">YES</span>{% else %}No{% endif %}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header py-2">Thông tin DB</div>
+      <div class="card-body small">
+        <p class="mb-1">Active: {% if machine.active %}<span class="badge text-bg-success">ON</span>{% else %}<span class="badge text-bg-secondary">OFF</span>{% endif %}</p>
+        <p class="mb-1">Shot total (DB): {{ machine.shot_total }}</p>
+        <p class="mb-1">Last shot (DB): {{ machine.last_shot }}</p>
+        <p class="mb-0">Last update DB: {{ machine.last_update|date:"Y-m-d H:i:s" }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="my-4">
+<h6 class="mb-2">Biểu đồ Shot Realtime</h6>
+<div class="card shadow-sm p-3 mb-4">
+  <canvas id="shotChart"></canvas>
+  <div class="small text-muted mt-2">Cập nhật mỗi 5s.</div>
+</div>
+
+<h6 class="mb-2">Linh kiện & Bảo dưỡng</h6>
+<div class="card shadow-sm">
+  <div class="card-body p-2">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Tên</th>
+            <th>Mã</th>
+            <th>Mã QL</th>
+            <th>NSX</th>
+            <th>Lifetime</th>
+            <th>Used</th>
+            <th>Remain</th>
+            <th>%</th>
+            <th>ETA</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for row in components_enriched %}
+          {% with p=row.prediction %}
+          <tr class="{% if row.status_level == 'danger' %}table-danger{% elif row.status_level == 'warning' %}table-warning{% endif %}">
+            <td>{{ forloop.counter }}</td>
+            <td class="small">{{ row.obj.name }}</td>
+            <td class="small">{{ row.obj.code }}</td>
+            <td class="small">{{ row.obj.management_code }}</td>
+            <td class="small">{{ row.obj.manufacturer }}</td>
+            <td class="text-end">{{ row.lifetime|default:"-" }}</td>
+            <td class="text-end">{% if p.used != None %}{{ p.used }}{% else %}-{% endif %}</td>
+            <td class="text-end">{% if p.remaining != None %}{{ p.remaining }}{% else %}-{% endif %}</td>
+            <td class="text-end">{% if p.pct_used != None %}{{ p.pct_used }}%{% else %}-{% endif %}</td>
+            <td class="small">
+              {% if p.eta %}{{ p.eta|date:"Y-m-d H:i" }} ({{ p.hours_left }}h){% else %}-{% endif %}
+            </td>
+            <td class="text-nowrap">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary btn-comp-edit" data-id="{{ row.obj.id }}">Sửa</button>
+                <button class="btn btn-outline-primary btn-comp-replace" data-id="{{ row.obj.id }}">Thay</button>
+                <button class="btn btn-outline-dark btn-comp-history" data-id="{{ row.obj.id }}">LS</button>
+              </div>
+            </td>
+          </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="10" class="text-center text-muted">Chưa có linh kiện.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="componentModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="componentModalTitle">Component</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-2">
+        <form id="compEditForm" class="d-none">
+          <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Tên</label>
+            <input name="name" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Mã</label>
+            <input name="code" class="form-control form-control-sm">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Lifetime</label>
+            <input name="lifetime" type="number" min="0" class="form-control form-control-sm">
+          </div>
+            <div class="mb-2">
+            <label class="form-label small mb-1">Mô tả</label>
+            <textarea name="detail" rows="2" class="form-control form-control-sm"></textarea>
+          </div>
+        </form>
+        <form id="compReplaceForm" class="d-none" enctype="multipart/form-data">
+          <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Ghi chú</label>
+            <textarea name="note" rows="2" class="form-control form-control-sm"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Người xác nhận</label>
+            <input name="confirmed_by" class="form-control form-control-sm">
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-4"><input type="file" name="image1" accept="image/*" class="form-control form-control-sm"></div>
+            <div class="col-4"><input type="file" name="image2" accept="image/*" class="form-control form-control-sm"></div>
+            <div class="col-4"><input type="file" name="image3" accept="image/*" class="form-control form-control-sm"></div>
+            <div class="col-4"><input type="file" name="image4" accept="image/*" class="form-control form-control-sm"></div>
+            <div class="col-4"><input type="file" name="image5" accept="image/*" class="form-control form-control-sm"></div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">File khác</label>
+            <input type="file" name="attachment" class="form-control form-control-sm">
+          </div>
+          <p class="small text-muted mb-0">Baseline shot sẽ reset về shot hiện tại.</p>
+        </form>
+        <div id="compHistoryBox" class="d-none">
+          <ul class="list-group list-group-flush small" id="compHistoryList"></ul>
+        </div>
+        <div id="modalAlert" class="small text-danger mt-2 d-none"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Đóng</button>
+        <button id="componentModalSubmit" class="btn btn-sm btn-primary d-none">Lưu</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // Chart realtime
+  const pk={{ machine.pk }};
+  const url=`/iot/api/devices/${pk}/realtime/`;
+  const ctx=document.getElementById('shotChart').getContext('2d');
+  const data={labels:[],datasets:[{label:'Shot Total',data:[],borderWidth:1.8,borderColor:'rgba(75,192,255,.9)',backgroundColor:'rgba(75,192,255,.15)',tension:.25,pointRadius:2,fill:true}]};
+  const chart=new Chart(ctx,{type:'line',data,options:{responsive:true,animation:false,scales:{x:{grid:{color:'rgba(127,127,127,.15)'}},y:{beginAtZero:true,grid:{color:'rgba(127,127,127,.15)'}}}}});
+  function poll(){fetch(url,{cache:'no-store'}).then(r=>r.json()).then(j=>{const lbl=new Date(j.ts).toLocaleTimeString();if(lbl!==data.labels[data.labels.length-1]){data.labels.push(lbl);data.datasets[0].data.push(j.shot_total);if(data.labels.length>60){data.labels.shift();data.datasets[0].data.shift();}chart.update('none');}}).finally(()=>setTimeout(poll,5000));}
+  poll();
+
+  // Component modal logic
+  const csrftoken='{{ csrf_token }}';
+  const modalEl=document.getElementById('componentModal');
+  const bsModal=new bootstrap.Modal(modalEl);
+  const titleEl=document.getElementById('componentModalTitle');
+  const submitBtn=document.getElementById('componentModalSubmit');
+  const formEdit=document.getElementById('compEditForm');
+  const formReplace=document.getElementById('compReplaceForm');
+  const histBox=document.getElementById('compHistoryBox');
+  const histList=document.getElementById('compHistoryList');
+  const alertBox=document.getElementById('modalAlert');
+  let currentMode=null,currentId=null;
+  function hideAll(){formEdit.classList.add('d-none');formReplace.classList.add('d-none');histBox.classList.add('d-none');submitBtn.classList.add('d-none');alertBox.classList.add('d-none');}
+  function openEdit(id){currentMode='edit';currentId=id;hideAll();titleEl.textContent='Sửa linh kiện';submitBtn.textContent='Lưu';submitBtn.classList.remove('d-none');formEdit.reset();formEdit.classList.remove('d-none');bsModal.show();}
+  function openReplace(id){currentMode='replace';currentId=id;hideAll();titleEl.textContent='Thay linh kiện';submitBtn.textContent='Xác nhận';submitBtn.classList.remove('d-none');formReplace.reset();formReplace.classList.remove('d-none');bsModal.show();}
+  function openHistory(id){currentMode='history';currentId=id;hideAll();titleEl.textContent='Lịch sử thay thế';histList.innerHTML='<li class="list-group-item small">Đang tải...</li>';histBox.classList.remove('d-none');bsModal.show();fetch(`/iot/components/${id}/history/`).then(r=>r.json()).then(j=>{histList.innerHTML='';if(!j.history.length){histList.innerHTML='<li class="list-group-item small text-muted">Trống</li>';return;}j.history.forEach(h=>{const li=document.createElement('li');let imgs='';if(h.images&&h.images.length){imgs='<div class="mt-1 d-flex flex-wrap gap-1">'+h.images.map(u=>`<img src="${u}" style="height:46px;border:1px solid #444;">`).join('')+'</div>';}li.className='list-group-item';li.innerHTML=`<div><strong>${h.replaced_at}</strong> - ${h.confirmed_by||''}</div><div class="text-muted">Shot: ${h.shot_at_replacement??'-'} (prev base: ${h.baseline_shot_before??'-'})</div><div>${h.note||''}</div>${imgs}`;histList.appendChild(li);});}).catch(()=>{histList.innerHTML='<li class="list-group-item text-danger">Lỗi tải.</li>';});}
+  submitBtn.addEventListener('click',()=>{alertBox.classList.add('d-none');let url,formData;if(currentMode==='edit'){url=`/iot/components/${currentId}/update/`;formData=new FormData(formEdit);}else if(currentMode==='replace'){url=`/iot/components/${currentId}/replace/`;formData=new FormData(formReplace);}else return;fetch(url,{method:'POST',headers:{'X-CSRFToken':csrftoken},body:formData}).then(r=>r.json()).then(j=>{if(!j.ok){alertBox.textContent='Lỗi: '+JSON.stringify(j.errors);alertBox.classList.remove('d-none');}else{location.reload();}}).catch(()=>{alertBox.textContent='Lỗi kết nối.';alertBox.classList.remove('d-none');});});
+  document.querySelectorAll('.btn-comp-edit').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id)));
+  document.querySelectorAll('.btn-comp-replace').forEach(b=>b.addEventListener('click',()=>openReplace(b.dataset.id)));
+  document.querySelectorAll('.btn-comp-history').forEach(b=>b.addEventListener('click',()=>openHistory(b.dataset.id)));
+})();
+</script>
+{% endblock %}

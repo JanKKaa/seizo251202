@@ -1,0 +1,92 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}入力用コンピューター管理{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-primary">入力用コンピューター管理</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">コンピューター名</label>
+                        <input type="text" class="form-control" name="ten_may" value="{{ may.ten_may|default_if_none:'' }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">IPアドレス</label>
+                        <input type="text" class="form-control" name="ip" value="{{ may.ip|default_if_none:'' }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">説明</label>
+                        <input type="text" class="form-control" name="mo_ta" value="{{ may.mo_ta|default_if_none:'' }}">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">担当者</label>
+                        <input type="text" class="form-control" name="nguoi_phu_trach" value="{{ may.nguoi_phu_trach|default_if_none:'' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">状態</label>
+                        <select class="form-select" name="trang_thai">
+                            <option value="active" {% if may.trang_thai == "active" %}selected{% endif %}>稼働中</option>
+                            <option value="inactive" {% if may.trang_thai == "inactive" %}selected{% endif %}>非稼働</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success me-2">保存/登録</button>
+                        {% if may %}
+                        <a href="?xoa={{ may.id }}" class="btn btn-danger" onclick="return confirm('本当にこのコンピューターを削除しますか？');">削除</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <h4 class="mb-3">登録済みコンピューター一覧</h4>
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">#</th>
+                    <th class="text-center">コンピューター名</th>
+                    <th class="text-center">IPアドレス</th>
+                    <th class="text-center">説明</th>
+                    <th class="text-center">担当者</th>
+                    <th class="text-center">状態</th>
+                    <th class="text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for may in danh_sach_may %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td>{{ may.ten_may }}</td>
+                    <td>{{ may.ip }}</td>
+                    <td>{{ may.mo_ta }}</td>
+                    <td>{{ may.nguoi_phu_trach }}</td>
+                    <td class="text-center">
+                        {% if may.trang_thai == "active" %}
+                            <span class="badge bg-success">稼働中</span>
+                        {% else %}
+                            <span class="badge bg-secondary">非稼働</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="?sua={{ may.id }}" class="btn btn-info btn-sm">編集</a>
+                        <a href="?xoa={{ may.id }}" class="btn btn-danger btn-sm" onclick="return confirm('本当にこのコンピューターを削除しますか？');">削除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">まだコンピューターが登録されていません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

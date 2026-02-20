@@ -1,0 +1,119 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\dangnhap.html -->
+{% extends "learn/base_learn.html" %}
+{% block content %}
+{% if messages %}
+    <div class="container mt-4" style="color: red;">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} text-center fs-5 fw-bold" style="z-index:9999;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+<style>
+    .key-btn {
+        background: rgba(78, 115, 223, 0.8); /* Xanh dương nhạt */
+        border: none;
+        border-radius: 50%; /* Hình tròn */
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 600;
+        height: 60px;
+        width: 60px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .key-btn:hover {
+        background: rgba(78, 115, 223, 1);
+        transform: scale(1.05);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    }
+    #clear-btn, #backspace-btn {
+        background: rgba(255, 193, 7, 0.8); /* Màu vàng cho clear và backspace */
+        border: none;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 1rem;
+        height: 60px;
+        width: 60px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #clear-btn:hover, #backspace-btn:hover {
+        background: rgba(255, 193, 7, 1);
+        transform: scale(1.05);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    }
+    .card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+</style>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h4 class="card-title mb-0"><i class="fas fa-user"></i> 社員コードでログイン</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="ma_nv" class="form-label">社員コード</label>
+                        <input type="text" class="form-control" id="ma_nv" name="ma_nv"  required readonly>
+                    </div>
+                    <div class="mb-3">
+                        <div class="row g-2 justify-content-center">
+                            {% for num in "1234567890" %}
+                            <div class="col-auto">
+                                <button type="button" class="key-btn" data-value="{{ num }}">{{ num }}</button>
+                            </div>
+                            {% endfor %}
+                            <div class="w-100"></div>
+                            <div class="col-auto">
+                                <button type="button" id="clear-btn">クリア</button>
+                            </div>
+                            <div class="col-auto">
+                                <button type="button" id="backspace-btn"><i class="fas fa-backspace"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-sign-in-alt"></i> ログイン</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('ma_nv');
+    const keyBtns = document.querySelectorAll('.key-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const backspaceBtn = document.getElementById('backspace-btn');
+
+    keyBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            input.value += this.dataset.value;
+        });
+    });
+
+    clearBtn.addEventListener('click', function() {
+        input.value = '';
+    });
+
+    backspaceBtn.addEventListener('click', function() {
+        input.value = input.value.slice(0, -1);
+    });
+});
+</script>
+{% endblock %}

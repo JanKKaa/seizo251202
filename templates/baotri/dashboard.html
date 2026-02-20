@@ -1,0 +1,220 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<h2 class="mb-4 text-primary font-weight-bold text-center">メンテナンス統計ダッシュボード</h2>
+<form method="get" class="form-inline justify-content-center mb-4">
+    <label class="mr-2">期間:</label>
+    <input type="date" name="start" value="{{ start }}" class="form-control mr-2">
+    <input type="date" name="end" value="{{ end }}" class="form-control mr-2">
+    <button type="submit" class="btn btn-primary">集計</button>
+</form>
+<!-- Nút trở về trang index -->
+        <a href="{% url 'baotri_index' %}" class="btn btn-secondary mb-3">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="card-title text-info">作業件数 TOP 10</h5>
+                <ol class="top5-list">
+                    {% for user in tasks_ranking %}
+                    <li class="top5-item d-flex align-items-center mb-3">
+                        <div class="top5-rank top5-rank-{{ forloop.counter }}">{{ forloop.counter }}</div>
+                        
+                        <div>
+                            <div class="top5-name">{{ user.created_by__first_name }} {{ user.created_by__last_name }}</div>
+                            <div class="top5-value text-primary">{{ user.total }} 件</div>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li>データがありません。</li>
+                    {% endfor %}
+                </ol>
+                <canvas id="tasksChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="card-title text-success">最速作業 TOP 10</h5>
+                <ol class="top5-list">
+                    {% for item in fastest_ranking %}
+                    <li class="top5-item d-flex align-items-center mb-3">
+                        <div class="top5-rank top5-rank-{{ forloop.counter }}">{{ forloop.counter }}</div>
+                        
+                        <div>
+                            <div class="top5-name">
+                                {{ item.created_by__first_name }} {{ item.created_by__last_name }}                                
+                            </div>
+                            <div class="top5-value text-success">{{ item.duration_min }}分 <span class="text-muted small">({{ item.code }})</span><span class="text-muted small ml-2">{{ item.product_name }}</span></div>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li>データがありません。</li>
+                    {% endfor %}
+                </ol>
+                <canvas id="fastestChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.top5-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1rem;
+}
+.top5-item {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 10px 16px;
+    box-shadow: 0 2px 8px #1976d220;
+    transition: box-shadow 0.2s;
+}
+.top5-item:hover {
+    box-shadow: 0 4px 16px #1976d240;
+}
+.top5-rank {
+    font-size: 2.2rem;
+    font-weight: bold;
+    width: 48px;
+    text-align: center;
+    margin-right: 12px;
+    color: #fff;
+    border-radius: 50%;
+    background: #1976d2;
+    line-height: 48px;
+}
+.top5-rank-1 { background: #ffd700; color: #333; }
+.top5-rank-2 { background: #b0c4de; color: #333; }
+.top5-rank-3 { background: #cd7f32; color: #fff; }
+.top5-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.top5-name {
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+.top5-value {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+</style>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 作業件数ランキング
+    const tasksLabels = [{% for user in tasks_ranking %}'{{ user.created_by__first_name|escapejs }} {{ user.created_by__last_name|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const tasksData = [{% for user in tasks_ranking %}{{ user.total|default:"0" }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    new Chart(document.getElementById('tasksChart'), {
+        type: 'bar',
+        data: {
+            labels: tasksLabels,
+            datasets: [{
+                label: '作業件数',
+                data: tasksData,
+                backgroundColor: ['#ffd700', '#b0c4de', '#cd7f32', '#1976d2', '#90caf9']
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 最速作業ランキング
+    const fastestLabels = [{% for item in fastest_ranking %}'{{ item.created_by__first_name|escapejs }} {{ item.created_by__last_name|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const fastestData = [{% for item in fastest_ranking %}{{ item.duration_min|default:"0" }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    new Chart(document.getElementById('fastestChart'), {
+        type: 'bar',
+        data: {
+            labels: fastestLabels,
+            datasets: [{
+                label: '最速作業時間（分）',
+                data: fastestData,
+                backgroundColor: ['#ffd700', '#b0c4de', '#cd7f32', '#43a047', '#a5d6a7']
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+</script>
+
+<hr>
+
+<h3 class="mt-5 mb-3">時間帯別メンテナンス回数（棒グラフ）</h3>
+<canvas id="baotriBarChart" width="900" height="350"></canvas>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('baotriBarChart').getContext('2d');
+const labels = JSON.parse('{{ chart_labels|escapejs }}');
+const data = JSON.parse('{{ chart_data|escapejs }}');
+const users = JSON.parse('{{ chart_users|escapejs }}');
+
+const barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'メンテナンス回数',
+            data: data,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    afterBody: function(context) {
+                        const idx = context[0].dataIndex;
+                        return users[idx] ? '担当者: ' + users[idx] : '';
+                    }
+                }
+            },
+            legend: { display: false }
+        },
+        scales: {
+            x: { title: { display: true, text: '時間帯' } },
+            y: { beginAtZero: true, title: { display: true, text: 'メンテナンス回数' } }
+        }
+    }
+});
+</script>
+
+<h3 class="mt-5 mb-3">平均メンテナンス時間（30分以上6時間以下のみ集計）</h3>
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>製品名</th>
+            <th>平均メンテナンス時間（分）</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in avg_time_list %}
+        <tr>
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.avg_min }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="2">データがありません。</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

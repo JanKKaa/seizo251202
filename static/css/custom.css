@@ -1,0 +1,28 @@
+body, html {
+    font-family: 'Noto Sans JP', sans-serif;
+}
+
+.bg-profile-image {
+    background: url('/path/to/your/background-image.jpg') no-repeat center center;
+    background-size: cover;
+}
+.img-fluid {
+    max-width: 150px;
+    height: auto;
+}
+
+
+/* custom.css */
+.rounded-sides {
+    border-radius: 15px; /* Adjust this value to your desired roundness */
+    border: 1px solid #ccc; /* Optional: to give it a border */
+    padding: 10px; /* Optional: to add padding */
+    margin-bottom: 10px; /* Optional: add spacing between fields */
+}
+/* custom.css */
+.rounded-input {
+    border-radius: 15px; /* Adjust this value to your desired roundness */
+    border: 1px solid #ccc; /* Optional: to give it a border */
+    padding: 10px; /* Optional: to add padding */
+    width: 100%; /* Ensure full width alignment */
+}

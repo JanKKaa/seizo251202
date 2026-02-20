@@ -1,0 +1,59 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}データ一覧{% endblock %}
+
+{% block content %}
+{% if success_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ success_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="container mt-4">
+    <h2 class="mb-4">データ一覧</h2>
+    <div class="mb-3">
+        <a href="{% url 'add_machine_data' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> 新しいデータを追加
+        </a>
+    </div>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-center">No.</th>
+                            <th class="text-center">機械No.</th>
+                            <th class="text-center">材料名</th>
+                            <th class="text-center">製品名</th>
+                            <th class="text-center">混合率</th>
+                            <th class="text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in machine_data_list %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>{{ item.machine_name }}</td>
+                            <td>{{ item.material_name }}</td>
+                            <td>{{ item.product_name }}</td>
+                            <td class="text-center">{{ item.ratio }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'edit_machine_data' item.id %}" class="btn btn-info btn-sm">編集</a>
+                                <a href="{% url 'delete_machine_data' item.id %}" class="btn btn-danger btn-sm" onclick="return confirm('本当に削除しますか？');">削除</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <a href="{% url 'index_xla' %}" class="btn btn-secondary mt-2">メインページに戻る</a>
+</div>
+{% endblock %}

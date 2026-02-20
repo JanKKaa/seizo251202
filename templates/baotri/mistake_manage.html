@@ -1,0 +1,83 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<h3>ミス・問題の記録（複数行入力 & 編集）</h3>
+
+{# Form chỉnh sửa một dòng nếu có #}
+{% if edit_form %}
+<div class="card mb-3">
+    <div class="card-header">ミス編集</div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ edit_form.as_p }}
+            <button type="submit" name="edit_submit" class="btn btn-success">保存</button>
+            <a href="{% url 'mistake_manage' %}" class="btn btn-secondary">キャンセル</a>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{# Form nhập nhiều dòng mới #}
+<form method="post">
+    {% csrf_token %}
+    <table class="table table-bordered table-sm">
+        <thead>
+            <tr>
+                <th>製品</th>
+                <th>内容・原因</th>
+            </tr>
+        </thead>
+        <tbody id="mistake-table-body">
+            {{ formset.management_form }}
+            {% for form in formset %}
+            <tr>
+                <td>{{ form.product }}</td>
+                <td>{{ form.description }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-info mb-2" id="add-row-btn">＋ 行を追加</button>
+    <button type="submit" name="add_submit" class="btn btn-danger">保存</button>
+</form>
+
+<h4 class="mt-4">ミス一覧</h4>
+<table class="table table-bordered table-sm">
+    <thead>
+        <tr>
+            <th>製品</th>
+            <th>内容・原因</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mistake in mistakes %}
+        <tr>
+            <td>{{ mistake.product.name }}</td>
+            <td>{{ mistake.description|truncatechars:30 }}</td>
+            <td>
+                <a href="{% url 'mistake_edit' mistake.id %}" class="btn btn-sm btn-primary">編集</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+<script>
+document.getElementById('add-row-btn').onclick = function() {
+    const tbody = document.getElementById('mistake-table-body');
+    const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+    const currentFormCount = parseInt(totalForms.value);
+    const emptyRow = tbody.querySelector('tr').cloneNode(true);
+
+    emptyRow.querySelectorAll('input, textarea, select').forEach(function(input) {
+        input.value = '';
+        if (input.name) input.name = input.name.replace(/\d+/, currentFormCount);
+        if (input.id) input.id = input.id.replace(/\d+/, currentFormCount);
+    });
+
+    tbody.appendChild(emptyRow);
+    totalForms.value = currentFormCount + 1;
+};
+</script>

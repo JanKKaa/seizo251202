@@ -1,0 +1,10 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<h3>内容確認・承認</h3>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">承認する</button>
+    <a href="{% url 'task_code_detail' task_code.id %}" class="btn btn-secondary">キャンセル</a>
+</form>
+{% endblock %}

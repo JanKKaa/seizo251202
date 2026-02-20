@@ -1,0 +1,12 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h4>機械の総ショット数を編集: {{ machine.name }}</h4>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="{% url 'machine_counter' %}" class="btn btn-secondary">戻る</a>
+    </form>
+</div>
+{% endblock %}

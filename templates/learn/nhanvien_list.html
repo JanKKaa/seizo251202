@@ -1,0 +1,56 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\nhanvien_list.html -->
+{% extends "learn/base_learn.html" %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">社員リスト</h1>
+    <div class="mb-3">
+        <a href="{% url 'learn:nhanvien_create' %}" class="btn btn-success">
+            <i class="fas fa-user-plus"></i> 新規社員追加
+        </a>
+    </div>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>社員番号</th>
+                            <th>氏名</th>
+                            <th>メール</th>
+                            <th>役職</th>
+                            <th>上司</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for nv in nhanvien_list %}
+                        <tr>
+                            <td>{{ nv.ma_so }}</td>
+                            <td>{{ nv.ten }}</td>
+                            <td>{{ nv.email }}</td>
+                            <td>{{ nv.chuc_vu|default:"" }}</td>
+                            <td>{% if nv.supervisor %}{{ nv.supervisor.ten }}{% else %}なし{% endif %}</td>
+                            <td>
+                                <a href="{% url 'learn:nhanvien_update' nv.pk %}" class="btn btn-primary btn-sm">編集</a>
+                                <a href="{% url 'learn:nhanvien_delete' nv.pk %}" class="btn btn-danger btn-sm">削除</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,179 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block title %}画像検査管理{% endblock %}
+
+{% block content %}
+{% if success_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ success_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="container mt-5">
+    <h1 class="display-4 text-center mb-4 text-primary font-weight-bold" style="letter-spacing:2px;">材料投入管理</h1>
+
+    <!-- ナビゲーションボタンエリア -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-4 text-center mb-2">
+            <a href="{% url 'qa_history' %}" class="btn btn-info btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-list"></i> 履歴
+            </a>
+        </div>
+        <div class="col-md-4 text-center mb-2">
+            <a href="{% url 'qa_device_list' %}" class="btn btn-secondary btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-database"></i> 機械番号管理
+            </a>
+        </div>
+        <div class="col-md-4 text-center mb-2">
+            <a href="{% url 'dashboard_qa' %}" class="btn btn-primary btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-tachometer-alt"></i> ダッシュボード
+            </a>
+        </div>
+    </div>
+
+    <!-- 時計表示エリア -->
+    <div class="text-center mb-4">
+        <iframe scrolling="no" frameborder="no" clocktype="html5" style="overflow:hidden;border:0;margin:0;padding:0;width:227px;height:75px;" src="https://www.clocklink.com/html5embed.php?clock=008&timezone=Japan_Tokyo&color=white&size=227&Title=&Message=&Target=&From=2025,1,1,0,0,0&Color=white"></iframe>
+    </div>
+
+    <!-- 検査するデバイス選択エリア -->
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-3 rounded-top">
+                    <h5 class="m-0 font-weight-bold text-center">機械番号を選択</h5>
+                </div>
+                <div class="card-body bg-light">
+                    <form method="get" action="{% url 'upload_image' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
+                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 200px; max-width:100%;">
+                            {% for d in device_list %}
+                                <option value="{{ d.id }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary shadow rounded px-6 py-2">
+                            <i class="fas fa-search"></i>  選択
+                        </button>
+                    </form>
+                    <!-- Thông báo chọn thành công -->
+                    <div id="device-selected-msg" class="mt-2 mb-2 text-center" style="font-weight:bold; color:#155724; display:none;">
+                        <i class="fas fa-check-circle"></i> 機械番号「<span id="selected-device-name"></span>」が選択されました！
+                    </div>
+                    <!-- Nút QR và refocus -->
+                    <div class="w-100 text-center mb-2">
+                        <button type="button" class="btn btn-outline-success" id="start-qr-btn" style="min-width:120px;">
+                            <i class="fas fa-qrcode"></i> QRで選択
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" id="refocus-qr-btn" style="min-width:120px; display:none;">
+                            <i class="fas fa-crosshairs"></i> 再フォーカス
+                        </button>
+                    </div>
+                    <div class="row align-items-center">
+                        <div class="col-7">
+                            <div id="qr-reader" style="width:260px; margin: 0 auto; display:none;"></div>
+                        </div>
+                        <div class="col-5 text-center">
+                            <img src="{% static 'img/thietbiQR.JPG' %}" alt="機械番号QR参考画像" style="max-width:200px; border:1px solid #ccc; border-radius:8px;">
+                            <div style="font-size:0.95rem; color:#888;">機械番号QR参考画像</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+const startQrBtn = document.getElementById('start-qr-btn');
+const refocusQrBtn = document.getElementById('refocus-qr-btn');
+const qrReader = document.getElementById('qr-reader');
+const selectDevice = document.getElementById('device_id');
+const deviceMsg = document.getElementById('device-selected-msg');
+const selectedDeviceName = document.getElementById('selected-device-name');
+let html5QrCode = null;
+let qrRunning = false;
+
+function showDeviceSelectedMsg() {
+    const selectedOption = selectDevice.options[selectDevice.selectedIndex];
+    selectedDeviceName.textContent = selectedOption.text;
+    deviceMsg.style.display = 'block';
+    // Đổi màu chữ option đã chọn
+    for (let i = 0; i < selectDevice.options.length; i++) {
+        selectDevice.options[i].style.color = '';
+        selectDevice.options[i].style.fontWeight = '';
+    }
+    selectedOption.style.color = '#006400';
+    selectedOption.style.fontWeight = 'bold';
+}
+
+startQrBtn.addEventListener('click', function() {
+    qrReader.style.display = 'block';
+    startQrBtn.style.display = 'none';
+    refocusQrBtn.style.display = 'inline-block';
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("qr-reader");
+    }
+    html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 200 },
+        qrCodeMessage => {
+            // Tìm thiết bị theo id hoặc tên
+            let found = false;
+            for (let i = 0; i < selectDevice.options.length; i++) {
+                if (selectDevice.options[i].value === qrCodeMessage || selectDevice.options[i].text === qrCodeMessage) {
+                    selectDevice.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                html5QrCode.stop();
+                qrReader.style.display = 'none';
+                startQrBtn.style.display = 'inline-block';
+                refocusQrBtn.style.display = 'none';
+                showDeviceSelectedMsg();
+            } else {
+                alert("QRコードがリストに一致しません: " + qrCodeMessage);
+            }
+        },
+        errorMessage => {}
+    );
+    qrRunning = true;
+});
+
+refocusQrBtn.addEventListener('click', function() {
+    if (html5QrCode && qrRunning) {
+        html5QrCode.stop().then(() => {
+            qrReader.innerHTML = "";
+            html5QrCode = new Html5Qrcode("qr-reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 200 },
+                qrCodeMessage => {
+                    let found = false;
+                    for (let i = 0; i < selectDevice.options.length; i++) {
+                        if (selectDevice.options[i].value === qrCodeMessage || selectDevice.options[i].text === qrCodeMessage) {
+                            selectDevice.selectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        html5QrCode.stop();
+                        qrReader.style.display = 'none';
+                        startQrBtn.style.display = 'inline-block';
+                        refocusQrBtn.style.display = 'none';
+                        showDeviceSelectedMsg();
+                    } else {
+                        alert("QRコードがリストに一致しません: " + qrCodeMessage);
+                    }
+                },
+                errorMessage => {}
+            );
+        });
+    }
+});
+</script>
+{% endblock %}

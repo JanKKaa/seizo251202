@@ -1,0 +1,24 @@
+{% extends "learn/base_learn.html" %}
+{% block title %}資格証明書編集{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <h2 class="mb-4">資格証明書編集</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">保存</button>
+        <a href="{% url 'learn:bangcap_list' %}" class="btn btn-secondary ms-2">戻る</a>
+    </form>
+</div>
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

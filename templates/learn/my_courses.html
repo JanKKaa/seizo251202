@@ -1,0 +1,333 @@
+{% extends "learn/base_learn.html" %}
+{% block title %}私のコース{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800 ">講習・研修進歩管理</h1>
+    <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\my_courses.html -->
+    <form method="get" class="mb-3" style="max-width:400px;">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="キーワードで検索..." value="{{ search_query|default:'' }}">
+            <button class="btn btn-primary" type="submit">検索</button>
+            <a href="{% url 'learn:my_courses' %}" class="btn btn-secondary">クリア</a>
+        </div>
+    </form>
+   <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\my_courses.html -->
+<div class="card shadow mb-4">
+    
+    <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover table-sm align-middle mb-0" id="dataTable" width="100%" cellspacing="0">
+                <colgroup>
+                    <col style="width: 6%;">
+                    <col style="width: 10%;">
+                    <col style="width: 18%;">
+                    <col style="width: 8%;">
+                    <col style="width: 7%;">
+                    <col style="width: 18%;">
+                    <col style="width: 15%;">
+                </colgroup>
+                <thead class="table-light text-center">
+                    <tr>
+                        <th class="text-nowrap">社員番号</th>
+                        <th class="text-nowrap">氏名</th>
+                        <th class="text-nowrap">コース</th>
+                        <th class="text-nowrap">ステータス</th>
+                        <th class="text-nowrap">完了</th>
+                       <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\my_courses.html -->
+                        <th class="text-nowrap">レポート承認状況</th>
+                        <th class="text-nowrap">ステータス</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for enrollment in user_enrollments %}
+                    <tr>
+                        <td class="text-center text-nowrap">{{ enrollment.user.username }}</td>
+                        <td class="text-center text-nowrap">
+                            {% if enrollment.nhanvien and enrollment.nhanvien.ten %}
+                                {{ enrollment.nhanvien.ten }}
+                            {% elif enrollment.user.get_full_name %}
+                                {{ enrollment.user.get_full_name }}
+                            {% else %}
+                                {{ enrollment.user.username }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-link p-0 text-primary" data-bs-toggle="modal" data-bs-target="#courseModal{{ enrollment.course.id }}">
+                                {{ enrollment.course.title }}
+                            </button>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-success">承認済み</span>
+                        </td>
+                        <td class="text-center">
+                            {% if enrollment.report_file and enrollment.report_approved_by_supervisor and enrollment.report_approved_by_kanri %}
+                                <span class="badge bg-success">完了</span>
+                            {% else %}
+                                <span class="badge bg-secondary">未完了</span>
+                            {% endif %}
+                        </td>
+                       <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\my_courses.html -->
+                        <td>
+                            <div class="d-flex flex-row justify-content-center align-items-center gap-2" style="min-height:0;">
+                                {% if enrollment.user.username == ma_so %}
+                                    {% if not enrollment.report_file or not enrollment.report_approved_by_supervisor or not enrollment.report_approved_by_kanri %}
+                                        <form method="post" enctype="multipart/form-data" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+                                            <label class="btn btn-outline-primary btn-sm mb-0" style="vertical-align: middle;">
+                                                <i class="fas fa-upload"></i>
+                                                <input type="file" name="report_file" required class="d-none" onchange="this.form.submit();">
+                                            </label>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                                {% if enrollment.report_file %}
+                                    <a href="{{ enrollment.report_file.url }}" target="_blank" class="btn btn-outline-info btn-sm" title="ダウンロード">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <span class="small text-truncate" style="max-width:120px; display:inline-block; vertical-align:middle;" title="{{ enrollment.report_file.name|cut:'reports/' }}">
+                                        {{ enrollment.report_file.name|cut:'reports/' }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small">ファイルなし</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                       <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\my_courses.html -->
+                        <td class="text-center">
+                            {% if enrollment.user.username == ma_so %}
+                                {% with nv=nhanvien %}
+                                    {% if nv.chuc_vu == '係長' or not nv.supervisor or not nv.supervisor.email %}
+                                        <span class="badge bg-secondary me-1">上司: 不要</span>
+                                        <span class="badge {% if enrollment.report_approved_by_kanri %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                            管理:
+                                            {% if enrollment.report_approved_by_kanri %}済{% else %}未{% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge {% if enrollment.report_approved_by_supervisor %}bg-success{% else %}bg-warning text-dark{% endif %} me-1">
+                                            上司:
+                                            {% if enrollment.report_approved_by_supervisor %}済{% else %}未{% endif %}
+                                        </span>
+                                        <span class="badge {% if enrollment.report_approved_by_kanri %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                            管理:
+                                            {% if enrollment.report_approved_by_kanri %}済{% else %}未{% endif %}
+                                        </span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                <span class="badge {% if enrollment.report_approved_by_supervisor %}bg-success{% else %}bg-warning text-dark{% endif %} me-1">
+                                    上司:
+                                    {% if enrollment.report_approved_by_supervisor %}済{% else %}未{% endif %}
+                                </span>
+                                <span class="badge {% if enrollment.report_approved_by_kanri %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                    管理:
+                                    {% if enrollment.report_approved_by_kanri %}済{% else %}未{% endif %}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- PHÂN TRANG -->
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center my-3">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+            </li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?q={{ search_query }}&page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.next_page_number }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+    {# BẢNG BÁO CÁO CẦN PHÊ DUYỆT #}
+    {% if show_pending_reports and pending_reports %}
+    <div class="card shadow mb-4 mt-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">承認待ちレポート</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>社員番号</th>
+                            <th>氏名</th>
+                            <th>コース</th>
+                            <th>レポート</th>
+                            <th>承認状況</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for enrollment in pending_reports %}
+                        <tr>
+                            <td>{{ enrollment.user.username }}</td>
+                            <td>
+                                {% if enrollment.user.ten %}
+                                    {{ enrollment.user.ten }}
+                                {% else %}
+                                    {{ enrollment.user.get_full_name|default:enrollment.user.username }}
+                                {% endif %}
+                            </td>
+                            <td>{{ enrollment.course.title }}</td>
+                            <td>
+                                {% if enrollment.report_file %}
+                                    <a href="{{ enrollment.report_file.url }}" target="_blank" class="btn btn-info btn-sm">
+                                        <i class="fas fa-download"></i> ダウンロード
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">ファイルなし</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if enrollment.report_status == 'pending_supervisor' %}
+                                    <span class="badge bg-warning text-dark">上司承認待ち</span>
+                                {% elif enrollment.report_status == 'pending_kanri' %}
+                                    <span class="badge bg-warning text-dark">管理者承認待ち</span>
+                                {% elif enrollment.report_status == 'approved' %}
+                                    <span class="badge bg-success">承認済み</span>
+                                {% elif enrollment.report_status == 'rejected' %}
+                                    <span class="badge bg-danger">見送り</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if is_kanri and enrollment.report_status == 'pending_kanri' %}
+                                <form method="post" action="{% url 'learn:approve_report_kanri' enrollment.id %}" enctype="multipart/form-data" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="file" name="report_file" required>
+                                    <input type="text" name="comment" placeholder="コメント (任意)">
+                                    <button type="submit" class="btn btn-success btn-sm">管理承認</button>
+                                </form>
+                                {% elif has_subordinates and enrollment.report_status == 'pending_supervisor' and enrollment.user.username != ma_so %}
+                                <form method="post" action="{% url 'learn:approve_report_supervisor' enrollment.id %}" enctype="multipart/form-data" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="file" name="report_file" required>
+                                    <input type="text" name="comment" placeholder="コメント (任意)">
+                                    <button type="submit" class="btn btn-success btn-sm">上司承認</button>
+                                </form>
+                                {% endif %}
+                                {% if is_kanri %}
+                                <a href="{% url 'learn:delete_report_file' enrollment.id %}" class="btn btn-danger btn-sm"
+                                   onclick="return confirm('本当にこのレポートを削除しますか？');">レポート削除</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6">承認待ちのレポートはありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modals for each course -->
+{% for enrollment in user_enrollments %}
+<div class="modal fade" id="courseModal{{ enrollment.course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ enrollment.course.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="courseModalLabel{{ enrollment.course.id }}">コース詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>タイトル:</strong> {{ enrollment.course.title }}</p>
+                <p><strong>理由:</strong> {{ enrollment.course.description }}</p>
+                <p><strong>外部リンク:</strong>
+                    {% if enrollment.course.external_url %}
+                        <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>
+                    {% else %}
+                        なし
+                    {% endif %}
+                </p>
+                <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
+                <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
+                <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
+                <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
+                <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
+                <p><strong>場所:</strong> {{ enrollment.course.location }}</p>
+                <p><strong>対象:</strong> {{ enrollment.course.target }}</p>
+                <p><strong>アクティブ:</strong>
+                    {% if enrollment.course.is_active %}
+                        <span class="badge bg-success">有効</span>
+                    {% else %}
+                        <span class="badge bg-secondary">無効</span>
+                    {% endif %}
+                </p>
+                <p><strong>作成者:</strong>
+                    {% if enrollment.course.creator %}
+                        {{ enrollment.course.creator.ten|default:enrollment.course.creator.username }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+                <p><strong>資料:</strong>
+                    {% if enrollment.course.material %}
+                        {% with url=enrollment.course.material.url|lower %}
+                            <a href="{{ enrollment.course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                {% if ".pdf" in url %}
+                                    <i class="fas fa-file-pdf"></i> PDFを表示
+                                {% elif ".xlsx" in url or ".xls" in url %}
+                                    <i class="fas fa-file-excel"></i> Excelを表示
+                                {% else %}
+                                    <i class="fas fa-file-image"></i> 画像を表示
+                                {% endif %}
+                            </a>
+                        {% endwith %}
+                    {% else %}
+                        なし
+                    {% endif %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+<br>
+{% endfor %}
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

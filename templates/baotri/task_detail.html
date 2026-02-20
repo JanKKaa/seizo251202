@@ -1,0 +1,82 @@
+<!-- filepath: c:\seizo0\trang_chu\templates\baotri\task_detail.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}詳細内容: {{ task.name }}{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">詳細: {{ task.name }}</h1>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
+                            <th class="small text-center font-weight-bold" style="width: 15%;">項目</th>
+                            <th class="small text-center font-weight-bold" style="width: 20%;">説明</th>
+                            <th class="small text-center font-weight-bold" style="width: 30%;">参考写真</th>
+                            <th class="small text-center font-weight-bold" style="width: 10%;">寸法</th>
+                            <th class="small text-center font-weight-bold" style="width: 10%;">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detail in task_details %}
+                        <tr>
+                            
+                            <td class="small text-center">
+                                <input type="number" name="order_{{ detail.id }}" class="form-control text-center" value="{{ detail.order }}" required>
+                            </td>
+                            <td class="small">
+                                <input type="text" name="item_{{ detail.id }}" class="form-control" value="{{ detail.item }}">
+                            </td>
+                            <td class="small">
+                                <textarea name="description_{{ detail.id }}" class="form-control">{{ detail.description }}</textarea>
+                            </td>
+                            <td class="small text-center">
+                                {% if detail.reference_image %}
+                                <img src="{{ detail.reference_image.url }}" alt="参考写真" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 100px; object-fit: cover;">
+                                {% endif %}
+                                <input type="file" name="reference_image_{{ detail.id }}" class="form-control-file">
+                            </td>
+                            <td class="small">
+                                <input type="text" name="drawing_size_{{ detail.id }}" class="form-control" value="{{ detail.drawing_size }}">
+                            </td>
+                            <td class="small text-center">
+                                <a href="{% url 'delete_task_detail' task.id detail.id %}" class="btn btn-danger btn-sm" onclick="return confirm('削除してよろしいでしょうか?');">
+                                    削除
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Thêm dòng mới -->
+                        <tr>
+                            <td class="small text-center">新規追加</td>
+                            <td class="small">
+                                <input type="text" name="new_item" class="form-control" placeholder="新しい項目">
+                            </td>
+                            <td class="small">
+                                <textarea name="new_description" class="form-control" placeholder="説明"></textarea>
+                            </td>
+                            <td class="small text-center">
+                                <input type="file" name="new_reference_image" class="form-control-file">
+                            </td>
+                            <td class="small">
+                                <input type="text" name="new_drawing_size" class="form-control" placeholder="寸法">
+                            </td>
+                            <td class="small text-center">
+                                <!-- Không cần nút xóa cho dòng mới -->
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Nút 保存 -->
+            <button type="submit" name="save_order" value="true" class="btn btn-success">保存</button>
+            <button type="submit" name="add_new" value="true" class="btn btn-primary">新規追加</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

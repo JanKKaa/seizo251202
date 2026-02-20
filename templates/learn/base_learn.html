@@ -1,0 +1,270 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}社員教育ポータル{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- SB Admin 2 CSS -->
+    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/sb-admin-2.css' %}" rel="stylesheet">
+    <link href="{% static 'css/learn.css' %}" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'learn/bangcap.css' %}">
+    <style>
+    /* Motivational quote animation and style */
+    #motivational-quote {
+        display: inline-block;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #007bff;
+        background: linear-gradient(90deg, #e3f2fd 60%, #fff 100%);
+        border-radius: 1.5rem;
+        padding: 0.5rem 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        transition: transform 0.3s cubic-bezier(.68,-0.55,.27,1.55), background 0.5s;
+    }
+    @keyframes popIn {
+        0% { transform: scale(0.7) rotate(-10deg); opacity: 0; }
+        60% { transform: scale(1.1) rotate(2deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); }
+    }
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0);}
+        50% { transform: translateY(-20px);}
+    }
+    @keyframes fadeInLeft {
+        0% { opacity: 0; transform: translateX(-50px);}
+        100% { opacity: 1; transform: translateX(0);}
+    }
+    @keyframes flipIn {
+        0% { transform: rotateY(90deg); opacity: 0;}
+        100% { transform: rotateY(0deg); opacity: 1;}
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0);}
+        20%, 60% { transform: translateX(-10px);}
+        40%, 80% { transform: translateX(10px);}
+    }
+    </style>
+</head>
+<body id="page-top">
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{% url 'learn:index' %}">
+                <div class="sidebar-brand-icon">
+                    <img src="{% static 'img/logo.png' %}" style="height:32px;">
+                </div>
+                
+            </a>
+            <hr class="sidebar-divider my-0">
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:index' %}">
+                    <i class="fas fa-fw fa-graduation-cap"></i>
+                    <span>講習・研修情報</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:course_create' %}">
+                    <i class="fas fa-plus"></i>
+                    <span>新しいコースを作成</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:course_list' %}">
+                    <i class="fas fa-fw fa-book"></i>
+                    <span>講習・研修参加状況一覧</span>
+                    {% if pending_course_count > 0 %}
+                        <span class="badge bg-danger ms-1">{{ pending_course_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            {% if request.session.ma_nv or user.is_authenticated and user.username == 'kanri' %}
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:my_courses' %}">
+                    <i class="fas fa-fw fa-user"></i>
+                    <span>講習・研修進歩管理</span>
+                    {% if pending_report_count > 0 %}
+                        <span class="badge bg-warning ms-1">{{ pending_report_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:bangcap_list' %}">
+                    <i class="fas fa-fw fa-certificate"></i>
+                    <span>資格一覧</span>
+                </a>
+            </li>
+            
+            {% endif %}
+            
+                        <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\base_learn.html -->
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:approval_history_list' %}">
+                    <i class="fas fa-history"></i>
+                    <span>承認履歴</span>
+                </a>
+            </li>
+            {% if user.is_authenticated and user.username == 'kanri' %}
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:nhanvien_list' %}">
+                    <i class="fas fa-users"></i>
+                    <span>社員リスト</span>
+                </a>
+            </li>
+          
+            {% endif %}
+            <hr class="sidebar-divider d-none d-md-block">
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div id="content">
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow sticky-top">
+    <div class="container-fluid px-0">
+       <div class="d-flex align-items-center">
+            {% if user.is_authenticated and user.username == 'kanri' %}
+            <a class="nav-link fw-bold text-primary ms-3" href="{% url 'learn:quote_list' %}" style="font-size:1.1rem; display:inline-block;">
+                <i class="fas fa-comment-dots"></i> 
+            </a>
+            {% endif %}
+        </div>
+        <div class="mx-auto w-100 text-center">
+            <span id="motivational-quote" class="fw-bold text-primary" style="font-size:1.1rem;"></span>
+        </div>
+        <ul class="navbar-nav ml-auto">
+            {% if request.session.ma_nv or user.is_authenticated and user.username == 'kanri' %}
+            <li class="nav-item dropdown no-arrow">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown">
+                    <span class="mr-2 d-none d-lg-inline text-gray-600 small" style="font-size: 1rem;">
+                        {% if request.session.ma_nv %}
+                            {{ request.session.ma_nv }} - {{ request.session.ten }}
+                        {% else %}
+                            {{ user.username }}
+                        {% endif %}
+                    </span>
+                    <i class="fas fa-user-check fa-lg"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="userDropdown">
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                        プロフィール
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="{% url 'learn:logout_nv' %}">
+                        <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                        ログアウト
+                    </a>
+                </div>
+            </li>
+            {% else %}
+            <li class="nav-item">
+                <a class="nav-link btn btn-outline-primary text-dark d-inline-flex align-items-center"
+                href="{% url 'learn:dangnhap' %}"
+                style="padding: 0.5rem 1rem; font-size: 1.1rem; white-space: nowrap;">
+                    <i class="fas fa-user me-2"></i> 社員ログイン
+                </a>
+            </li>
+            {% endif %}
+            {% if user.is_authenticated %}
+            <li class="nav-item dropdown no-arrow">
+                <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-toggle="dropdown">
+                    <span class="mr-2 d-none d-lg-inline text-gray-600 small" style="font-size: 1rem;">{{ user.username }}</span>
+                    <i class="fas fa-user-shield fa-lg"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="adminDropdown">
+                    <a class="dropdown-item" href="#">
+                        <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                        管理部
+                    </a>
+                    <a class="dropdown-item" href="{% url 'learn:logout_admin' %}">
+                        <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                        ログアウト
+                    </a>
+                </div>
+            </li>
+            {% else %}
+            <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\base_learn.html -->
+           <li class="nav-item">
+                <a class="nav-link btn btn-warning btn-sm text-dark d-inline-flex align-items-center"
+                href="{% url 'learn:login_admin' %}"
+                style="padding: 0.5rem 1rem; font-size: 1.1rem; white-space: nowrap;">
+                    <i class="fas fa-cog me-2"></i> 管理者ログイン
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</nav>
+                <!-- End of Topbar -->
+
+                <div class="container-fluid">
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+    <!-- Footer -->
+<footer class="footer" style="padding: 8px 0; background: linear-gradient(90deg, #f8f9fc 60%, #e3e6f0 100%); border-top: 1.5px solid #dee2e6;">
+    <div class="container">
+        <div class="row justify-content-center align-items-center">
+            <div class="col-auto">
+                <span class="d-flex align-items-center" style="font-size:1.05rem; color: #495057;">
+                    <i class="fas fa-graduation-cap me-2 text-primary"></i>
+                    <strong>&copy; 2025 HAYASHI TECHNO CO., LTD.</strong>
+                    <span class="mx-2" style="color:#adb5bd;">|</span>
+                    <span>講習・研修管理システム</span>
+                </span>
+            </div>
+        </div>
+    </div>
+</footer>
+    <!-- End of Page Wrapper -->
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+    var dbQuotes = {{ db_quotes|safe }};
+    var quoteSpan = document.getElementById('motivational-quote');
+    // Danh sách hiệu ứng chuyển động
+    var animations = [
+        'popIn 0.7s cubic-bezier(.68,-0.55,.27,1.55)',
+        'bounce 0.7s cubic-bezier(.68,-0.55,.27,1.55)',
+        'fadeInLeft 0.7s cubic-bezier(.68,-0.55,.27,1.55)',
+        'flipIn 0.7s cubic-bezier(.68,-0.55,.27,1.55)',
+        'shake 0.5s cubic-bezier(.68,-0.55,.27,1.55)'
+    ];
+    function randomAnimation() {
+        return animations[Math.floor(Math.random() * animations.length)];
+    }
+    if (dbQuotes.length > 0 && quoteSpan) {
+        function showQuote() {
+            var quote = dbQuotes[Math.floor(Math.random() * dbQuotes.length)];
+            var anim = randomAnimation();
+            quoteSpan.style.animation = 'none';
+            void quoteSpan.offsetWidth; // trigger reflow
+            quoteSpan.textContent = quote.text + " — " + quote.author;
+            quoteSpan.style.animation = anim;
+        }
+        showQuote();
+        setInterval(showQuote, 10000);
+        quoteSpan.addEventListener('click', showQuote);
+    } else if (quoteSpan) {
+        quoteSpan.textContent = "名言が登録されていません。";
+    }
+});
+</script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

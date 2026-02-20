@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>料理を注文</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap CSS & FontAwesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+    .flatpickr-calendar {
+        font-size: 1.1rem !important;
+        min-width: 350px;
+        max-width: 420px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+        border-radius: 1rem;
+        border: 1.5px solid #007bff;
+        margin: 0 auto;
+        /* Căn giữa nội dung lịch */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .flatpickr-days, .flatpickr-weekdays {
+        width: 100% !important;
+        display: flex;
+        justify-content: center;   /* Căn giữa các cột */
+        align-items: center;
+        text-align: center;
+    }
+    .flatpickr-day, .flatpickr-weekday {
+        width: 2.5em !important;
+        height: 2.5em !important;
+        line-height: 2.5em !important;
+        font-size: 1em !important;
+        text-align: center;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box;
+        justify-content: center;
+        align-items: center;
+    }
+    .flatpickr-months {
+        justify-content: center !important;
+        text-align: center !important;
+    }
+    .flatpickr-current-month, .flatpickr-prev-month, .flatpickr-next-month {
+        text-align: center !important;
+        margin: 0 auto !important;
+    }
+    .flatpickr-weekday {
+        font-weight: bold;
+        background: #f8fafc;
+        color: #4e73df;
+        border-radius: 0.5em 0.5em 0 0;
+        border: none;
+    }
+    .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
+        background: #4e73df !important;
+        color: #fff !important;
+    }
+    .flatpickr-day.holiday,
+    .flatpickr-day.holiday:hover {
+        background: #fff0f0 !important;
+        color: #d00 !important;
+        border-color: #d00 !important;
+        cursor: not-allowed !important;
+    }
+    .calendar-wrap {
+        background: #fff;
+        border-radius: 1rem;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        padding: 2rem 1.5rem 1.5rem 1.5rem;
+        margin-bottom: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .calendar-wrap.text-center {
+        text-align: center;
+    }
+    .calendar-controls {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .calendar-controls select, .calendar-controls button {
+        font-size: 1.1rem;
+        padding: 0.5rem 1.2rem;
+        border-radius: 0.5rem;
+    }
+    @media (max-width: 991px) {
+        .row.flex-lg-row {
+            flex-direction: column !important;
+        }
+        .calendar-wrap {
+            margin-bottom: 2rem;
+        }
+    }
+    @media (max-width: 600px) {
+        .flatpickr-calendar {
+            min-width: 100%;
+            font-size: 1rem !important;
+        }
+        .calendar-wrap {
+            padding: 1rem 0.2rem;
+        }
+    }
+    .active-month {
+        background: #1976d2 !important;
+        color: #fff !important;
+        border-color: #1976d2 !important;
+    }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2 class="mb-3"><i class="fas fa-shopping-cart"></i> 料理を注文: {{ mon.ten }}</h2>
+    <!-- Thông báo nằm trên cùng, nổi bật, dễ đọc -->
+    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:1.05rem; border-radius:0.7rem;">
+        <i class="fas fa-info-circle"></i>
+        1ヶ月の間は同じ料理しか注文できません。別の料理を選択したい場合は、翌月に変更してください。
+    </div>
+    <div class="row flex-lg-row mb-4">
+        <div class="col-lg-6 col-12 mb-4">
+            <form method="post">
+                {% csrf_token %}
+                {% if mon.hinh_anh %}
+                <img src="{{ mon.hinh_anh.url }}" class="img-fluid rounded mb-3" alt="{{ mon.ten }}" style="max-width:600px;max-height:400px;object-fit:cover;">
+                {% endif %}
+                <p>{{ mon.mo_ta }}</p>
+                <p class="font-weight-bold text-danger">{{ mon.gia2|floatformat:0 }} 円 （社員値段）</p>
+                <input type="hidden" name="order_dates" id="order_dates">
+                <input type="hidden" name="order_year" id="order_year">
+                <input type="hidden" name="order_month" id="order_month">
+                <!-- Thêm trường chọn ca làm việc vào đây -->
+                <div class="form-group">
+                    <label for="calamviec">勤務区分</label>
+                    <select id="calamviec" name="calamviec" class="form-control">
+                        {% if ma_nv == "1000" %}
+                            <option value="客様" selected>客様（ゲスト）</option>
+                        {% else %}
+                            <option value="日勤" selected>日勤（昼間）</option>
+                            <option value="夜勤">夜勤（夜間）</option>
+                            <option value="工作課">工作課</option>
+                            <option value="客様">客様（ゲスト）</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <!-- Trong form đặt món -->
+                {% if allow_so_luong %}
+                <div class="form-group">
+                    <label for="so_luong">数量</label>
+                    <input type="number" name="so_luong" id="so_luong" min="1" value="1" class="form-control">
+                </div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary btn-lg mb-2 w-100">注文する</button>
+                <a href="{% url 'menu:list' %}" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-home"></i> メニューに戻る
+                </a>
+            </form>
+        </div>
+        <div class="col-lg-6 col-12 mb-4">
+            <div class="calendar-wrap text-center">
+                {% if allow_so_luong %}
+                    <label class="form-label font-weight-bold mb-3" style="font-size:1.08rem;">
+                        注文日を選択（複数選択可）
+                    </label>
+                    <input type="text" id="calendar-inline" class="form-control mb-3" placeholder="注文日を選択">
+                    <div class="text-muted" style="font-size:0.95rem;">
+                        ※ 選択した日に注文が登録されます。
+                    </div>
+                {% else %}
+                    <label class="form-label font-weight-bold mb-3" style="font-size:1.08rem;">
+                        注文月を選択
+                    </label>
+                    <div class="d-flex justify-content-center align-items-center mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm mr-2" id="prev-year"><i class="fas fa-chevron-left"></i></button>
+                        <span id="current-year" style="font-size:1.3rem;font-weight:bold;"></span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm ml-2" id="next-year"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="row" id="year-calendar" style="max-width:700px;margin:0 auto;">
+                        <!-- JS render các nút tháng ở đây -->
+                    </div>
+                    <div class="text-muted" style="font-size:0.95rem;">
+                        ※ 選択した月の16日から翌月15日までが注文期間になります。
+                    </div>
+                    {% if da_dat_mon %}
+                    <button type="button" class="btn btn-warning btn-block mb-3" id="order-year-btn">
+                        <i class="fas fa-calendar-plus"></i> 1年分まとめて注文
+                    </button>
+                    {% else %}
+                    <div class="alert alert-danger mb-3" style="font-size:1.05rem;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        まず1回注文を行ってから「1年分まとめて注文」をご利用ください。
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    {% if error %}
+    <div class="alert alert-danger mt-3" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+   
+</div>
+<!-- Flatpickr JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+const holidays = {{ holidays|safe }};
+
+const fp = flatpickr("#calendar-inline", {
+    inline: true,
+    mode: "multiple",
+    dateFormat: "Y-m-d",
+    locale: "ja",
+    minDate: "today",
+    disable: [
+        function(date) {
+            const y = date.getFullYear();
+            const m = (date.getMonth() + 1).toString().padStart(2, '0');
+            const d = date.getDate().toString().padStart(2, '0');
+            const ymd = `${y}-${m}-${d}`;
+            return (date.getDay() === 0 || date.getDay() === 6 || holidays.includes(ymd));
+        }
+    ],
+    onDayCreate: function(dObj, dStr, fp, dayElem) {
+        const y = dayElem.dateObj.getFullYear();
+        const m = (dayElem.dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const d = dayElem.dateObj.getDate().toString().padStart(2, '0');
+        const ymd = `${y}-${m}-${d}`;
+        if (holidays.includes(ymd)) {
+            dayElem.classList.add('holiday');
+        }
+    },
+    onChange: function(selectedDates, dateStr, instance) {
+        document.getElementById('order_dates').value = dateStr;
+    }
+});
+
+const monByMonth = {{ mon_by_month_json|safe }}; // { "2025-1": "カレー", ... }
+
+function renderMonths(year) {
+    const monthNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+    let html = '';
+    for (let m = 1; m <= 12; m++) {
+        const key = year + '-' + m;
+        const monName = monByMonth[key] || '';
+        html += `
+        <div class="col-6 col-md-3 mb-3">
+            <button type="button"
+                class="btn btn-block btn-outline-primary month-btn py-3"
+                data-month="${m}"
+                style="width:100%;font-size:1.1rem;position:relative;">
+                ${monthNames[m-1]}
+                ${monName ? `<div style='font-size:0.95rem;color:#d32f2f;font-weight:bold;'>${monName}</div>` : ''}
+            </button>
+        </div>`;
+    }
+    document.getElementById('year-calendar').innerHTML = html;
+    // Gắn sự kiện click cho từng tháng
+    document.querySelectorAll('.month-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            // Bỏ chọn tất cả nút
+            document.querySelectorAll('.month-btn').forEach(b => {
+                b.classList.remove('active-month'); // Sửa lại cho đúng
+            });
+            // Đánh dấu nút vừa chọn
+            this.classList.add('active-month');
+            // Set giá trị hidden
+            document.getElementById('order_year').value = currentYear;
+            document.getElementById('order_month').value = this.getAttribute('data-month');
+            // Nếu muốn submit ngay thì bỏ comment dòng dưới:
+            // this.closest('form').submit();
+        }
+    });
+}
+
+let today = new Date();
+let currentYear = today.getFullYear();
+
+function updateYearDisplay() {
+    document.getElementById('current-year').textContent = currentYear + "年";
+    document.getElementById('order_year').value = currentYear;
+    renderMonths(currentYear);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('prev-year').onclick = function() {
+        currentYear--;
+        updateYearDisplay();
+    };
+    document.getElementById('next-year').onclick = function() {
+        currentYear++;
+        updateYearDisplay();
+    };
+    updateYearDisplay();
+    // Khi submit, kiểm tra đã chọn tháng chưa
+    document.querySelector('form').onsubmit = function(e) {
+        if (!document.getElementById('order_month').value) {
+            alert("注文月を選択してください。");
+            e.preventDefault();
+            return false;
+        }
+    };
+    var orderYearBtn = document.getElementById('order-year-btn');
+    if (orderYearBtn) {
+        orderYearBtn.onclick = function() {
+            if (confirm("最新の注文と同じ料理で1年分まとめて注文しますか？")) {
+                window.location.href = "{% url 'menu:order_menu_year' mon.id %}";
+            }
+        };
+    }
+});
+</script>
+<!-- Bootstrap JS (optional) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

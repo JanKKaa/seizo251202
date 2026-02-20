@@ -1,0 +1,59 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block title %}画像検査管理{% endblock %}
+
+{% block content %}
+{% if success_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ success_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="container mt-5">
+    <h1 class="display-4 text-center mb-4 text-primary font-weight-bold" style="letter-spacing:2px;">材料投入管理システム</h1>
+
+    <!-- ナビゲーションボタンエリア -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-4 text-center mb-2">
+            <a href="{% url 'lich_su' %}" class="btn btn-info btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-list"></i> 投入履歴
+            </a>
+        </div>
+        <div class="col-md-4 text-center mb-2">
+            <a href="{% url 'device_info_list' %}" class="btn btn-secondary btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-database"></i> 機械番号管理
+            </a>
+        </div>
+    </div>
+
+    <!-- 時計表示エリア -->
+    <div class="text-center mb-4">
+        <iframe scrolling="no" frameborder="no" clocktype="html5" style="overflow:hidden;border:0;margin:0;padding:0;width:227px;height:75px;" src="https://www.clocklink.com/html5embed.php?clock=008&timezone=Japan_Tokyo&color=white&size=227&Title=&Message=&Target=&From=2025,1,1,0,0,0&Color=white"></iframe>
+    </div>
+
+    <!-- 検査するデバイス選択エリア -->
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-3 rounded-top">
+                    <h5 class="m-0 font-weight-bold text-center">機械番号を選択</h5>
+                </div>
+                <div class="card-body bg-light">
+                    <form method="get" action="{% url 'upload_image' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
+                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 100px; max-width:100%;">
+                            {% for d in device_list %}
+                                <option value="{{ d.id }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary shadow rounded px-6 py-2">
+                            <i class="fas fa-search"></i>  選択
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+<div class="dashboard-alarm-area">
+  <div class="dashboard-alarm-area-inner">
+
+    <div id="alarm-popup-list"></div>
+    <div id="esp32-alarm-popup-list"></div>
+    <div id="alarm-gif-area"></div>
+
+    <div class="alarm-history-wrapper">
+
+      <!-- 金型保守状況（Bootstrap 5） -->
+      <style>
+        .mold-card-status {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
+        }
+        .mold-card-title {
+          font-weight: bold;
+          font-size: 1.1rem;
+          color: #333;
+          margin-bottom: 0.25rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .mold-card-info {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.7SSrem;
+          margin-bottom: 0.2rem;
+        }
+        .mold-card-info .label {
+          color: #888;
+          min-width: 4em;
+          display: inline-block;
+        }
+        .mold-card-time {
+          display: flex;
+          gap: 1.2em;
+          font-size: 0.7rem;
+          color: #555;
+        }
+        @media (max-width: 768px) {
+          .mold-card-info, .mold-card-time {
+            flex-direction: column;
+            gap: 0.2em;
+          }
+        }
+        .mold-card-horizontal {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          padding: 0.45rem 0.5rem;
+          border-radius: 0.4rem;
+          background: #fff;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+          margin-bottom: 0.45rem;
+          min-height: 56px;
+          font-size: 0.7rem;
+          max-width: 100%;
+          overflow-x: auto;
+          flex-wrap: wrap;
+        }
+        .mold-card-horizontal .badge {
+          min-width: 48px;
+          font-size: 0.78em;
+        }
+        .mold-card-title {
+          font-weight: 600;
+          font-size: 0.7rem;
+          color: #333;
+          margin-bottom: 0;
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          white-space: nowrap;
+        }
+        .mold-card-info,
+        .mold-card-time {
+          font-size: 0.7rem;
+          color: #555;
+          margin-bottom: 0;
+          white-space: nowrap;
+        }
+        .mold-card-status {
+          gap: 0.35rem;
+          margin-bottom: 0.3rem;
+          font-size: 0.8rem;
+        }
+        .mold-card-info .label {
+          min-width: 3.2em;
+        }
+        .mold-maintenance-status .fw-bold {
+          font-size: 1rem !important;
+        }
+        @media (max-width: 900px) {
+          .mold-card-horizontal {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+            min-height: unset;
+          }
+        }
+      </style>
+
+      <div class="mold-maintenance-status my-3">
+        <div class="fw-bold mb-2 text-primary" style="font-size:1.2rem;">
+          <i class="bi bi-tools"></i> 金型メンテ状況
+        </div>
+        <div>
+          {% for m in maintenance_list %}
+          <div class="mold-card-horizontal border border-warning">
+            <span class="badge bg-warning text-dark me-2">メンテ中</span>
+            <span class="mold-card-title"><i class="bi bi-box"></i> {{ m.mold_name }}</span>
+            <span class="mold-card-info"><i class="bi bi-person"></i> {{ m.maintainer }}</span>
+            <span class="mold-card-time">
+              <i class="bi bi-clock"></i> 開始 {{ m.start_time|date:"H:i" }}
+              {% if m.end_time %}
+              <i class="bi bi-clock-history ms-2"></i> 完了 {{ m.end_time|date:"H:i" }}
+              {% endif %}
+            </span>
+          </div>
+          {% endfor %}
+          {% for m in maintained_list %}
+          <div class="mold-card-horizontal border border-success">
+            <span class="badge bg-success me-2">完了</span>
+            <span class="mold-card-title"><i class="bi bi-box"></i> {{ m.mold_name }}</span>
+            <span class="mold-card-info"><i class="bi bi-person"></i> {{ m.maintainer }}</span>
+            <span class="mold-card-time">
+              <i class="bi bi-clock-history ms-2"></i> {{ m.duration }}
+            </span>
+          </div>
+          {% empty %}
+          <div class="alert alert-info text-center mb-0" style="font-size:0.75rem;">
+            <i class="bi bi-check-circle"></i> 本日、保守中または保守完了の金型はありません。
+          </div>
+          {% endfor %}
+        </div>
+        <div class="text-end small text-muted mt-2" style="font-size:0.7rem;"  >
+          メンテ中：<strong>{{ maintenance_list|length }}</strong>　|　完了：<strong>{{ maintained_list|length }}</strong>
+        </div>
+      </div>
+      <!-- 金型メンテ状況ここまで -->
+
+      <!-- OEE表示領域 -->
+      <div class="oee-title" style="display:none"></div>
+      <div class="oee-summary" id="oee-summary" style="display:none"></div>
+      <div class="alarm-summary" id="alarm-summary"></div>
+      <div class="alarm-history-list" id="alarm-history-list"></div>
+      <div class="alarm-history-footer" id="alarm-history-footer"></div>
+
+    </div> <!-- .alarm-history-wrapper -->
+
+  </div> <!-- .dashboard-alarm-area-inner -->
+</div> <!-- .dashboard-alarm-area -->

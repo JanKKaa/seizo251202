@@ -1,0 +1,274 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}Chatworkメッセージ{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h3 class="mb-4"><i class="fab fa-chat me-2"></i>Chatwork メッセージ履歴</h3>
+  <a href="{% url 'iot:iot_index' %}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left"></i> 戻る
+    </a>
+  <div class="row mb-3">
+    <div class="col-md-6 mb-2">
+      <input type="text" id="search-keyword" class="form-control" placeholder="キーワードで検索（送信者・内容・時間）">
+    </div>
+    <div class="col-md-6 mb-2">
+      <input type="date" id="date-picker" class="form-control" min="2000-01-01">
+    </div>
+  </div>
+  <div id="chatwork-calendar"></div>
+</div>
+<button class="btn btn-primary btn-sm" onclick="deleteSelectedChatworkMessages()">選択・削除</button>
+<button class="btn btn-success btn-sm ms-2" onclick="exportChatworkCsv()">CSV出力（全件）</button>
+<style>
+  mark {
+    background-color: #ffd600;
+    color: #222;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+  }
+</style>
+
+<script>
+let allGroups = {};
+let expandedDays = {};
+let lastMessageId = null;
+
+function highlightKeyword(text, keyword) {
+  if (!keyword) return text;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(escaped, 'gi'), match => `<mark>${match}</mark>`);
+}
+
+function renderCalendar(groups, keyword = "", selectedDate = "") {
+  const el = document.getElementById('chatwork-calendar');
+  let dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  if (keyword) {
+    selectedDate = "";
+  }
+  if (selectedDate) {
+    dates = dates.filter(date => date === selectedDate);
+  }
+  if (dates.length === 0) {
+    el.innerHTML = "<div class='alert alert-info'>現在、表示できるメッセージはありません。</div>";
+    return;
+  }
+  el.innerHTML = dates.map(date => {
+    const filtered = groups[date].filter(msg =>
+      (msg.sender || '').toLowerCase().includes(keyword) ||
+      (msg.message || '').toLowerCase().includes(keyword) ||
+      (msg.time || '').toLowerCase().includes(keyword)
+    );
+    if (filtered.length === 0) return '';
+    const showCount = expandedDays[date] ? filtered.length : Math.min(10, filtered.length);
+    return `
+      <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <strong><i class="fa-regular fa-calendar-days me-2"></i>${date}</strong>
+        </div>
+        <ul class="list-group list-group-flush">
+          ${filtered.slice(0, showCount).map(msg => `
+            <li class="list-group-item">
+              <div class="d-flex align-items-center mb-2">
+                <input type="checkbox" class="form-check-input me-2 chatwork-checkbox" value="${msg.message_id}">
+                <span class="badge bg-secondary me-2">${highlightKeyword(msg.sender || '', keyword)}</span>
+                <span class="text-muted small">${highlightKeyword(msg.time || '', keyword)}</span>
+                <button class="btn btn-sm btn-danger ms-auto" onclick="deleteChatworkMessage('${msg.message_id}', this)">削除</button>
+              </div>
+              <div>
+                <span class="chat-message-content" style="font-size:1.0em;">
+                  ${highlightKeyword((msg.message || '').replace(/\n/g, '<br>'), keyword)}
+                </span>
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+        ${filtered.length > 10 && !expandedDays[date] ? `
+          <div class="card-footer text-center">
+            <button class="btn btn-sm btn-outline-primary" onclick="expandDay('${date}')">もっと見る (${filtered.length - 10} 件のメッセージ)</button>
+          </div>
+        ` : ''}
+        ${filtered.length > 10 && expandedDays[date] ? `
+          <div class="card-footer text-center">
+            <button class="btn btn-sm btn-outline-secondary" onclick="collapseDay('${date}')">折りたたむ</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function expandDay(date) {
+  expandedDays[date] = true;
+  const keyword = document.getElementById('search-keyword').value.trim().toLowerCase();
+  const selectedDate = document.getElementById('date-picker').value;
+  renderCalendar(allGroups, keyword, selectedDate);
+}
+
+function collapseDay(date) {
+  expandedDays[date] = false;
+  const keyword = document.getElementById('search-keyword').value.trim().toLowerCase();
+  const selectedDate = document.getElementById('date-picker').value;
+  renderCalendar(allGroups, keyword, selectedDate);
+}
+
+function showChatworkPopup(msg) {
+  let html = `<strong>${msg.sender || ''}</strong><br>${msg.time || ''}<br>`;
+  html += `<span>${(msg.message || '').replace(/\n/g, '<br>')}</span>`;
+  if (msg.file_url) html += `<br><a href="${msg.file_url}" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">Tải file đính kèm</a>`;
+  document.getElementById('popup-content').innerHTML = html;
+  document.getElementById('chatwork-popup').style.display = 'block';
+}
+
+function checkNewMessageAndNotify(groups) {
+  const todayStr = getTodayStr();
+  const todayMessages = groups[todayStr] || [];
+  if (todayMessages.length === 0) return;
+  const latestMsg = todayMessages[0];
+  if (!latestMsg.message_id) return;
+  if (lastMessageId !== latestMsg.message_id) {
+    if (lastMessageId !== null) {
+      showChatworkPopup(latestMsg);
+    }
+    lastMessageId = latestMsg.message_id;
+  }
+}
+
+function fetchAndRender() {
+  fetch('/iot/api/chatwork/grouped/')
+    .then(r => r.json())
+    .then(data => {
+      allGroups = data.groups || {};
+      renderCalendar(allGroups, '', getTodayStr());
+      checkNewMessageAndNotify(allGroups);
+      const dates = Object.keys(allGroups).sort();
+      if (dates.length > 0) {
+        document.getElementById('date-picker').setAttribute('min', dates[0]);
+        document.getElementById('date-picker').setAttribute('max', dates[dates.length - 1]);
+      }
+    });
+}
+
+function getTodayStr() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+fetchAndRender();
+
+document.getElementById('search-keyword').addEventListener('input', function() {
+  const keyword = this.value.trim().toLowerCase();
+  const selectedDate = document.getElementById('date-picker').value;
+  renderCalendar(allGroups, keyword, selectedDate);
+});
+
+document.getElementById('date-picker').addEventListener('change', function() {
+  const selectedDate = this.value;
+  const keyword = document.getElementById('search-keyword').value.trim().toLowerCase();
+  renderCalendar(allGroups, keyword, selectedDate);
+});
+
+setInterval(() => {
+  fetchAndRender();
+}, 60000);
+
+function deleteChatworkMessage(message_id, btn) {
+  if (!confirm('メッセージを削除してもよろしいですか？')) return;
+  btn.disabled = true;
+  fetch('/iot/api/chatwork/delete/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message_id})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      fetchAndRender();
+    } else {
+      alert('削除に失敗しました！');
+      btn.disabled = false;
+    }
+  })
+  .catch(() => {
+    alert('エラーが発生しました！');
+    btn.disabled = false;
+  });
+}
+
+function deleteSelectedChatworkMessages() {
+  const selectedMessages = [];
+  document.querySelectorAll('.chatwork-checkbox:checked').forEach(cb => {
+    selectedMessages.push(cb.value);
+  });
+  if (selectedMessages.length === 0) {
+    alert('削除するメッセージを選択してください。');
+    return;
+  }
+  if (!confirm('選択したメッセージを削除してもよろしいですか？')) return;
+  fetch('/iot/api/chatwork/delete/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message_ids: selectedMessages})
+  })
+  .then (r => r.json())
+  .then(data => {
+    if (data.success) {
+      fetchAndRender();
+    } else {
+      alert('削除に失敗しました！');
+    }
+  })
+  .catch(() => {
+    alert('エラーが発生しました！');
+  });
+}
+
+function csvEscape(val) {
+  const s = (val ?? '').toString().replace(/\r?\n/g, '\\n');
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function exportChatworkCsv() {
+  if (!allGroups || Object.keys(allGroups).length === 0) {
+    alert('出力するデータがありません。');
+    return;
+  }
+  const rows = [];
+  rows.push(['date','time','sender','message','message_id','file_url']);
+  Object.keys(allGroups).sort().forEach(date => {
+    (allGroups[date] || []).forEach(msg => {
+      rows.push([
+        date,
+        msg.time || '',
+        msg.sender || '',
+        msg.message || '',
+        msg.message_id || '',
+        msg.file_url || ''
+      ]);
+    });
+  });
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chatwork_all_${getTodayStr()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}
+
+<div id="chatwork-popup" style="display:none;position:fixed;top:20px;right:20px;z-index:9999;min-width:300px;">
+  <div style="background:#fff;border:1px solid #007bff;border-radius:8px;padding:16px;box-shadow:0 2px 8px #0002;">
+    <div id="popup-content"></div>
+    <button onclick="document.getElementById('chatwork-popup').style.display='none'" class="btn btn-sm btn-primary mt-2">Đóng</button>
+  </div>
+</div>
+

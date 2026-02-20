@@ -1,0 +1,12 @@
+<!-- filepath: c:\Users\Shin\seizo0\trang_chu\news\templates\news\news_confirm_delete.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">記事を削除</h1>
+<p>本当に記事 "{{ article.title }}" を削除しますか？</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">削除</button>
+    <a href="{% url 'news_list' %}" class="btn btn-secondary">キャンセル</a>
+</form>
+{% endblock %}

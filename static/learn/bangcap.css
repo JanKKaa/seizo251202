@@ -1,0 +1,122 @@
+/* Badge chung */
+.badge-cap {
+    border-radius: 1.2rem;
+    padding: 0.4em 1.1em;
+    font-weight: bold;
+    box-shadow: 0 0 8px 1px rgba(0,0,0,0.06);
+    font-family: 'Segoe UI', 'Meiryo', sans-serif;
+    letter-spacing: 0.08em;
+    transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+    position: relative;
+    overflow: hidden;
+    background: #fff !important;
+    font-size: 0.98rem;
+    margin-bottom: 0.3rem;
+}
+
+/* Card luôn nền trắng */
+.card {
+    background: #fff !important;
+}
+
+/* Card nhỏ gọn hơn, tối ưu chiều cao và padding */
+.card.bangcap-card {
+    max-width: 250px;
+    min-width: 170px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.25rem 0.3rem 0.1rem 0.3rem;
+    border-radius: 0.9rem;
+    font-size: 0.90rem;
+    box-sizing: border-box;
+    min-height: 120px;
+}
+.card.bangcap-card .card-header {
+    font-size: 0.97rem;
+    padding: 0.32rem 0.2rem;
+}
+.card.bangcap-card .card-body {
+    padding: 0.32rem 0.2rem 0.1rem 0.2rem;
+}
+.card.bangcap-card .card-footer {
+    padding: 0.18rem 0.2rem;
+}
+.card.bangcap-card .w-100.mb-2 {
+    margin-bottom: 0.18rem !important;
+}
+@media (max-width: 768px) {
+    .card.bangcap-card {
+        max-width: 98vw;
+        min-width: 0;
+        font-size: 0.88rem;
+    }
+}
+
+/* 4級: Đồng */
+.badge-4 {
+    background: #fff !important;
+    color: #b87333;
+    border: 2px solid #b87333;
+    box-shadow: 0 0 6px #b8733333;
+}
+.border-cap-4 {
+    border: 2px solid #b87333 !important;
+    box-shadow: 0 0 6px #b8733333;
+}
+
+/* 3級: Xanh lam bạc nổi bật */
+.badge-3 {
+    background: #fff !important;
+    color: #5bc0f8;
+    border: 2px solid #5bc0f8;
+    box-shadow: 0 0 7px #5bc0f833;
+}
+.border-cap-3 {
+    border: 2px solid #5bc0f8 !important;
+    box-shadow: 0 0 7px #5bc0f833;
+}
+
+/* 2級: Xanh ngọc */
+.badge-2 {
+    background: #fff !important;
+    color: #3edfcf;
+    border: 2px solid #3edfcf;
+    box-shadow: 0 0 8px #3edfcf44;
+}
+.border-cap-2 {
+    border: 2px solid #3edfcf !important;
+    box-shadow: 0 0 8px #3edfcf44;
+}
+
+/* 1級: Vàng */
+.badge-1 {
+    background: #fff !important;
+    color: #ffd700;
+    border: 2px solid #ffd700;
+    box-shadow: 0 0 8px #ffd70033;
+}
+.border-cap-1 {
+    border: 2px solid #ffd700 !important;
+    box-shadow: 0 0 8px #ffd70033;
+}
+
+/* 特急: Kim cương */
+.badge-tokkyu {
+    background: #fff !important;
+    color: #00bcd4;
+    border: 2px solid #b9f2ff;
+    box-shadow: 0 0 12px #b9f2ff33, 0 0 16px #fff3;
+    text-shadow: 0 0 6px #fff, 0 0 2px #b9f2ff;
+}
+.border-cap-tokkyu {
+    border: 2px solid #b9f2ff !important;
+    box-shadow: 0 0 12px #b9f2ff33, 0 0 16px #fff3;
+}
+
+/* Container cuộn dọc, không cuộn topbar */
+.bangcap-scroll-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-bottom: 1rem;
+    overflow-x: hidden;
+}

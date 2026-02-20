@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>社員管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="fas fa-users"></i> 社員管理</h2>
+        <div>
+            <a href="{% url 'menu:nhanvien_create' %}" class="btn btn-success mr-2">
+                <i class="fas fa-user-plus"></i> 新しい社員を追加
+            </a>
+            <a href="{% url 'menu:list' %}" class="btn btn-outline-secondary mr-2">
+                <i class="fas fa-home"></i> メニューに戻る
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover bg-white shadow-sm">
+            <thead class="thead-light">
+                <tr>
+                    <th>社員番号</th>
+                    <th>氏名</th>
+                    <th class="text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nv in nhanvien_list %}
+                <tr>
+                    <td>{{ nv.ma_so }}</td>
+                    <td>{{ nv.ten }}</td>
+                    <td class="text-center">
+                        <a href="{% url 'menu:nhanvien_update' nv.id %}" class="btn btn-info btn-sm mr-1">
+                            <i class="fas fa-edit"></i> 編集
+                        </a>
+                        <a href="{% url 'menu:nhanvien_delete' nv.id %}" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash"></i> 削除
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted">社員情報がありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

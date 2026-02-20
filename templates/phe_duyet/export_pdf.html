@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ドキュメント一覧</title>
+    <style>
+    @font-face {
+        font-family: "NotoSansJP";
+        src: url("{% static 'fonts/NotoSansJP-Regular.ttf' %}");
+    }
+    body, table, td, th {
+        font-family: "NotoSansJP", sans-serif !important;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        border: 1px solid black;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    </style>
+</head>
+<body>
+    <h1>ドキュメント一覧</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>タイトル</th>
+                <th>提出日</th>
+                <th>依頼者</th>
+                <th>承認者</th>
+                <th>ステータス</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for document in documents %}
+            <tr>
+                <td>{{ document.id }}</td>
+                <td>{{ document.title }}</td>
+                <td>{{ document.submission_date }}</td>
+                <td>{{ document.created_by.first_name }} {{ document.created_by.last_name }}</td>
+                <td>
+                    {% if document.recipient %}
+                        {{ document.recipient.first_name }} {{ document.recipient.last_name }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>
+                    {% if document.is_approved %}
+                        承認
+                    {% elif document.is_rejected %}
+                        不承認
+                    {% else %}
+                        確認中
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}部品交換履歴 - {{ component.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h4><i class="fas fa-history"></i> 部品交換履歴: {{ component.name }}</h4>
+    <table class="table table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>交換日時</th>
+                <th>備考</th>
+                <th>証拠画像</th>
+                <th>確認者</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in histories %}
+            <tr>
+                <td>{{ h.replaced_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ h.note }}</td>
+                <td>
+                    {% if h.image1 %}
+                        <img src="{{ h.image1.url }}" alt="証拠画像" class="img-thumbnail mb-1" style="max-width:100px;max-height:100px;">
+                    {% endif %}
+                    {% if h.image2 %}
+                        <img src="{{ h.image2.url }}" alt="証拠画像" class="img-thumbnail mb-1" style="max-width:100px;max-height:100px;">
+                    {% endif %}
+                    {% if h.image3 %}
+                        <img src="{{ h.image3.url }}" alt="証拠画像" class="img-thumbnail mb-1" style="max-width:100px;max-height:100px;">
+                    {% endif %}
+                    {% if h.image4 %}
+                        <img src="{{ h.image4.url }}" alt="証拠画像" class="img-thumbnail mb-1" style="max-width:100px;max-height:100px;">
+                    {% endif %}
+                    {% if h.image5 %}
+                        <img src="{{ h.image5.url }}" alt="証拠画像" class="img-thumbnail mb-1" style="max-width:100px;max-height:100px;">
+                    {% endif %}
+                    {% if not h.image1 and not h.image2 and not h.image3 and not h.image4 and not h.image5 %}
+                        <span class="text-muted">なし</span>
+                    {% endif %}
+                </td>
+                <td>{{ h.confirmed_by }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">履歴がありません。</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'quanlysx' component.machine.address %}" class="btn btn-secondary mt-2">設備詳細へ戻る</a>
+</div>
+{% endblock %}

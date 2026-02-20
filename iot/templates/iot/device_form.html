@@ -1,0 +1,22 @@
+{% extends "iot/base_iot.html" %}
+{% block title %}{% if mode == 'create' %}Tạo thiết bị{% else %}Cập nhật{% endif %}{% endblock %}
+{% block content %}
+<h5 class="mb-3">{% if mode == 'create' %}Tạo mới thiết bị{% else %}Cập nhật: {{ machine.address }}{% endif %}</h5>
+<form method="post" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body">
+    {% for field in form %}
+      <div class="mb-2">
+        <label class="form-label small mb-1">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary btn-sm">Lưu</button>
+    <a class="btn btn-outline-secondary btn-sm" href="{% if mode == 'create' %}{% url 'device_list' %}{% else %}{% url 'device_detail' machine.pk %}{% endif %}">Hủy</a>
+  </div>
+</form>
+{% endblock %}

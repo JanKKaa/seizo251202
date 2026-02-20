@@ -1,0 +1,100 @@
+.footer {
+    background-color: #343a40;
+    color: #ffffff;
+    padding: 20px 0;
+    margin-top: 50px;
+    position: relative;
+    width: 100%;
+    clear: both;
+}
+
+.footer .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.footer p {
+    margin: 0;
+    font-size: 14px;
+    color: #adb5bd;
+}
+
+.footer a {
+    color: #17a2b8;
+    text-decoration: none;
+}
+
+.footer a:hover {
+    text-decoration: underline;
+    color: #ffffff;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f9f9f9;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+.hero {
+    padding: 20px 5px;
+    background-color: #4e73df;
+    color: #fff;
+}
+
+.hero .display-4 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.hero .lead {
+    font-size: 1.2rem;
+    font-weight: 300;
+}
+
+.card {
+    border-radius: 15px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card-title {
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+}
+
+.card-text {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.btn-outline-dark {
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-weight: 500;
+}
+
+
+.article-content {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 20px;
+    line-height: 1.8;
+    color: #333;
+}
+
+.display-4 {
+    font-family: "Merriweather", serif;
+}
+
+.container img {
+    max-height: 500px;
+    object-fit: cover;
+}

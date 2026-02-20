@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金型メンテナンス</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fc;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .btn-lg {
+            font-size: 1.25rem;
+            padding: 15px 30px;
+            border-radius: 8px;
+        }
+
+        .btn-lg:hover {
+            transform: scale(1.05);
+            transition: all 0.3s ease;
+        }
+
+        .card {
+            border-radius: 10px;
+        }
+
+        .card-header {
+            background-color: #4e73df;
+            color: white;
+            font-weight: bold;
+        }
+
+        .card-body {
+            background-color: #ffffff;
+        }
+
+        .text-primary {
+            color: #4e73df !important;
+        }
+
+        .shadow {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .shadow:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\baotri\index.html -->
+    {% extends "trang_chu/base.html" %}
+    {% block title %}保守履歴一覧{% endblock %}
+    {% block content %}
+    <div class="container py-4">
+        <h1 class="text-center text-primary mb-4" style="font-size:2.2rem;font-weight:bold;">金型メンテナンス</h1>
+
+        <div class="mb-3 text-end">
+            <a href="{% url 'export_maintenance_pdf' %}" class="btn btn-danger btn-sm me-2">
+                <i class="fas fa-file-pdf"></i> PDFをエクスポート
+            </a>
+            <a href="{% url 'export_maintenance_csv' %}" class="btn btn-success btn-sm me-2">
+                <i class="fas fa-file-csv"></i> CSVをエクスポート
+            </a>
+            <a href="{% url 'mistake_manage' %}" class="btn btn-warning btn-sm">ミス・問題を記録</a>
+        </div>
+
+        <div class="row g-3 justify-content-center mb-4">
+            <div class="col-12 col-sm-6 col-md-3">
+                <a href="{% url 'task_code_list' %}" class="btn btn-info btn-lg w-100 mb-2">
+                    <i class="fas fa-list"></i> 作業の履歴
+                </a>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <a href="{% url 'add_task' %}" class="btn btn-success btn-lg w-100 mb-2">
+                    <i class="fas fa-plus"></i> 新規作成
+                </a>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <a href="{% url 'baotri_dashboard' %}" class="btn btn-primary btn-lg w-100 mb-2">
+                    <i class="fas fa-chart-bar"></i> ダッシュボード統計
+                </a>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <a href="{% url 'baotri_shot_report' %}" class="btn btn-secondary btn-lg w-100 mb-2">
+                    <i class="fas fa-cogs"></i> ショット管理を見る
+                </a>
+            </div>
+        </div>
+
+        <div class="text-center mb-4">
+            <iframe scrolling="no" frameborder="no" clocktype="html5"
+                style="overflow:hidden;border:0;margin:0;padding:0;width:120px;height:40px;"
+                src="https://www.clocklink.com/html5embed.php?clock=004&timezone=JST&color=blue&size=120&Title=&Message=&Target=&From=2025,1,1,0,0,0&Color=blue">
+            </iframe>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">管理</div>
+                    <div class="card-body">
+                        <form method="get" action="{% url 'baotri_index' %}">
+                            <div class="mb-3">
+                                <label for="task_select" class="form-label fw-bold">製品一覧:</label>
+                                <div class="input-group">
+                                    <select id="task_select" name="task_id" class="form-select">
+                                        {% for task in tasks %}
+                                        <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
+                                            {{ task.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> 選択
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">メンテナンス作業開始</div>
+                    <div class="card-body text-center">
+                        {% if selected_task %}
+                        <p><strong>製品名:</strong> {{ selected_task.name }}</p>
+                        <p><strong>金型番号:</strong> {{ selected_task.code }}</p>
+                        <a href="{% url 'task_code' %}?task_id={{ selected_task.id }}" class="btn btn-warning btn-lg mt-3">
+                            <i class="fas fa-play"></i> スタート
+                        </a>
+                        {% else %}
+                        <p class="text-center">製品名を選んでください</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if selected_task %}
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        情報
+                        {% if request.user.is_superuser %}
+                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editTaskModal">
+                            <i class="fas fa-edit"></i> 編集
+                        </button>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <p><strong>製品名:</strong> {{ selected_task.name }}</p>
+                        <p><strong>金型No.:</strong> {{ selected_task.code }}</p>
+                        <p><strong>機械番号:</strong> {{ selected_task.machine_count }}</p>
+                        <p><strong>取数:</strong> {{ selected_task.quantity }}</p>
+                        <p><strong>材料:</strong> {{ selected_task.material }}</p>
+                        <p><strong>頻度:</strong> {{ selected_task.maintenance_frequency }}</p>
+                        <p><strong>作成者:</strong> {{ selected_task.creator.first_name }} {{ selected_task.creator.last_name }}</p>
+                        <p><strong>作成日:</strong> {{ selected_task.created_at|date:"Y/m/d H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white">製品写真</div>
+                            <div class="card-body text-center">
+                                {% if selected_task.task_image %}
+                                <img src="{{ selected_task.task_image.url }}" alt="製品写真" class="img-fluid rounded shadow-sm" style="max-height:200px;object-fit:cover;">
+                                {% else %}
+                                <p>写真なし</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white">金型写真</div>
+                            <div class="card-body text-center">
+                                {% if selected_task.product_image %}
+                                <img src="{{ selected_task.product_image.url }}" alt="金型写真" class="img-fluid rounded shadow-sm" style="max-height:200px;object-fit:cover;">
+                                {% else %}
+                                <p>写真なし</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Modal chỉnh sửa -->
+        {% if request.user.is_superuser and selected_task %}
+        <div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="post" enctype="multipart/form-data" action="{% url 'edit_task' selected_task.id %}">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editTaskModalLabel">編集</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="task_name" class="form-label">製品名</label>
+                                <input type="text" class="form-control" id="task_name" name="name" value="{{ selected_task.name }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="task_code" class="form-label">金型No.</label>
+                                <input type="text" class="form-control" id="task_code" name="code" value="{{ selected_task.code }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="task_machine_count" class="form-label">機械番号</label>
+                                <input type="number" class="form-control" id="task_machine_count" name="machine_count" value="{{ selected_task.machine_count }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="task_material" class="form-label">材料</label>
+                                <input type="text" class="form-control" id="task_material" name="material" value="{{ selected_task.material }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="task_image" class="form-label">製品写真</label>
+                                <input type="file" class="form-control" id="task_image" name="task_image">
+                            </div>
+                            <div class="mb-3">
+                                <label for="product_image" class="form-label">金型写真</label>
+                                <input type="file" class="form-control" id="product_image" name="product_image">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endblock %}
+</body>
+</html>

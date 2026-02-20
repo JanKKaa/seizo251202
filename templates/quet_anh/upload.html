@@ -1,0 +1,460 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center text-primary mb-4 fw-bold" style="letter-spacing:1px;">撮影して処理</h2>
+    
+    {# --- 通知（常に上部に表示） --- #}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mt-2 mb-0 py-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% if expected_text and is_match %}
+      <div class="alert alert-success text-center d-flex align-items-center justify-content-center" style="font-size:1.1rem;">
+        <i class="fas fa-check-circle me-2" style="font-size:1.5rem;color:#198754;"></i>
+        <span>
+            <strong>比較結果: ✔️ 一致</strong>
+            <br>
+            <span class="fw-bold">一致した文字：</span>
+            <span style="color:red;">{{ matched_text }}</span>
+        </span>
+      </div>
+      {% if show_back_to_index %}
+      <div class="text-center mt-2 mb-3">
+        <a href="{% url 'index_qa' %}" class="btn btn-primary btn-lg rounded-pill">
+            <i class="fas fa-arrow-left"></i> 機械No.選択ページに戻る
+        </a>
+      </div>
+      {% endif %}
+    {% elif expected_text and not is_match %}
+      <div id="alert-danger-custom" class="alert alert-danger text-center d-flex align-items-center justify-content-center" style="font-size:1.3rem; padding: 20px; border: 3px solid #dc3545; box-shadow: 0px 0px 10px rgba(220, 53, 69, 0.5);">
+    <i class="fas fa-exclamation-triangle me-3" style="font-size:2rem;color:#dc3545;"></i>
+    <span><strong>一致しません！</strong> もう一度確認し、上司に報告してください。</span>
+    </div>
+
+    <script>
+        var alertDanger = document.getElementById('alert-danger-custom');
+        if (alertDanger) {
+            alertDanger.scrollIntoView({behavior: "smooth"});
+        }
+    </script>
+
+    {% endif %}
+
+    <div class="mb-3">
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary rounded-pill">
+            <i class="fas fa-arrow-left"></i> 機械No.選択ページに戻る
+        </a>
+    </div>
+
+    <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_image' %}">
+        {% csrf_token %}
+        <div class="row justify-content-center">
+            <div class="col-lg-5 mb-4">
+                <div class="card shadow border-0 h-100">
+                    <div class="card-header bg-primary text-white text-center fw-bold">
+                        カメラ &amp; 撮影
+                    </div>
+                    <div class="card-body bg-light">
+                        <div class="mb-2 text-center">
+                            <button id="frontCam" class="btn btn-outline-primary btn-sm mx-1" type="button">フロントカメラ</button>
+                            <button id="backCam" class="btn btn-outline-secondary btn-sm mx-1" type="button">バックカメラ</button>
+                        </div>
+                       
+                        <div class="text-center mb-2">
+                            <video id="video" width="100%" height="320" autoplay style="border-radius:8px;box-shadow:0 2px 8px #e3e3e3;max-width:100%;"></video>
+                            <canvas id="canvas" style="display:none;max-width:100%;height:auto;margin-top:10px;border-radius:8px;box-shadow:0 2px 8px #e3e3e3;"></canvas>
+                        </div>
+                        <div class="mb-2 text-center">
+                            <button id="refocusCam" class="btn btn-outline-warning btn-sm mx-1" type="button">
+                                <i class="fas fa-crosshairs"></i> 再フォーカス
+                            </button>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <button id="snap" class="btn btn-primary px-4 rounded-pill" type="button" style="min-width:120px;">
+                                <i class="fas fa-camera"></i> 撮影
+                            </button>
+                        </div>
+                        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+                        <!-- ĐÃ LOẠI BỎ input file upload -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 mb-4">
+                <div class="card shadow border-0 h-100">
+                    <div class="card-header bg-success text-white text-center fw-bold">
+                        情報 &amp; QRコード読み取り
+                    </div>
+                    <div class="card-body bg-light">
+                        <div class="form-group mb-3">
+                            <label><strong>QRコードを読み取って比較内容を取得:</strong></label>
+                            <div class="row align-items-center">
+                                <div class="col-md-7 col-12 mb-2 mb-md-0">
+                                    <div id="qr-reader" style="width:100%;"></div>
+                                    <input type="text" class="form-control mt-2" id="expected_text" name="expected_text" placeholder="QR読み取り後、自動入力されます" value="{{ expected_text }}" readonly>
+                                    <div class="d-flex justify-content-end gap-2 mt-2">
+                                        <button type="button" class="btn btn-outline-warning" id="refocus-qr-btn" style="min-width:120px;">
+                                            <i class="fas fa-crosshairs"></i> 再フォーカス
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" id="start-qr-btn" style="min-width:120px;">QR読み取り開始</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="stop-qr-btn" style="display:none;min-width:120px;">停止</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-5 col-12 text-center">
+                                    <img src="{% static 'img/thamkhaoQR.JPEG' %}" alt="QRコード参考画像" style="max-width:180px; border:1px solid #ccc; border-radius:8px;">
+                                    <div style="font-size:0.95rem; color:#888;">QRコード読み取り参考画像</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% if device %}
+                        <div class="form-group mb-3">
+                            <label><strong>選択した機械情報：</strong></label>
+                            <div class="border rounded p-2 mb-2 bg-light">
+                                <div><strong>機械No.:</strong> {{ device.name }}</div>
+                                <div><strong>材料名：</strong> {{ device.material }}</div>
+                                <div><strong>製品名：</strong> {{ device.product }}</div>
+                                <div><strong>混合率：</strong> {{ device.ratio }}</div>
+                            </div>
+                            <input type="hidden" name="device" value="{{ device.id }}">
+                            <input type="hidden" name="machine_number" value="{{ device.name }}">
+                        </div>
+                        {% endif %}
+                        <div class="form-group mb-3">
+                            <label><strong>作業者：</strong></label>
+                            <span class="form-control-plaintext" style="font-weight:bold;">
+                                {% if form.instance.operator_name %}
+                                    {{ form.instance.operator_name }}
+                                {% else %}
+                                    {{ request.user.last_name }} {{ request.user.first_name }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="input_weight"><strong>投入した材料の重さ (kg)：</strong></label>
+                            <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="decimal">
+                            <div id="virtual-numpad" class="d-flex flex-column align-items-center mt-2" style="max-width:260px;margin:0 auto;gap:4px;">
+    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="7">7</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="8">8</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="9">9</button>
+    </div>
+    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="4">4</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="5">5</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="6">6</button>
+    </div>
+    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="1">1</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="2">2</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="3">3</button>
+    </div>
+    <div class="d-flex w-100 justify-content-center gap-2">
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num="0" style="flex:1;">0</button>
+        <button type="button" class="btn btn-outline-secondary num-btn" data-num=".">.</button>
+        <button type="button" class="btn btn-danger num-btn" data-num="del">⌫</button>
+        <button type="button" class="btn btn-warning num-btn" data-num="clear">C</button>
+    </div>
+</div>
+                        </div>
+                        <input type="hidden" id="captured_image" name="captured_image">
+                         <div class="card p-3">
+                         <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success px-4 rounded-pill shadow" style="min-width:120px;">
+                                <i class="fas fa-upload"></i> 送信
+                            </button>
+                         </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if form.instance.image or form.instance.processed_image or data %}
+    <div class="row mt-4 justify-content-center">
+        <div class="col-md-4 mb-3">
+            {% if form.instance.image %}
+                <div class="card shadow-sm">
+                    <div class="card-header text-center bg-info text-white py-2">アップロード画像</div>
+                    <div class="card-body text-center">
+                        <img src="{{ form.instance.image.url }}" alt="アップロード画像" class="img-fluid mb-2 rounded" style="max-width:100%;">
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col-md-4 mb-3">
+            {% if form.instance.processed_image %}
+                <div class="card shadow-sm">
+                    <div class="card-header text-center bg-warning text-white py-2">前処理画像</div>
+                    <div class="card-body text-center">
+                        <img src="{{ form.instance.processed_image.url }}" alt="前処理画像" class="img-fluid mb-2 rounded" style="max-width:100%;">
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col-md-4 mb-3">
+            {% if data %}
+                <div class="card shadow-sm">
+                    <div class="card-header text-center bg-secondary text-white py-2">画像から読み取った文字</div>
+                    <div class="card-body">
+                        <pre style="background:#f8f9fa;padding:10px;max-height:350px;overflow:auto;">{{ data }}</pre>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if form.errors %}
+    <div class="alert alert-danger">
+        <ul>
+        {% for field in form %}
+            {% for error in field.errors %}
+                <li>{{ field.label }}: {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+        {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if match_ratios %}
+    <div class="alert alert-info text-center">
+        <b>各部分の一致率：</b>
+        {% for ratio in match_ratios %}
+            <span class="badge bg-primary mx-1">{{ ratio }}%</span>
+        {% endfor %}
+        <br>
+        <b>最低一致率：</b> <span class="badge bg-success">{{ min_ratio }}%</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- オーバーレイローディング -->
+<style>
+#loading-overlay {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: linear-gradient(135deg, #f4f8fb 60%, #e3eefd 100%);
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s;
+}
+#loading-overlay .loading-box {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    padding: 48px 36px 36px 36px;
+    min-width: 340px;
+    max-width: 90vw;
+    text-align: center;
+    animation: fadeInScale 0.5s;
+}
+@keyframes fadeInScale {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.85);}
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1);}
+}
+.loading-logo {
+    width: 110px; height: 110px; object-fit: contain;
+    margin-bottom: 18px;
+    filter: drop-shadow(0 2px 8px #b0b0b0);
+    animation: logoPulse 1.8s infinite;
+}
+@keyframes logoPulse {
+    0%, 100% { filter: drop-shadow(0 2px 8px #b0b0b0) brightness(1);}
+    50% { filter: drop-shadow(0 2px 16px #6fa8dc) brightness(1.15);}
+}
+.custom-spinner {
+    width: 54px; height: 54px;
+    border: 7px solid #e3eefd;
+    border-top: 7px solid #0070c9;
+    border-radius: 50%;
+    margin: 0 auto 18px auto;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg);}
+    100% { transform: rotate(360deg);}
+}
+.loading-text {
+    font-size: 1.25rem;
+    color: #0070c9;
+    font-weight: bold;
+    margin-top: 12px;
+    letter-spacing: 1px;
+}
+</style>
+<div id="loading-overlay">
+    <div class="loading-box">
+        <img src="{% static 'img/logo1.png' %}" alt="Logo" class="loading-logo">
+        <div class="custom-spinner"></div>
+        <div class="loading-text">
+            画像を処理中です。<br>しばらくお待ちください...
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+    const inputWeight = document.getElementById('input_weight');
+    const capturedImage = document.getElementById('captured_image');
+    const expectedTextInput = document.getElementById('expected_text');
+
+    // Kiểm tra số kg
+    const val = inputWeight.value.trim();
+    if (!val || !/^(\d+|\d*\.\d+)$/.test(val)) {
+        alert("重量(kg)を正しく入力してください。例: 12.5, 0.5, .5");
+        e.preventDefault();
+        return false;
+    }
+    // Kiểm tra ảnh đã chụp
+    if (!capturedImage.value) {
+        alert("カメラで撮影した画像がありません。『撮影』ボタンを押して画像を取得してください。");
+        e.preventDefault();
+        return false;
+    }
+    // Kiểm tra QR code
+    if (!expectedTextInput.value || expectedTextInput.value.trim() === "None"|| expectedTextInput.value.trim() === "") {
+        alert("QRコードを読み取ってください。");
+        e.preventDefault();
+        return false;
+    }
+    document.getElementById('loading-overlay').style.display = 'block';
+});
+</script>
+<!-- QRコード読み取りライブラリ -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<script>
+    // カメラ切り替え
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snap = document.getElementById('snap');
+    const capturedImage = document.getElementById('captured_image');
+    const frontCam = document.getElementById('frontCam');
+    const backCam = document.getElementById('backCam');
+    const refocusCam = document.getElementById('refocusCam');
+    let currentStream = null;
+
+    function startCamera(facingMode = "environment") {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } })
+            .then(function(stream) {
+                currentStream = stream;
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(function(err) {
+                alert("カメラにアクセスできません: " + err);
+            });
+    }
+
+    // デフォルトはバックカメラ
+    startCamera("environment");
+
+    frontCam.addEventListener("click", function() {
+        startCamera("user");
+    });
+
+    backCam.addEventListener("click", function() {
+        startCamera("environment");
+    });
+
+    snap.addEventListener("click", function() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.style.display = "block";
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataURL = canvas.toDataURL('image/png');
+        capturedImage.value = dataURL;
+    });
+
+    refocusCam.addEventListener("click", function() {
+        // Dừng stream hiện tại và khởi động lại camera để lấy nét lại
+        startCamera(currentStream && currentStream.getVideoTracks()[0].getSettings().facingMode || "environment");
+    });
+
+
+
+    // QRコード読み取り
+    let html5QrCode;
+    const qrReader = document.getElementById('qr-reader');
+    const expectedTextInput = document.getElementById('expected_text');
+    const startQrBtn = document.getElementById('start-qr-btn');
+    const stopQrBtn = document.getElementById('stop-qr-btn');
+
+    startQrBtn.onclick = function() {
+        startQrBtn.style.display = "none";
+        stopQrBtn.style.display = "inline-block";
+        qrReader.style.display = "block";
+        html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            {
+                fps: 10,
+                qrbox: 250
+            },
+            qrCodeMessage => {
+                expectedTextInput.value = qrCodeMessage;
+                html5QrCode.stop();
+                qrReader.innerHTML = "";
+                startQrBtn.style.display = "inline-block";
+                stopQrBtn.style.display = "none";
+            },
+            errorMessage => {
+                // エラーをログに出力する場合
+            }
+        ).catch(err => {
+            alert("QRコード読み取り用カメラにアクセスできません: " + err);
+            startQrBtn.style.display = "inline-block";
+            stopQrBtn.style.display = "none";
+        });
+    };
+
+    stopQrBtn.onclick = function() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                qrReader.innerHTML = "";
+                startQrBtn.style.display = "inline-block";
+                stopQrBtn.style.display = "none";
+            });
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const inputWeight = document.getElementById('input_weight');
+    const numpad = document.getElementById('virtual-numpad');
+    if (numpad && inputWeight) {
+        numpad.addEventListener('click', function(e) {
+            if (e.target.classList.contains('num-btn')) {
+                let val = inputWeight.value || '';
+                const num = e.target.getAttribute('data-num');
+                if (num === 'del') {
+                    inputWeight.value = val.slice(0, -1);
+                } else if (num === 'clear') {
+                    inputWeight.value = '';
+                } else {
+                    inputWeight.value += num;
+                }
+                inputWeight.focus();
+            }
+        });
+        // Ngăn bàn phím thật hiện ra trên mobile khi nhấn input
+        inputWeight.addEventListener('focus', function(e) {
+            setTimeout(() => inputWeight.blur(), 100);
+        });
+    }
+});
+</script>
+</div>
+
+{% endblock %}

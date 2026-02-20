@@ -1,0 +1,14 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<h3>ファイル差し替え</h3>
+<div class="mb-3">
+    <label>現在のファイル: </label>
+    <a href="{{ document.file.url }}" target="_blank">{{ document.file.name|cut:"documents/" }}</a>
+</div>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">差し替え</button>
+    <a href="{% url 'phe_duyet:index' %}" class="btn btn-secondary">キャンセル</a>
+</form>
+{% endblock %}

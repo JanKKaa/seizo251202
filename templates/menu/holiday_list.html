@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>休日一覧・登録</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap & FontAwesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body>
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="fas fa-calendar-day"></i> 休日一覧・登録</h2>
+    <!-- Form đăng ký ngày nghỉ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-row align-items-end">
+                    <div class="form-group col-md-4 mb-0">
+                        <label for="holiday_date">休日の日付</label>
+                        <input type="text" class="form-control" id="holiday_date" name="holiday_date" placeholder="日付を選択" autocomplete="off" required>
+                        <small class="form-text text-muted">複数の日付を選択できます。</small>
+                    </div>
+                    <div class="form-group col-md-6 mb-0">
+                        <label for="holiday_note">備考（任意）</label>
+                        <input type="text" class="form-control" id="holiday_note" name="holiday_note" placeholder="例: 山の日, 振替休日など">
+                    </div>
+                    <div class="form-group col-md-2 mb-0">
+                        <button type="submit" class="btn btn-warning btn-block">
+                            <i class="fas fa-plus"></i> 登録
+                        </button>
+                    </div>
+                </div>
+                {% if error %}
+                    <div class="alert alert-danger mt-3">{{ error }}</div>
+                {% endif %}
+                {% if message %}
+                    <div class="alert alert-success mt-3">{{ message }}</div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+    <!-- Danh sách ngày nghỉ -->
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <i class="fas fa-calendar-alt"></i> 登録済みの休日【土日以外】
+        </div>
+        <div class="card-body p-0">
+            {% now "Y" as current_year %}
+            {% with next_year=current_year|add:"1" %}
+            <div class="row">
+                {% regroup holidays by date.year as year_list %}
+                {% for year_group in year_list %}
+                    {% if year_group.grouper|stringformat:"s" == current_year or year_group.grouper|stringformat:"s" == next_year|stringformat:"s" %}
+                        {% regroup year_group.list by date.month as month_list %}
+                        {% for month_group in month_list %}
+                        <div class="col-md-4 col-sm-6 mb-4">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-header bg-info text-white py-2">
+                                    <strong>{{ year_group.grouper }}年 {{ month_group.grouper }}月</strong>
+                                </div>
+                                <div class="card-body p-2">
+                                    {% if month_group.list %}
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:40%;">日付</th>
+                                                <th style="width:40%;">備考</th>
+                                                <th style="width:20%;">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for holiday in month_group.list %}
+                                            <tr>
+                                                <td class="text-nowrap">{{ holiday.date|date:"Y-m-d" }}</td>
+                                                <td>{{ holiday.note }}</td>
+                                                <td>
+                                                    <form method="post" action="{% url 'menu:holiday_delete' holiday.id %}" style="display:inline;">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-danger px-2 py-1" onclick="return confirm('本当に削除しますか？');">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <div class="text-muted text-center py-2">休日なし</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endwith %}
+            {% if holidays|length == 0 %}
+            <tr>
+                <td colspan="3" class="text-center text-muted">まだ休日が登録されていません。</td>
+            </tr>
+            {% endif %}
+        </div>
+    </div>
+    <div class="mt-4">
+        <a href="{% url 'menu:list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> メニューに戻る</a>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script>
+flatpickr("#holiday_date", {
+    mode: "multiple",
+    dateFormat: "Y-m-d",
+    locale: "ja"
+});
+</script>
+</body>
+</html>

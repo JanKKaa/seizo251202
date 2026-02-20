@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>注文を再登録</h2>
+    
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            <p><strong>社員番号:</strong> {{ ma_nv }}</p>
+            <p><strong>氏名:</strong> {{ ten_nv }}</p>
+            <p><strong>料理:</strong> {{ order.mon_an.ten }}</p>
+            <p><strong>現在の配達日:</strong> {{ order.ngay_giao|date:"Y年m月d日" }}</p>
+        </div>
+    </div>
+    
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="ngay_giao">新しい配達日：</label>
+            <input type="date" id="ngay_giao" name="ngay_giao" class="form-control" value="{{ order.ngay_giao|date:'Y-m-d' }}" required>
+            <small class="form-text text-muted">過去の日付でも選択できます。土日祝日は選択できません。</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="so_luong">数量：</label>
+            <input type="number" id="so_luong" name="so_luong" class="form-control" value="{{ order.so_luong }}" min="1" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="calamviec">勤務区分：</label>
+            <select id="calamviec" name="calamviec" class="form-control">
+                <option value="日勤" {% if order.calamviec == '日勤' %}selected{% endif %}>日勤</option>
+                <option value="夜勤" {% if order.calamviec == '夜勤' %}selected{% endif %}>夜勤</option>
+                <option value="工作課" {% if order.calamviec == '工作課' %}selected{% endif %}>工作課</option>
+                <option value="客様" {% if order.calamviec == '客様' %}selected{% endif %}>客様</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="ghi_chu">備考：</label>
+            <textarea id="ghi_chu" name="ghi_chu" class="form-control" rows="3">{{ order.ghi_chu }}</textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">再登録</button>
+        <a href="{% url 'menu:order_history' %}" class="btn btn-secondary">キャンセル</a>
+    </form>
+</div>
+
+<script>
+// Vô hiệu hóa Chủ nhật và Thứ bảy
+document.getElementById('ngay_giao').addEventListener('change', function() {
+    const selectedDate = new Date(this.value + 'T00:00:00');
+    const dayOfWeek = selectedDate.getDay();
+    const holidays = {{ holidays|safe }};
+    
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        alert('土日祝日には注文できません。');
+        this.value = '';
+    } else if (holidays.includes(this.value)) {
+        alert('この日は休日です。');
+        this.value = '';
+    }
+});
+</script>
+{% endblock %}

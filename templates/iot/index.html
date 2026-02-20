@@ -1,0 +1,278 @@
+{% extends "trang_chu/base.html" %}
+{% load humanize %}
+
+{% block title %}IOTダッシュボード - 成形機 稼働状況{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+  html, body {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    
+  }
+  body {
+    background: linear-gradient(120deg, #e3f0ff 0%, #f7fafd 100%);
+    font-family: 'Meiryo', 'Segoe UI', Arial, sans-serif;
+    color: #1a237e;
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard-header {
+    background: linear-gradient(90deg, #1976d2 0%, #1565c0 100%);
+    color: #fff;
+    padding: 10px 0 8px 0;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+    box-shadow: 0 4px 18px rgba(33,150,243,.12);
+    margin-bottom: 0;
+    border-bottom-left-radius: 32px;
+    border-bottom-right-radius: 32px;
+    position: relative;
+    z-index: 0;
+  }
+  .main-content {
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 8px 4px 0 4px;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .card-section {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 2px 24px rgba(33,150,243,.08);
+    padding: 12px 8px;
+    margin-bottom: 12px;
+    transition: box-shadow .2s;
+  }
+  .dashboard-footer {
+    text-align: center;
+    color: #888;
+    font-size: 1em;
+    margin-top: 0;
+    padding: 8px 0 8px 0;
+    flex-shrink: 0;
+    background: transparent;
+  }
+  .alert-info {
+    background: linear-gradient(90deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1565c0;
+    border: none;
+    font-weight: 600;
+    font-size: 1.08em;
+    box-shadow: 0 2px 8px rgba(33,150,243,.08);
+  }
+  .alert-danger {
+    background: linear-gradient(90deg, #ffebee 0%, #ffcdd2 100%);
+    color: #c62828;
+    border: none;
+    font-weight: 700;
+    font-size: 1.08em;
+    box-shadow: 0 2px 8px rgba(198,40,40,.08);
+  }
+  .btn-group-custom .btn {
+    min-width: 160px;
+    font-weight: 700;
+    font-size: 1em;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(33,150,243,.06);
+    transition: all .18s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .btn-group-custom .btn i {
+    font-size: 1.1em;
+  }
+  .btn-warning, .btn-warning:active, .btn-warning:focus {
+    background: linear-gradient(90deg, #ffd54f 0%, #ffb300 100%);
+    color: #212121;
+    border: none;
+    font-weight: 700;
+  }
+  .btn-outline-info {
+    border-color: #1976d2;
+    color: #1976d2;
+  }
+  .btn-outline-info:hover {
+    background: #1976d2;
+    color: #fff;
+  }
+  .btn-outline-success {
+    border-color: #388e3c;
+    color: #388e3c;
+  }
+  .btn-outline-success:hover {
+    background: #388e3c;
+    color: #fff;
+  }
+  .btn-outline-warning {
+    border-color: #ffa000;
+    color: #ffa000;
+  }
+  .btn-outline-warning:hover {
+    background: #ffa000;
+    color: #fff;
+  }
+  .btn-outline-danger {
+    border-color: #e53935;
+    color: #e53935;
+  }
+  .btn-outline-danger:hover {
+    background: #e53935;
+    color: #fff;
+  }
+  .stat-card {
+    background: linear-gradient(120deg, #e3f2fd 0%, #fff 100%);
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(33,150,243,.07);
+    padding: 18px 10px;
+    text-align: center;
+    margin-bottom: 12px;
+    transition: box-shadow .2s;
+  }
+  .stat-card:hover {
+    box-shadow: 0 4px 24px rgba(33,150,243,.18);
+  }
+  .stat-card .stat-title {
+    font-size: 1em;
+    color: #1976d2;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .stat-card .stat-value {
+    font-size: 1.5em;
+    font-weight: 900;
+    color: #1565c0;
+    margin-bottom: 2px;
+  }
+  .stat-card .stat-desc {
+    font-size: 0.95em;
+    color: #888;
+  }
+  @media (max-width: 768px) {
+    .main-content { padding: 8px 2px 0 2px; }
+    .card-section { padding: 10px 4px; }
+    .btn-group-custom .btn { min-width: 100px; font-size: 0.95em; }
+    .dashboard-header { font-size: 1.2rem; padding: 10px 0 8px 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-header" style="z-index: 0;">
+  <i class="fa-solid fa-gauge-high me-2"></i> IOTダッシュボード - 成形機 稼働状況
+</div>
+
+<div class="main-content">
+  {% if net100_error %}
+    <div class="alert alert-danger text-center my-2">
+      <i class="fa-solid fa-triangle-exclamation me-2"></i>
+      ネットワークからNET100の信号がありません。ネットワーク接続またはNET100機器をご確認ください。
+    </div>
+  {% endif %}
+
+  {% if notifications %}
+    <div class="card-section mb-3">
+      <h4 class="mb-2"><i class="fa-solid fa-bell me-2"></i>通知一覧</h4>
+      {% for n in notifications %}
+        <div class="alert alert-info d-flex justify-content-between align-items-center mb-2">
+          <div>
+            <strong>{{ n.message }}</strong>
+            <span class="ms-2">({{ n.appear_at|date:"H:i" }} - {{ n.expire_at|date:"H:i" }})</span>
+          </div>
+          <a href="{% url 'delete_notification' n.pk %}" class="btn btn-danger btn-sm ms-3">削除</a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-section mb-3">
+      <h4 class="mb-2"><i class="fa-solid fa-bell-slash me-2"></i>通知</h4>
+      <p class="text-muted">通知はありません。</p>
+    </div>
+  {% endif %}
+  <div class="card-section mb-3">
+    <h4 class="mb-2"><i class="fa-solid fa-list-check me-2"></i>機能メニュー</h4>
+    <div class="btn-group-custom d-flex flex-wrap gap-2">
+      <a href="{% url 'iot:molding' %}" class="btn btn-success btn-sm"><i class="fa-solid fa-cube"></i> 金型寿命管理</a>
+      <a href="{% url 'iot:machine_counter' %}" class="btn btn-info btn-sm"><i class="fa-solid fa-industry"></i> ショット数監視</a>
+      <a href="{% url 'iot:upload_production_plan' %}" class="btn btn-outline-info btn-sm"><i class="fa-solid fa-upload"></i> 生産計画 (CSV)</a>
+      <a href="{% url 'iot:production_plan_status' %}" class="btn btn-outline-warning btn-sm"><i class="fa-solid fa-table"></i> 計画と実績の比較</a>
+      <a href="{% url 'iot:change4m-manage' %}" class="btn btn-outline-danger btn-sm">
+        <i class="fa-solid fa-clipboard-list"></i> 4M更新管理
+      </a>
+      <a href="{% url 'iot:chatwork_page' %}" class="btn btn-outline-primary btn-sm">
+        <i class="fab fa-chat"></i> Chatworkメッセージ
+      </a>
+      <a href="{% url 'iot:master_import' %}" class="btn btn-outline-success btn-sm">
+        <i class="fa-solid fa-database"></i> 製品マスター
+      </a>
+    </div>
+  </div>
+
+  {% comment %} --- Hướng dẫn sử dụng các chức năng --- {% endcomment %}
+  <div class="card-section mb-3">
+    <h4 class="mb-2"><i class="fa-solid fa-circle-question me-2"></i>ご利用ガイド（操作説明）</h4>
+    <ul class="mb-2">
+      <li>
+        <strong>金型寿命管理</strong>：<br>
+        金型ごとの寿命・ショット数を管理します。金型の状態や交換時期を確認できます。
+      </li>
+      <li>
+        <strong>ショット数監視</strong>：<br>
+        各成形機のショット数をリアルタイムで監視します。生産状況の把握にご利用ください。
+      </li>
+      <li>
+        <strong>生産計画 (CSV) アップロード</strong>：<br>
+        <ol class="mb-1">
+          <li>「生産計画 (CSV)」ボタンをクリックします。</li>
+          <li>CSVファイル選択画面で、アップロードしたい生産計画ファイルを選択します。</li>
+          <li>「アップロード」ボタンを押して完了です。</li>
+        </ol>
+        ※CSVフォーマット例はアップロード画面でダウンロードできます。
+      </li>
+      <li>
+        <strong>計画と実績の比較</strong>：<br>
+        アップロードした生産計画と実際の生産実績を比較・確認できます。
+      </li>
+      <li>
+        <strong>4M更新管理</strong>：<br>
+        4M（人・機械・材料・方法）の変更履歴や管理を行います。
+      </li>
+      <li>
+        <strong>Chatworkメッセージ</strong>：<br>
+        Chatworkでの通知・連絡履歴を確認できます。
+      </li>
+      <li>
+        <strong>製品マスター</strong>：<br>
+        製品ごとのショット数マスターを一括登録・更新できます。
+      </li>
+    </ul>
+    <div class="alert alert-info py-2 px-3 mb-0">
+      <i class="fa-solid fa-info-circle me-2"></i>
+      詳細な操作方法やご不明点は、生産技術課までお問い合わせください。
+    </div>
+  </div>
+
+  <div class="card-section text-center">
+    <a href="{% url 'iot:iot_dashboard' %}" class="btn btn-warning btn-lg px-4 py-2 shadow">
+      <i class="fa-solid fa-th-large"></i> 新ダッシュボード表示
+    </a>
+  </div>
+</div>
+
+<div class="dashboard-footer">
+  <span><i class="fa-regular fa-copyright"></i> 2025 成形機 IOTダッシュボード | 製造部-生産技術課</span>
+</div>
+{% endblock %}

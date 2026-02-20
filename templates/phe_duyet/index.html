@@ -1,0 +1,226 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}承認{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">ドキュメント一覧</h1>
+<a href="{% url 'phe_duyet:create_document' %}" class="btn btn-primary mb-4">申請</a>
+<div class="card shadow mb-4 export-fixed">
+    <a href="{% url 'phe_duyet:export_pdf' %}" class="btn btn-danger btn-sm">PDFをエクスポート</a>
+    <a href="{% url 'phe_duyet:export_csv' %}" class="btn btn-success btn-sm">CSVをエクスポート</a>
+</div>
+
+<style>
+    .export-fixed {
+        position: fixed;
+        right: 20px;
+        top: 80px; /* Mặc định bằng chiều cao banner */
+        width: 170px;
+        text-align: right;
+        z-index: 1100;
+    }
+    @media (max-width: 600px) {
+        .export-fixed { top: 56px; }
+    }
+</style>
+
+<!-- DataTales Example -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">ドキュメント一覧</h6>
+        {% with total_documents=page_obj.paginator.count %}
+        <tr>
+            <td colspan="9" class="small text-right">総ドキュメント数: {{ total_documents }}</td>
+        </tr>
+        {% endwith %}
+    </div>
+    <div class="card-body">
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm" id="dataTable" width="100%" cellspacing="0">
+                <thead class="thead-light">
+                    <tr>
+                        <th class="small text-center font-weight-bold" style="width: 2%; font-size: 13px;">No.</th>
+                        <th class="small text-center font-weight-bold" style="width: 5%; font-size: 13px;">提出日</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">依頼者</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">タイトル</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%; font-size: 13px;">ファイル名</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">確認</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">承認者</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">アクション</th>
+                        <th class="small text-center font-weight-bold" style="width: 60%; font-size: 13px;">コメント</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for document in page_obj %}
+                    <tr>
+                        <td class="small text-center">{{ forloop.counter0|add:page_obj.start_index }}</td>
+                        <td class="small text-center">{{ document.submission_date }}</td>
+                        <td class="small text-center">{{ document.created_by.first_name }} {{ document.created_by.last_name }}</td>
+                        <td class="small">{{ document.title }}
+                            <br>
+                            <a href="{{ document.file.url }}" class="btn btn-primary btn-sm" target="_blank">ドキュメントを見る</a>
+                        </td>
+                        <td class="small" id="file-name-{{ document.id }}">
+                            {{ document.file.name|cut:"documents/" }}
+                            
+                        </td>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                var fileNameElement = document.getElementById('file-name-{{ document.id }}');
+                                var fileName = fileNameElement.textContent.trim();
+                                var maxLength = 20;
+                                if (fileName.length > maxLength) {
+                                    var truncatedFileName = fileName.substring(0, maxLength) + '...';
+                                    fileNameElement.textContent = truncatedFileName;
+                                }
+                            });
+                        </script>
+                        <td class="small text-center">
+                            {% if document.is_approved %}
+                                <a href="#" class="btn btn-success btn-icon-split btn-sm">
+                                    <span class="icon text-white-50">
+                                        <i class="fas fa-check"></i>
+                                    </span>
+                                    <span class="text">承認</span>
+                                </a>
+                            {% elif document.is_rejected %}
+                                <a href="#" class="btn btn-danger btn-icon-split btn-sm">
+                                    <span class="icon text-white-50">
+                                        <i class="fas fa-times"></i>
+                                    </span>
+                                    <span class="text">不承認</span>
+                                </a>
+                            {% else %}
+                                <a href="#" class="btn btn-warning btn-icon-split btn-sm">
+                                    <span class="icon text-white-50">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </span>
+                                    <span class="text">確認中</span>
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td class="small text-center">
+                            {% if document.recipient %}
+                                 {{ document.recipient.last_name }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td class="small text-center">
+                            {% if document.is_approved %}
+                                <!-- Nút Download nếu tài liệu đã được phê duyệt -->
+                                <a href="{{ document.approved_file.url }}" class="btn btn-success btn-sm" download>
+                                    <i class="fas fa-download"></i> ダウンロード
+                                </a>
+                            {% elif not document.is_rejected %}
+                                <!-- Nút Approve và Reject nếu tài liệu chưa được phê duyệt -->
+                                {% if document.recipient == user %}
+                                    <a href="{% url 'phe_duyet:approve_document' document.id %}" class="btn btn-primary btn-sm">承認</a>
+                                    <form method="post" action="{% url 'phe_duyet:approve_document' document.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="reject" value="true">
+                                        <button type="submit" class="btn btn-danger btn-sm">不承認</button>
+                                    </form>
+                                {% endif %}
+                            {% endif %}
+                            
+                            <!-- Nút gửi email nhắc nhở nếu tài liệu chưa được phê duyệt -->
+                            {% if not document.is_approved %}
+                                <form method="post" action="{% url 'phe_duyet:send_reminder_email' document.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-warning btn-sm">メールを送信</button>
+                                </form>
+                            {% endif %}
+                            
+                           
+                            <!-- Nút xóa tài liệu nếu người dùng là superuser -->
+                            {% if user.is_superuser %}
+                            <form method="post" action="{% url 'phe_duyet:delete_document' document.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('このドキュメントを削除しますか？');">削除</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            <form method="post" action="{% url 'phe_duyet:index' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="document_id" value="{{ document.id }}">
+                                <textarea name="comment" class="form-control form-control-sm" rows="2" placeholder="コメントを追加..." oninput="checkComment(this)"></textarea>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <button type="submit" id="submit-button-{{ document.id }}" class="btn btn-primary btn-sm mt-2" disabled>送信</button>
+                                    {% if document.approved_by %}
+                                        <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="toggleComments('{{ document.id }}')">コメントを表示/非表示</button>
+                                    {% endif %}
+                                </div>
+                            </form>
+                            <div class="mt-2">
+                                <div id="comments-{{ document.id }}" class="comments-section">
+                                    {% for comment in document.comments.all %}
+                                    <p class="small text-muted m-1"><strong>{{ comment.user.first_name }} {{ comment.user.last_name }}</strong> <br>({{ comment.created_at }}):</p>
+                                    <p style="text-align: right;">{{ comment.text }}</p>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <!-- Các nút khác (xem, tải về, ...) -->
+                            {% if document.created_by == user or document.recipient == user or user.is_superuser %}
+                                <a href="{% url 'phe_duyet:update_document_file' document.id %}" class="btn btn-info btn-sm">差し替え</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-center">
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleComments(documentId) {
+        var commentsSection = document.getElementById('comments-' + documentId);
+        if (commentsSection.style.display === 'none') {
+            commentsSection.style.display = 'block';
+        } else {
+            commentsSection.style.display = 'none';
+        }
+    }
+
+    function checkComment(textarea) {
+        var form = textarea.closest('form');
+        var submitButton = form.querySelector('button[type="submit"]');
+        if (textarea.value.trim() === '') {
+            submitButton.disabled = true;
+        } else {
+            submitButton.disabled = false;
+        }
+    }
+</script>
+
+{% endblock %}

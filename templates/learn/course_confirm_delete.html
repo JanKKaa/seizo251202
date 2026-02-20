@@ -1,0 +1,16 @@
+{% extends "learn/base_learn.html" %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">コース削除確認</h1>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <p>コース "{{ course.title }}" を削除しますか？</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">削除</button>
+                <a href="{% url 'learn:course_list' %}" class="btn btn-secondary">キャンセル</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

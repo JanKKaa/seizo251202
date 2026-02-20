@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP8266 Devices Status</title>
+    <style>
+        .pin-box { display: inline-block; width: 60px; height: 60px; margin: 4px; text-align: center; border-radius: 8px; font-size: 1em; }
+        .on { background: #4caf50; color: #fff; }
+        .off { background: #f44336; color: #fff; }
+        .device { margin-bottom: 24px; }
+    </style>
+</head>
+<body>
+    <h2>ESP8266 Devices Status</h2>
+    <div id="devices"></div>
+    <script>
+        function fetchAll() {
+            fetch('/arduino/status/all/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        let html = '';
+                        for (const dev of data.devices) {
+                            html += `<div class="device"><b>${dev.address}</b> (${dev.timestamp})<br>`;
+                            for (const [pin, val] of Object.entries(dev.pins)) {
+                                html += `<div class="pin-box ${val == 1 ? 'on' : 'off'}">${pin}<br>${val == 1 ? 'ON' : 'OFF'}</div>`;
+                            }
+                            html += '</div>';
+                        }
+                        document.getElementById('devices').innerHTML = html;
+                    } else {
+                        document.getElementById('devices').innerHTML = '<span style="color:red;">No data</span>';
+                    }
+                });
+        }
+        setInterval(fetchAll, 1000);
+        fetchAll();
+    </script>
+</body>
+</html>

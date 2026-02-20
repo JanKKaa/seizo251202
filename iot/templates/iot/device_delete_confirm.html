@@ -1,0 +1,15 @@
+{% extends "iot/base_iot.html" %}
+{% block title %}Xóa thiết bị{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="text-danger">Xóa thiết bị</h5>
+    <p>Bạn chắc chắn muốn xóa: <strong>{{ machine.address }}</strong> ({{ machine.name }})?</p>
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
+      <button class="btn btn-danger btn-sm">Xóa</button>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'device_detail' machine.pk %}">Quay lại</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

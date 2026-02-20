@@ -1,0 +1,321 @@
+{% extends "trang_chu/base.html" %}
+{% load humanize %}
+
+{% block title %}金型寿命管理 - 成形条件別集計{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">現在の稼働状態</h2>
+
+    {% if active_machines %}
+    <h4 class="mb-3">NET100</h4>
+    <div class="table-responsive mb-4" style="min-width:900px;">
+        <table class="table table-bordered table-striped align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width:6%;">#</th>
+                    <th style="width:18%;">機械名</th>
+                    <th style="width:26%;">成形条件名</th>
+                    <th style="width:14%;">ショット数</th>
+                    <th style="width:14%;">サイクルタイム</th>
+                    <th style="width:12%;">状態</th>
+                    <th style="width:10%;">最終ショット</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in active_machines %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ m.name }}</td>
+                    <td class="text-truncate" style="max-width:260px;">{{ m.condname }}</td>
+                    <td>{{ m.shotno|intcomma }}</td>
+                    <td>{{ m.cycletime }}</td>
+                    <td><span class="badge bg-success">生産中</span></td>
+                    <td>
+                        {% if m.last_shot %}
+                            {{ m.last_shot|intcomma }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">NET100 データがありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if esp32_devices %}
+    <h4 class="mb-3">ESP32</h4>
+    <div class="table-responsive mb-4" style="min-width:1100px;">
+        <table class="table table-bordered table-striped align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width:4%;">#</th>
+                    <th style="width:16%;">機械名</th>
+                    <th style="width:20%;">製品 / 条件名</th>
+                    <th style="width:12%;">ESP32ショット</th>
+                    <th style="width:12%;">DB累積ショット</th>
+                    <th style="width:14%;">サイクルタイム</th>
+                    <th style="width:18%;">状態</th>
+                    <th style="width:20%;">最終ショット / 更新</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in esp32_devices %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        {{ d.name|default:"-" }}
+                        {% if d.matched_condname %}
+                            <div class="small text-muted">条件: {{ d.matched_condname }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-truncate" style="max-width:220px;">
+                        {{ d.product_display }}
+                        {% if d.matched_mold_name %}
+                            <div class="small text-muted">金型: {{ d.matched_mold_name }}</div>
+                        {% endif %}
+                        {% if d.matched_condname %}
+                            <div class="small text-muted">条件: {{ d.matched_condname }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if d.current_shot_value is not None %}
+                            {{ d.current_shot_value|intcomma }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if d.db_total_shot is not None %}
+                            {{ d.db_total_shot|intcomma }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ d.cycle_display }}</td>
+                    <td>
+                        <span class="{{ d.status_badge_class }}">{{ d.status_display }}</span>
+                        {% if not d.status_is_running and d.status_raw != d.status_display %}
+                            <div class="small text-muted">{{ d.status_raw }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div>
+                            ESP32:
+                            {% if d.last_shot_value is not None %}
+                                {{ d.last_shot_value|intcomma }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted">
+                            DB:
+                            {% if d.db_last_shot is not None %}
+                                {{ d.db_last_shot|intcomma }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted">
+                            更新:
+                            {% if d.db_last_update %}
+                                {{ d.db_last_update|date:"Y-m-d H:i:s" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">ESP32 データがありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    <div class="mb-3 text-end">
+        <a href="{% url 'iot:molding_create' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> 条件追加
+        </a>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="moldTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active" type="button" role="tab">生産中</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="inactive-tab" data-bs-toggle="tab" data-bs-target="#inactive" type="button" role="tab">生産終了</button>
+        </li>
+    </ul>
+    <div class="tab-content" id="moldTabContent">
+        <!-- 生産中 TAB -->
+        <div class="tab-pane fade show active" id="active" role="tabpanel">
+            <h4 class="mt-3">【生産中】金型一覧</h4>
+            <div class="table-responsive mb-5">
+                <table class="table table-bordered table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:3%;">#</th>
+                            <th style="width:10%;">品番</th>
+                            <th style="width:15%;">品名</th>
+                            <th style="width:10%;">条件名</th>
+                            <th style="width:5%;">寿命</th>
+                            <th style="width:10%;">残り</th>
+                            <th style="width:4%;">状態</th>
+                            <th style="width:12%;">最終ショット</th>
+                            {% if request.user.is_superuser %}
+                            <th style="width:8%;">操作</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in moldlifetimes %}
+                            {% if m.mold.status == "active" %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ m.mold.code }}</td>
+                                <td class="text-truncate" style="max-width:180px;">{{ m.mold.name }}</td>
+                                <td class="text-truncate" style="max-width:120px;">{{ m.condname }}</td>
+                                <td>{{ m.total_shot|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 18px;">
+                                        <div class="progress-bar {{ m.bar_class }} animate-bar"
+                                             role="progressbar"
+                                             data-width="{{ m.bar_width }}"
+                                             style="width:0%">
+                                            {{ m.bar_text }}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">生産中</span>
+                                </td>
+                                <td>
+                                    {% if m.last_update %}
+                                        {{ m.last_update|date:"Y-m-d H:i:s" }}
+                                    {% endif %}
+                                </td>
+                                {% if request.user.is_superuser %}
+                                <td>
+                                    <a href="{% url 'iot:molding_edit' m.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'iot:molding_delete' m.id %}" class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('本当に削除しますか？');">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endif %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if request.user.is_superuser %}9{% else %}8{% endif %}" class="text-center">登録データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 生産終了 TAB -->
+        <div class="tab-pane fade" id="inactive" role="tabpanel">
+            <h4 class="mt-3">【生産終了】金型一覧</h4>
+            <div class="table-responsive mb-4" style="min-width:1300px;">
+                <table class="table table-bordered table-sm align-middle" style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:3%;">#</th>
+                            <th style="width:10%;">品番</th>
+                            <th style="width:15%;">品名</th>
+                            <th style="width:10%;">条件名</th>
+                            <th style="width:5%;">寿命</th>
+                            <th style="width:10%;">残り</th>
+                            <th style="width:4%;">状態</th>
+                            <th style="width:12%;">最終ショット</th>
+                            {% if request.user.is_superuser %}
+                            <th style="width:8%;">操作</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in moldlifetimes %}
+                            {% if m.mold.status == "inactive" %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ m.mold.code }}</td>
+                                <td class="text-truncate" style="max-width:180px;">{{ m.mold.name }}</td>
+                                <td class="text-truncate" style="max-width:120px;">{{ m.condname }}</td>
+                                <td>{{ m.total_shot|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 18px;">
+                                        <div class="progress-bar {{ m.bar_class }} animate-bar"
+                                             role="progressbar"
+                                             data-width="{{ m.bar_width }}"
+                                             style="width:0%">
+                                            {{ m.bar_text }}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">生産終了</span>
+                                </td>
+                                <td>
+                                    {% if m.last_update %}
+                                        {{ m.last_update|date:"Y-m-d H:i:s" }}
+                                    {% endif %}
+                                </td>
+                                {% if request.user.is_superuser %}
+                                <td>
+                                    <a href="{% url 'iot:molding_edit' m.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'iot:molding_delete' m.id %}" class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('本当に削除しますか？');">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endif %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if request.user.is_superuser %}9{% else %}8{% endif %}" class="text-center">登録データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3 text-end">
+        <a href="{% url 'iot:iot_index' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+    </div>
+</div>
+
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('.animate-bar').forEach(function(bar) {
+            var percent = bar.getAttribute('data-width');
+            setTimeout(function() {
+                bar.style.width = percent + '%';
+            }, 200); // delay nhỏ cho hiệu ứng mượt
+        });
+    });
+    setTimeout(function() {
+        window.location.reload();
+    }, 15000); // 15 giây tự động reload
+</script>
+
+{% endblock %}

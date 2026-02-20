@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>保守履歴一覧</title>
+    <style>
+    @font-face {
+        font-family: "NotoSansJP";
+        src: url("{% static 'fonts/NotoSansJP-Regular.ttf' %}");
+    }
+    body, table, td, th {
+        font-family: "NotoSansJP", sans-serif !important;
+    }
+    @page {
+        size: A4 landscape;
+        margin: 15mm 10mm 15mm 10mm;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid black; padding: 6px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>保守履歴一覧</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>コード</th>
+                <th>作業名</th>
+                <th>設備名</th>
+                <th>担当者</th>
+                <th>結果</th>
+                <th>実際の寸法</th>
+                <th>確認済み</th>
+                <th>作成日時</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in histories %}
+            <tr>
+                <td>{{ h.id }}</td>
+                <td>{{ h.task_code.code }}</td>
+                <td>{{ h.detail.item }}</td>
+                <td>{{ h.task_code.task.name }}</td>
+                <td>
+                    {% if h.maintainer %}
+                        {{ h.maintainer.last_name }} {{ h.maintainer.first_name }}
+                    {% endif %}
+                </td>
+                <td>{{ h.result }}</td>
+                <td>{{ h.actual_size }}</td>
+                <td>{% if h.is_confirmed %}はい{% else %}いいえ{% endif %}</td>
+                <td>{{ h.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

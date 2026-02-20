@@ -1,0 +1,15 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}料理を削除{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="alert alert-danger">
+        <h4><i class="fas fa-exclamation-triangle"></i> 本当に削除しますか？</h4>
+        <p>料理「<strong>{{ object.ten }}</strong>」を削除してもよろしいですか？</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">削除</button>
+            <a href="{% url 'menu:list' %}" class="btn btn-secondary">キャンセル</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

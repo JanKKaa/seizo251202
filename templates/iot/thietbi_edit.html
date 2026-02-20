@@ -1,0 +1,72 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}設備情報編集 - {{ machine.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-tools"></i> 設備情報編集</h4>
+                </div>
+                <div class="card-body" style="max-width: 100vw;">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            {% for field in form %}
+                                <div class="form-group mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <h5 class="mb-3"><i class="fas fa-cogs"></i> 部品情報</h5>
+                        {{ formset.management_form }}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm align-middle bg-white w-100" style="min-width: 900px;">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th style="width: 5%;">#</th>
+                                        <th style="width: 18%;">部品コード</th>
+                                        <th style="width: 22%;">部品名</th>
+                                        <th style="width: 20%;">部品寿命（ショット数）</th>
+                                        <th style="width: 25%;">部品詳細</th>
+                                        <th style="width: 10%;">削除</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for subform in formset %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ subform.code }}</td>
+                                        <td>{{ subform.name }}</td>
+                                        <td>{{ subform.lifetime }}</td>
+                                        <td>{{ subform.detail }}</td>
+                                        <td class="text-center">
+                                            {% if subform.instance.pk %}
+                                                {{ subform.DELETE }}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存</button>
+                            <a href="{% url 'quanlysx' machine.address %}" class="btn btn-secondary">戻る</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

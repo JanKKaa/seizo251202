@@ -1,0 +1,7 @@
+﻿python : Python 
+At line:1 char:76
++ ... nue makemig_out.txt; python manage.py makemigrations iot *>&1 | Out-F ...
++                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Python :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

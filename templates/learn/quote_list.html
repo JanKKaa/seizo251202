@@ -1,0 +1,45 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\quote_list.html -->
+{% extends "learn/base_learn.html" %}
+{% block content %}
+
+<div class="container py-3">
+    <h3 class="mb-4"><i class="fas fa-comment-dots text-primary"></i> 名言管理</h3>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="post" class="row g-3 align-items-end">{% csrf_token %}
+                <div class="col-md-8">
+                    <label for="id_text" class="form-label fw-bold">名言</label>
+                    {{ form.text }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_author" class="form-label fw-bold">著者</label>
+                    {{ form.author }}
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-plus"></i> 追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white fw-bold">
+            <i class="fas fa-list"></i> 名言一覧
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for q in quotes %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="fs-5">“{{ q.text }}”</span>
+                    <span class="text-secondary ms-2">— {{ q.author }}</span>
+                </div>
+                <a href="{% url 'learn:quote_delete' q.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('本当に削除しますか？');">
+                    <i class="fas fa-trash-alt"></i> 削除
+                </a>
+            </li>
+            {% empty %}
+            <li class="list-group-item text-center text-muted">名言がありません。</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

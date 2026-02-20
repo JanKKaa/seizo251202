@@ -1,0 +1,57 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<h2><span class="badge bg-success me-2">材料受入</span>ZAIRYOZAIKOYOSOKU（CSV）</h2>
+
+<div class="mb-3 d-flex gap-2">
+  <a href="{% url 'iot:iot_index' %}" class="btn btn-outline-secondary">
+    <i class="fa-solid fa-arrow-left"></i> 戻る
+  </a>
+  <a href="{% url 'iot:upload_production_plan' %}" class="btn btn-outline-primary">
+    <i class="fa-solid fa-industry"></i> 生産計画アップロードへ
+  </a>
+  <a href="{% url 'iot:production_plan_status' %}" class="btn btn-outline-success">
+    <i class="fa-solid fa-table-list"></i> 計画一覧へ
+  </a>
+</div>
+
+<div class="alert alert-success d-flex align-items-center gap-3">
+  <i class="fa-solid fa-boxes-stacked fa-2x"></i>
+  <div>
+    <p class="mb-1 fw-bold">生産管理システム　02.発注～仕入　23.材料在庫予測表示　処理区分7₌CSV</p>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="card p-4 shadow-sm border border-success">
+  {% csrf_token %}
+  <div class="mb-3">
+    <label class="form-label fw-semibold text-success">
+      <i class="fa-solid fa-file-csv me-1"></i> ZAIRYOZAIKOYOSOKUファイル
+    </label>
+    <input type="file" name="csv_file" accept=".csv" class="form-control" required>
+  </div>
+  <div class="d-flex justify-content-end">
+    <button type="submit" class="btn btn-success">
+      <i class="fa-solid fa-upload me-1"></i> アップロード
+    </button>
+  </div>
+</form>
+
+{% if messages %}
+  <ul class="mt-4">
+    {% for msg in messages %}
+      <li>{{ msg }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if debug_logs %}
+  <div class="alert alert-info mt-3" style="white-space: pre-wrap;">
+    <strong>デバッグログ：</strong>
+    <ul>
+      {% for log in debug_logs %}
+        <li>{{ log }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% endblock %}

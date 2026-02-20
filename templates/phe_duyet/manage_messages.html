@@ -1,0 +1,20 @@
+<!-- filepath: /c:/Users/Shin/seizo0/trang_chu/templates/phe_duyet/manage_messages.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}メッセージ管理{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">メッセージ管理</h1>
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <a href="{% url 'phe_duyet:inbox' %}" class="btn btn-primary btn-block">
+            <i class="fas fa-inbox"></i> 受信トレイ
+        </a>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <a href="{% url 'phe_duyet:send_message' %}" class="btn btn-success btn-block">
+            <i class="fas fa-paper-plane"></i> メッセージを送信
+        </a>
+    </div>
+</div>
+{% endblock %}

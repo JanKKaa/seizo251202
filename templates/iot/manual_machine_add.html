@@ -1,0 +1,12 @@
+{% extends "trang_chu/base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h4>手動で機械情報を追加</h4>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">追加</button>
+        <a href="{% url 'iot_index' %}" class="btn btn-secondary">戻る</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% load humanize %}
+
+<!-- BẢNG TRÊN: VISION EVENT -->
+<div class="kpi2-panel kpi2-panel--top" id="dashboard-left-2" aria-live="polite">
+  <div class="kpi2-panel-header">
+    <div class="kpi2-panel-title">
+      <i class="fas fa-camera"></i>
+      <span>材料投入管理</span>
+    </div>
+    <span id="last-update-label-2" class="kpi2-panel-updated small"></span>
+  </div>
+  <div class="kpi2-panel-body">
+    <table class="table table-sm table-bordered table-striped mb-0 kpi2-table" id="vision-event-table">
+      <tbody>
+        <tr>
+          <td class="text-muted text-center" colspan="5">データがありません。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- BẢNG DƯỚI: KẾ HOẠCH NGUYÊN LIỆU -->
+<div class="kpi2-panel kpi2-panel--bottom">
+  <div class="kpi2-panel-header">
+    <div class="kpi2-panel-title">
+      <i class="fas fa-truck-loading"></i>
+      <span>材料入庫予定（本日 {{ total_material_today|default:0|intcomma }}kg)</span>
+    </div>
+  </div>
+  <div class="kpi2-panel-body">
+    <table class="table table-sm table-bordered table-striped mb-0 kpi2-table">
+      <thead>
+        <tr>
+          <th class="text-center">日付</th>
+          <th class="text-center">品名</th>
+          <th class="text-center">量</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in material_plans_today %}
+        <tr>
+          <td class="text-center">{{ today_label }}</td>
+          <td class="text-center">{{ plan.product_name|default:"未設定" }}</td>
+          <td class="text-center">{{ plan.total_plan|intcomma }} kg</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td class="text-muted text-center" colspan="3">本日の予定なし</td>
+        </tr>
+        {% endfor %}
+
+        {% for plan in material_plans_tomorrow %}
+        <tr>
+          <td class="text-center">{{ tomorrow_label }}</td>
+          <td class="text-center">{{ plan.product_name|default:"未設定" }}</td>
+          <td class="text-center">{{ plan.total_plan|intcomma }} kg</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td class="text-muted text-center" colspan="3">翌日の予定なし</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  const tableBody = document.querySelector("#vision-event-table tbody");
+  const lastUpdateLabel = document.getElementById("last-update-label-2");
+  const visionUrl = "{% url 'vision_latest_events' %}";
+
+  function renderTable(events) {
+    if (!tableBody) return;
+    tableBody.innerHTML = "";
+    const limitedEvents = Array.isArray(events) ? events.slice(0, 3) : [];
+    if (!limitedEvents.length) {
+      tableBody.innerHTML = `<tr>
+        <td class="text-muted text-center" colspan="5">データがありません。</td>
+      </tr>`;
+      return;
+    }
+    limitedEvents.forEach(evt => {
+      tableBody.innerHTML += `
+        <tr>
+          <td class="text-center">${evt.title || "未設定"}</td>
+          <td class="text-center">${evt.operator || ""}</td>
+          <td class="text-center">${evt.result || ""}</td>
+          <td class="text-center">${evt.weight ? evt.weight + "kg" : ""}</td>
+          <td class="text-center">${evt.timestamp ? evt.timestamp.slice(11, 16) : ""}</td>
+        </tr>
+      `;
+    });
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch(visionUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (res.ok) {
+        const data = await res.json();
+        renderTable(data.vision_events || []);
+        if (lastUpdateLabel) {
+          const now = new Date();
+          lastUpdateLabel.textContent = `更新: ${now.toLocaleTimeString("ja-JP", { hour12: false })}`;
+        }
+      }
+    } catch (err) {
+      console.error("Vision KPI refresh failed:", err);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 60000);
+})();
+</script>

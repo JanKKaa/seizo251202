@@ -1,0 +1,116 @@
+{% extends "trang_chu/base.html" %}
+{% load humanize %}
+
+{% block title %}機械ショット管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="fas fa-industry me-2"></i>機械ショット数監視</h2>
+        <button class="btn btn-outline-primary" onclick="location.reload()">
+            <i class="fas fa-sync-alt"></i> 更新
+        </button>
+    </div>
+    <div class="table-responsive shadow rounded">
+        <table class="table table-hover table-bordered align-middle bg-white">
+            <thead class="table-primary">
+                <tr>
+                    <th class="text-center">#</th>
+                    <th>IPアドレス</th>
+                    <th>機械名</th>
+                    <th>ショット数</th>
+                    <th>状態</th>
+                    <th>最終更新</th>
+                    <th>最終ショット</th>
+                    <th>アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in machines %}
+                <tr>
+                    <td class="text-center fw-bold">{{ forloop.counter }}</td>
+                    <td class="text-monospace">{{ m.address }}</td>
+                    <td>
+                        <span class="fw-semibold">{{ m.name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-info text-white fs-6">{{ m.shot_total|intcomma }}</span>
+                    </td>
+                    <td>
+                        {% if m.status == "production" %}
+                            <span class="badge bg-success text-white fs-6"><i class="fas fa-play-circle"></i> 生産中</span>
+                        {% else %}
+                            <span class="badge bg-secondary text-white fs-6"><i class="fas fa-pause-circle"></i> 停止</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if m.last_update %}
+                            <span class="text-muted">{{ m.last_update|date:"Y-m-d H:i:s" }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if m.last_shot %}
+                            <span class="badge bg-warning text-dark fs-6">{{ m.last_shot|intcomma }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if request.user.is_superuser %}
+                            <a href="{% url 'iot:edit_shot_total' m.pk %}" class="btn btn-sm btn-info">
+                                <i class="fas fa-edit"></i> ショットを編集
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-danger">データがありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-4 d-flex justify-content-end gap-2">
+        <a href="{% url 'iot:iot_index' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+      
+    </div>
+</div>
+<script>
+    // Tự động reload mỗi 15 giây, có hiệu ứng loading
+    setTimeout(function() {
+        document.body.style.cursor = 'wait';
+        window.location.reload();
+    }, 15000);
+
+    // Highlight row khi hover
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('table.table-hover tbody tr');
+        rows.forEach(row => {
+            row.addEventListener('mouseenter', () => row.classList.add('table-active'));
+            row.addEventListener('mouseleave', () => row.classList.remove('table-active'));
+        });
+    });
+</script>
+<style>
+    .table th, .table td {
+        vertical-align: middle !important;
+    }
+    .table thead th {
+        font-size: 1rem;
+        letter-spacing: 0.05em;
+    }
+    .table-hover tbody tr:hover {
+        background-color: #e3f2fd;
+        transition: background 0.2s;
+    }
+    .badge.fs-6 {
+        font-size: 1rem;
+        padding: 0.5em 0.8em;
+    }
+</style>
+{% endblock %}

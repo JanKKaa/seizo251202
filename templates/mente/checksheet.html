@@ -1,0 +1,80 @@
+<!-- filepath: c:\Users\Shin\Downloads\seizo0 250325\seizo0\trang_chu\templates\mente\checksheet.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}チェックシート: {{ product.name }}{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">チェックシート: {{ product.name }}</h1>
+
+
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="small text-center font-weight-bold" style="width: 5%;">番号</th>
+                            <th class="small text-center font-weight-bold" style="width: 15%;">項目</th>
+                            <th class="small text-center font-weight-bold" style="width: 20%;">説明</th>
+                            <th class="small text-center font-weight-bold" style="width: 30%;">参考画像</th>
+                            <th class="small text-center font-weight-bold" style="width: 10%;">図面サイズ</th>
+                            <th class="small text-center font-weight-bold" style="width: 10%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for checksheet in checksheets %}
+                        <tr>
+                            <td class="small text-center">{{ forloop.counter }}</td>
+                            <td class="small">
+                                <input type="text" name="item_{{ checksheet.id }}" class="form-control" value="{{ checksheet.item }}">
+                            </td>
+                            <td class="small">
+                                <textarea name="description_{{ checksheet.id }}" class="form-control">{{ checksheet.description }}</textarea>
+                            </td>
+                            <td class="small text-center">
+                                {% if checksheet.reference_image %}
+                                <img src="{{ checksheet.reference_image.url }}" alt="参考画像" class="img-fluid rounded shadow-sm zoom-image" style="max-height: 100px; object-fit: cover;">
+                                {% endif %}
+                                <input type="file" name="reference_image_{{ checksheet.id }}" class="form-control-file">
+                            </td>
+                            <td class="small">
+                                <input type="text" name="drawing_size_{{ checksheet.id }}" class="form-control" value="{{ checksheet.drawing_size }}">
+                            </td>
+                            <td class="small text-center">
+                                <!-- 削除ボタン -->
+                                <a href="{% url 'delete_checksheet' product.id checksheet.id %}" class="btn btn-danger btn-sm" onclick="return confirm('この行を削除してもよろしいですか？');">
+                                    削除
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- 新しい行 -->
+                        <tr>
+                            <td class="small text-center">新規</td>
+                            <td class="small">
+                                <input type="text" name="new_item" class="form-control" placeholder="新しい項目を入力してください" required>
+                            </td>
+                            <td class="small">
+                                <textarea name="new_description" class="form-control" placeholder="新しい説明を入力してください" required></textarea>
+                            </td>
+                            <td class="small text-center">
+                                <input type="file" name="new_reference_image" class="form-control-file" required>
+                            </td>
+                            <td class="small">
+                                <input type="text" name="new_drawing_size" class="form-control" placeholder="図面サイズを入力してください">
+                            </td>
+                            <td class="small text-center">
+                                <!-- 新しい行には削除ボタンは不要 -->
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" name="add_new" value="true" class="btn btn-primary">保存して新しい行を追加</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,256 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}入力テンプレート設計{% endblock %}
+{% block content %}
+<style>
+    .apple-card { border-radius: 24px; box-shadow: 0 4px 32px 0 rgba(60,60,60,0.07); border: none; background: #fff; }
+    .apple-title { font-size: 2rem; font-weight: 700; color: #222; margin-bottom: 1.5rem; }
+    .keyboard-row { display: flex; justify-content: center; margin-bottom: 4px; flex-wrap: wrap; }
+    .key-btn {
+        min-width: 40px; min-height: 32px; max-width: 50px; max-height: 40px;
+        margin: 1.5px; border-radius: 7px;
+        border: 1px solid #d1d5db; background: #f8f9fa; font-size: 1.2rem; font-weight: 500;
+        transition: background 0.15s, box-shadow 0.15s;
+        padding: 0 6px;
+    }
+    .key-btn.wide { min-width: 100px; max-width: 200px; }
+    .key-btn.space { min-width: 180px; max-width: 200px; font-size: 1.2rem;}
+    .key-btn.special {min-width: 70px; max-width: 80px; background: #e9ecef; color: #0071e3; font-size: 1rem; }
+    .key-btn.func { background: #f3f6fa; color:rgb(4, 29, 255);; font-size: 1.2rem; }
+    .key-btn.ctrl { min-width: 70px; max-width: 80px; background: #fbeee6; color: #b36b00; font-size: 1rem;}
+    .key-btn.enter { background: #e6fbe6; color: #1a7f37; }
+    .key-btn.tab { background: #e6f0fb; color: #005bb5; }
+    .key-btn.dong { min-width: 70px; max-width: 80px; background: #e6e6fb; color: #5b00b5; font-size: 1rem; }
+    .key-btn:focus { outline: 2px solid #0071e3; }
+    .table thead th { background: #f5f6fa; }
+    @media (max-width: 1200px) {
+        .col-xl-12 { flex: 0 0 100%; max-width: 100%; }
+    }
+
+    .form-control {
+    border-radius: 20px;
+    border: 1px solid #ccc;
+    transition: all 0.3s ease-in-out;
+    }
+
+    .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+    }
+
+    .form-label {
+    font-size: 16px;
+    font-weight: bold;
+    color: #007bff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    }
+    .text-danger {
+        font-weight: bold;
+        color: #dc3545;
+    }
+    .form-label {
+    padding: 5px 10px;
+    background-color: rgba(0, 123, 255, 0.1);
+    border-radius: 5px;
+    }
+</style>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-xl-12 col-lg-12 col-md-12">
+            <div class="card apple-card p-4 w-100">
+                <div class="card-body">
+                    <div class="apple-title text-center mb-4">入力テンプレート設計</div>
+                    <form id="form-mau-nhaplieu" method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">プログラム名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control rounded-pill shadow-sm px-3" name="ten_chuong_trinh"
+                                required maxlength="255" value="{{ mau.ten_chuong_trinh|default_if_none:'' }}">
+                            </div>
+                        </div>
+                        <br>
+                        <div class="row gx-5">
+                            <!-- Cột 1: Quy tắc -->
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="mb-2 fw-bold">入力手順:</div>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-bordered align-middle" id="table-mau-nhaplieu">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="text-center" style="width: 70px;">番号</th>
+                                                <th class="text-center">入力内容</th>
+                                                <th class="text-center" style="width: 50px;">削除</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for dong in quy_tac_list %}
+                                            <tr>
+                                                <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
+                                                <td><input type="text" name="content[]" class="form-control content-input" value="{{ dong }}" readonly></td>
+                                                <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button type="button" class="btn btn-primary mb-3" id="btn-them-dong">
+                                    <i class="fas fa-plus"></i> 行を追加
+                                </button>
+                                <button type="button" class="btn btn-warning mb-3" id="btn-them-delay">
+                                    <i class="fas fa-clock"></i> 待機（5秒）
+                                </button>
+                                <button type="submit" class="btn btn-success mb-3">
+                                    <i class="fas fa-save"></i> テンプレートを保存
+                                </button>
+                            </div>
+                            <!-- Cột 2: Bàn phím ảo -->
+                            <div class="col-lg-8 col-md-6">
+                                <div class="mb-2 fw-bold">バーチャルキーボード:</div>
+                                <div id="virtual-keyboard" class="mb-3">
+                                    <!-- Hàng phím đặc biệt 1 -->
+                                    <div class="keyboard-row">
+                                        <button type="button" class="key-btn func" data-key="F1">F1</button>
+                                        <button type="button" class="key-btn func" data-key="F2">F2</button>
+                                        <button type="button" class="key-btn func" data-key="F3">F3</button>
+                                        <button type="button" class="key-btn func" data-key="F4">F4</button>
+                                        <button type="button" class="key-btn func" data-key="F5">F5</button>
+                                        <button type="button" class="key-btn func" data-key="F6">F6</button>
+                                        <button type="button" class="key-btn func" data-key="F7">F7</button>
+                                        <button type="button" class="key-btn func" data-key="F8">F8</button>
+                                        <button type="button" class="key-btn func" data-key="F9">F9</button>
+                                        <button type="button" class="key-btn func" data-key="F10">F10</button>
+                                        <button type="button" class="key-btn func" data-key="F11">F11</button>
+                                        <button type="button" class="key-btn func" data-key="F12">F12</button>
+                                    </div>
+                                    <!-- Hàng phím số -->
+                                    <div class="keyboard-row">
+                                        {% for key in "1234567890" %}
+                                            <button type="button" class="key-btn func" data-key="{{ key }}">{{ key }}</button>
+                                        {% endfor %}
+                                        <button type="button" class="key-btn func" data-key="BACKSPACE">⌫</button>
+                                    </div>
+                                    <!-- Hàng QWERTY -->
+                                    <div class="keyboard-row">
+                                        <button type="button" class="key-btn tab wide" data-key="TAB">Tab</button>
+                                        {% for key in "qwertyuiop" %}
+                                            <button type="button" class="key-btn" data-key="{{ key|upper }}">{{ key|upper }}</button>
+                                        {% endfor %}
+                                    </div>
+                                    <!-- Hàng ASDF -->
+                                    <div class="keyboard-row">
+                                        <span style="width:18px"></span>
+                                        {% for key in "asdfghjkl" %}
+                                            <button type="button" class="key-btn" data-key="{{ key|upper }}">{{ key|upper }}</button>
+                                        {% endfor %}
+                                        <button type="button" class="key-btn enter wide" data-key="ENTER">Enter</button>
+                                    </div>
+                                    <!-- Hàng ZXCV -->
+                                    <div class="keyboard-row">
+                                        <span style="width:36px"></span>
+                                        {% for key in "zxcvbnm" %}
+                                            <button type="button" class="key-btn" data-key="{{ key|upper }}">{{ key|upper }}</button>
+                                        {% endfor %}
+                                        <button type="button" class="key-btn special space" data-key=" ">Space</button>
+                                    </div>
+                                    <!-- Hàng phím đặc biệt 2 -->
+                                    <br>
+                                    <div class="keyboard-row">
+                                        <button type="button" class="key-btn dong" data-key="dong1">行 1</button>
+                                        <button type="button" class="key-btn dong" data-key="dong2">行 2</button>
+                                        <button type="button" class="key-btn dong" data-key="dong3">行 3</button>
+                                        <button type="button" class="key-btn dong" data-key="dong4">行 4</button>
+                                        <button type="button" class="key-btn dong" data-key="dong5">行 5</button>
+                                    </div>
+                                    <div class="keyboard-row">
+                                        <button type="button" class="key-btn ctrl wide" data-key="CTRL+A">Ctrl+A</button>
+                                        <button type="button" class="key-btn ctrl wide" data-key="CTRL+C">Ctrl+C</button>
+                                        <button type="button" class="key-btn special wide" data-key="Data">Data</button>
+                                        <button type="button" class="key-btn special wide" data-key="DELETE">Delete</button>
+                                    </div>
+                                    <!-- Hàng phím điều hướng -->
+                                    <div class="keyboard-row">
+                                        <button type="button" class="key-btn special" data-key="LEFT">&#8592; 左</button>
+                                        <button type="button" class="key-btn special" data-key="UP">&#8593; 上</button>
+                                        <button type="button" class="key-btn special" data-key="DOWN">&#8595; 下</button>
+                                        <button type="button" class="key-btn special" data-key="RIGHT">&#8594; 右</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-muted" style="font-size:0.95em;">入力内容のセルを選択し、バーチャルキーボードのキーを押してください。</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+let activeInput = null;
+function setActiveInput(input) {
+    activeInput = input;
+}
+document.querySelectorAll('.content-input').forEach(function(input) {
+    input.addEventListener('focus', function() { setActiveInput(this); });
+    input.addEventListener('click', function() { setActiveInput(this); });
+});
+function updateSTT() {
+    const rows = document.querySelectorAll('#table-mau-nhaplieu tbody tr');
+    rows.forEach((row, idx) => {
+        const sttInput = row.querySelector('input[name="stt[]"]');
+        if (sttInput) sttInput.value = idx + 1;
+    });
+}
+function addRowByKey(key) {
+    const tbody = document.querySelector('#table-mau-nhaplieu tbody');
+    let displayValue = key;
+    if (key.startsWith('dong')) {
+        let dongSo = key.replace('dong', '');
+        displayValue = '行 ' + dongSo;
+    }
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
+        <td><input type="text" name="content[]" class="form-control content-input" value="${displayValue}" readonly></td>
+        <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
+    `;
+    tbody.appendChild(newRow);
+    updateSTT();
+    // Tự động focus vào ô nội dung vừa thêm
+    const contentInput = newRow.querySelector('.content-input');
+    if (contentInput) {
+        contentInput.removeAttribute('readonly');
+        contentInput.focus();
+        setActiveInput(contentInput);
+    }
+}
+document.getElementById('virtual-keyboard').addEventListener('click', function(e) {
+    if (e.target.classList.contains('key-btn')) {
+        let key = e.target.getAttribute('data-key');
+        addRowByKey(key);
+    }
+});
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('btn-xoa')) {
+        const row = e.target.closest('tr');
+        row.parentNode.removeChild(row);
+        updateSTT();
+    }
+});
+document.getElementById('btn-them-dong').onclick = function() {
+    addRowByKey('');
+};
+document.getElementById('btn-them-delay').onclick = function() {
+    const tbody = document.querySelector('#table-mau-nhaplieu tbody');
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
+        <td><input type="text" name="content[]" class="form-control content-input" value="DELAY_5S" readonly></td>
+        <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
+    `;
+    tbody.appendChild(newRow);
+    updateSTT();
+};
+updateSTT();
+</script>
+{% endblock %}

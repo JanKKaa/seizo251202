@@ -1,0 +1,53 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}履歴一覧{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">履歴一覧</h2>
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">#</th>
+                    <th class="text-center">画像</th>
+                    <th class="text-center">機械番号</th>
+                    <th class="text-center">材料名</th>
+                    <th class="text-center">製品名</th>
+                    <th class="text-center">混合率</th>
+                    <th class="text-center">結果</th>
+                    <th class="text-center">日時</th>
+                    <th class="text-center">作業者</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in results %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td class="text-center">
+                        {% if item.image %}
+                            <img src="{{ item.image.url }}" alt="画像" style="max-width:80px;">
+                        {% endif %}
+                    </td>
+                    <td>{{ item.machine.name }}</td>
+                    <td>{{ item.machine.material }}</td>
+                    <td>{{ item.machine.product }}</td>
+                    <td>{{ item.machine.ratio }}</td>
+                    <td class="text-center">{{ item.result }}</td>
+                    <td class="text-center">{{ item.created_at|date:"Y/m/d H:i" }}</td>
+                    <td class="text-center">
+                        {% if item.user %}
+                            {{ item.user.get_full_name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted">履歴がありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

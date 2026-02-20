@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ホームページ{% endblock %}</title>
+    {% load static %}
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="{% static 'css/custom.css' %}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" type="text/css">
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+    <!-- Your head content here -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <style>
+        body, html {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .navbar-nav .nav-item .nav-link:hover {
+            background-color:rgb(156, 176, 235);
+            color: #fff;
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        .nav-link i {
+            font-size: 1.0rem;
+        }
+        .sidebar-brand-text {
+            font-size: 1.0rem !important;
+            letter-spacing: 1px;
+        }
+        .sidebar-brand-text sup {
+            font-size: 1.5em;
+        }
+        .sidebar .nav-link > span {
+        font-size: 1.0rem;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #ffffff;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.12);
+        transition: color 0.3s;
+        /* Không có hiệu ứng cầu vồng ở trạng thái bình thường */
+        }
+        .sidebar .nav-link.active > span,
+        .sidebar .nav-link:hover > span {
+            background: linear-gradient(90deg, #ff005a, #ffbe00, #00ff94, #00c3ff, #a600ff, #ff005a 80%);
+            background-size: 300% 100%;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            animation: rainbow-move 2s linear infinite;
+            font-weight: bold;
+        }
+
+        @keyframes rainbow-move {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+        .rainbow-logo-border {
+        background: none;
+        transition: background 0.4s;
+        }
+        .rainbow-logo-border:hover {
+            background: linear-gradient(90deg, #ff005a, #ffbe00, #00ff94, #00c3ff, #a600ff, #ff005a 80%);
+            background-size: 300% 100%;
+            animation: rainbow-move 2.5s linear infinite;
+        }
+        .sidebar .nav-link > i {
+            font-size: 1.0rem;
+            margin-right: 6px;
+            color: #fffde7;
+        }
+                /* ...existing code... */
+        .nav-link-seizou > i,
+        .nav-link-kanri > i {
+            font-size: 1.0rem !important;
+            margin-right: 12px;
+            color: #ffe082;
+            vertical-align: middle;
+        }
+        .nav-link-seizou > span,
+        .nav-link-kanri > span {
+            font-size: 1.0rem !important;
+            font-weight: bold;
+            color: #fff;
+            letter-spacing: 2px;
+            vertical-align: middle;
+        }
+        .nav-link-seizou:hover > span,
+        .nav-link-kanri:hover > span {
+            color: #ffd600;
+        }
+        /* --- ĐỔI MÀU NỀN THEO NGÀY LỄ --- */
+        body.event-oshougatsu { background: #fffbe7 !important; }
+        body.event-seijin { background: #e3f2fd !important; }
+        body.event-kenkoku { background: #f9fbe7 !important; }
+        body.event-hinamatsuri { background: #ffe0f0 !important; }
+        body.event-goldenweek { background: #fffde7 !important; }
+        body.event-tanabata { background: #e3f2fd !important; }
+        body.event-obon { background: #fff3e0 !important; }
+        body.event-keirou { background: #f3e5f5 !important; }
+        body.event-shubun { background: #e8f5e9 !important; }
+        body.event-bunka { background: #e3f2fd !important; }
+        body.event-christmas { background: #eaf6fb !important; }
+        /* Banner nổi bật hơn */
+         .event-banner {
+            max-width: 600px;
+            margin: 0 auto;
+            left: 0;
+            right: 0;
+            position: fixed;
+            top: 0;
+            z-index: 1050;
+            width: 95%;
+            background: #fff;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-right: 48px; /* Để không che nút */
+        }
+        .event-banner img {
+            height: 44px;
+            margin-right: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: box-shadow 0.2s;
+        }
+        .event-banner img:hover {
+            box-shadow: 0 0 0 3px #b3c6ff;
+        }
+        .event-banner-content {
+            text-align: left;
+        }
+        .event-banner-space { height: 68px; }
+        @media (max-width: 600px) {
+            .event-banner { padding: 6px 4px; }
+            .event-banner img { height: 32px; margin-right: 8px; }
+            .event-banner-space { height: 48px; }
+        }
+        #banner-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0; top: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+        }
+        #banner-modal img {
+            max-width: 90vw;
+            max-height: 80vh;
+            border-radius: 12px;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.3);
+        }
+        #banner-modal:target { display: flex; }
+        .banner-toggle-btn {
+            background: rgba(255,255,255,0.8);
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 1101;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: background 0.2s;
+        }
+        .banner-toggle-btn:hover {
+            background: #e3e3e3;
+        }
+        .event-banner-oshougatsu { background: linear-gradient(90deg, #fffbe7 60%, #ffe0b2 100%); color: #d35400; }
+        .event-banner-seijin { background: linear-gradient(90deg, #e3f2fd 60%, #bbdefb 100%); color: #1976d2; }
+        .event-banner-kenkoku { background: linear-gradient(90deg, #f9fbe7 60%, #e8f5e9 100%); color: #388e3c; }
+        .event-banner-hinamatsuri { background: linear-gradient(90deg, #ffe0f0 60%, #f8bbd0 100%); color: #c2185b; }
+        .event-banner-goldenweek { background: linear-gradient(90deg, #fffde7 60%, #fff9c4 100%); color: #fbc02d; }
+        .event-banner-tanabata { background: linear-gradient(90deg, #e3f2fd 60%, #b3e5fc 100%); color: #1976d2; }
+        .event-banner-obon { background: linear-gradient(90deg, #fff3e0 60%, #ffe0b2 100%); color: #e65100; }
+        .event-banner-keirou { background: linear-gradient(90deg, #f3e5f5 60%, #ce93d8 100%); color: #6a1b9a; }
+        .event-banner-shubun { background: linear-gradient(90deg, #e8f5e9 60%, #c8e6c9 100%); color: #388e3c; }
+        .event-banner-bunka { background: linear-gradient(90deg, #e3f2fd 60%, #b3e5fc 100%); color: #1976d2; }
+        .event-banner-christmas { background: linear-gradient(90deg, #eaf6fb 60%, #ffe0e0 100%); color: #e74c3c; }
+    
+    
+
+                /* Đảm bảo footer luôn ở dưới cùng */
+        html, body {
+            height: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        #wrapper {
+            flex: 1 0 auto;
+        }
+        .footer {
+            margin-top: auto;
+        }
+    
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+    <!-- Your scripts here -->
+    {% if japan_event %}
+    <div id="event-banner-wrapper">
+        <!-- Banner cố định trên cùng, gọn và cân đối -->
+        {% if japan_event == 'oshougatsu' %}
+            <div class="event-banner event-banner-oshougatsu" id="eventBanner">
+                <img src="{% static 'img/oshougatsu.jpg' %}" alt="oshougatsu"
+                     onclick="showBannerModal(this, 'お正月 (Tết Dương lịch)', '日本語: 新年を祝う最も重要な祝日。家族が集まり、神社や寺に初詣に行きます。<br>Tiếng Việt: Ngày đầu năm mới, dịp sum họp gia đình, thăm đền chùa và cầu chúc may mắn cho năm mới.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🎍 新年あけましておめでとうございます！</div>
+                    <div style="font-size:0.95rem;">今年もよろしくお願いします。</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'seijin' %}
+            <div class="event-banner event-banner-seijin" id="eventBanner">
+                <img src="{% static 'img/seijin.png' %}" alt="seijin"
+                     onclick="showBannerModal(this, '成人の日 (Ngày thành nhân)', '日本語: 20歳になった若者を祝う日。<br>Tiếng Việt: Ngày lễ dành cho những người tròn 20 tuổi, đánh dấu bước trưởng thành trong xã hội Nhật.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">👘 成人の日 おめでとう！</div>
+                    <div style="font-size:0.95rem;">新成人の皆様に幸多き未来を！</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'kenkoku' %}
+            <div class="event-banner event-banner-kenkoku" id="eventBanner">
+                <img src="{% static 'img/kenkoku.png' %}" alt="kenkoku"
+                     onclick="showBannerModal(this, '建国記念の日 (Ngày Quốc Khánh)', '日本語: 日本の建国を祝う日。<br>Tiếng Việt: Ngày kỷ niệm thành lập quốc gia Nhật Bản.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🇯🇵 建国記念の日</div>
+                    <div style="font-size:0.95rem;">日本の歴史と文化を祝う日</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'hinamatsuri' %}
+            <div class="event-banner event-banner-hinamatsuri" id="eventBanner">
+                <img src="{% static 'img/hinamatsuri.png' %}" alt="hinamatsuri"
+                     onclick="showBannerModal(this, 'ひな祭り (Lễ hội búp bê)', '日本語: 女の子の健やかな成長を願う日。雛人形を飾ります。<br>Tiếng Việt: Lễ hội dành cho bé gái, cầu chúc sức khỏe và hạnh phúc.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🎎 ひな祭り</div>
+                    <div style="font-size:0.95rem;">女の子の健やかな成長を願って</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'goldenweek' %}
+            <div class="event-banner event-banner-goldenweek" id="eventBanner">
+                <img src="{% static 'img/goldenweek.png' %}" alt="goldenweek"
+                     onclick="showBannerModal(this, 'ゴールデンウィーク (Tuần lễ vàng)', '日本語: 4月末〜5月初の連休。旅行や帰省が多い。<br>Tiếng Việt: Chuỗi ngày nghỉ lễ lớn nhất năm, nhiều người đi du lịch hoặc về quê.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🌟 ゴールデンウィーク</div>
+                    <div style="font-size:0.95rem;">楽しい連休をお過ごしください！</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'tanabata' %}
+            <div class="event-banner event-banner-tanabata" id="eventBanner">
+                <img src="{% static 'img/tanabata.jpg' %}" alt="tanabata"
+                     onclick="showBannerModal(this, '七夕 (Lễ hội sao)', '日本語: 織姫と彦星が年に一度会う日。短冊に願い事を書きます。<br>Tiếng Việt: Lễ hội ngắm sao, viết điều ước lên giấy treo lên cây tre.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🎋 七夕</div>
+                    <div style="font-size:0.95rem;">願い事が叶いますように</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'obon' %}
+            <div class="event-banner event-banner-obon" id="eventBanner">
+                <img src="{% static 'img/obon.png' %}" alt="obon"
+                     onclick="showBannerModal(this, 'お盆 (Lễ Vu Lan)', '日本語: 先祖の霊を迎える伝統行事。<br>Tiếng Việt: Lễ hội tưởng nhớ tổ tiên, gia đình sum họp và viếng mộ.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🏮 お盆</div>
+                    <div style="font-size:0.95rem;">ご先祖様に感謝を</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'keirou' %}
+            <div class="event-banner event-banner-keirou" id="eventBanner">
+                <img src="{% static 'img/keirou.png' %}" alt="keirou"
+                     onclick="showBannerModal(this, '敬老の日 (Ngày kính lão)', '日本語: 高齢者を敬い、長寿を祝う日。<br>Tiếng Việt: Ngày tôn vinh người cao tuổi, chúc sức khỏe và trường thọ.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">👴👵 敬老の日</div>
+                    <div style="font-size:0.95rem;">おじいちゃん・おばあちゃん、いつもありがとう！</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'shubun' %}
+            <div class="event-banner event-banner-shubun" id="eventBanner">
+                <img src="{% static 'img/shubun.png' %}" alt="shubun"
+                     onclick="showBannerModal(this, '秋分の日 (Ngày thu phân)', '日本語: 昼と夜が同じ長さになる日。先祖を敬う。<br>Tiếng Việt: Ngày thu phân, tỏ lòng biết ơn tổ tiên.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🍁 秋分の日</div>
+                    <div style="font-size:0.95rem;">自然とご先祖様に感謝する日</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'bunka' %}
+            <div class="event-banner event-banner-bunka" id="eventBanner">
+                <img src="{% static 'img/bunka.png' %}" alt="bunka"
+                     onclick="showBannerModal(this, '文化の日 (Ngày Văn hóa)', '日本語: 自由と平和を愛し、文化をすすめる日。<br>Tiếng Việt: Ngày tôn vinh văn hóa, nghệ thuật và tự do.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🎨 文化の日</div>
+                    <div style="font-size:0.95rem;">自由と平和を愛し、文化をすすめる日</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% elif japan_event == 'christmas' %}
+            <div class="event-banner event-banner-christmas" id="eventBanner">
+                <img src="{% static 'img/christmas.png' %}" alt="christmas"
+                     onclick="showBannerModal(this, 'クリスマス (Giáng sinh)', '日本語: キリストの誕生を祝う日。日本では恋人や友人と過ごすことが多い。<br>Tiếng Việt: Lễ Giáng sinh, dịp sum họp, tặng quà và trang trí cây thông.')">
+                <div class="event-banner-content">
+                    <div style="font-size:1.2rem;font-weight:bold;">🎄 メリークリスマス！</div>
+                    <div style="font-size:0.95rem;">素敵なクリスマスをお過ごしください</div>
+                </div>
+                <button class="banner-toggle-btn" onclick="hideBanner()" title="Ẩn banner">
+                    <i class="fas fa-angle-up"></i>
+                </button>
+            </div>
+        {% endif %}
+        
+
+        <!-- Modal phóng to ảnh và chi tiết ngày lễ -->
+        <div id="banner-modal" onclick="hideBannerModal()" style="display:none;">
+            <div style="background:#fff; border-radius:12px; padding:24px; max-width:90vw; max-height:80vh; box-shadow:0 4px 32px rgba(0,0,0,0.3); display:flex; flex-direction:column; align-items:center;">
+                <img id="banner-modal-img" src="" alt="banner" style="max-width:60vw; max-height:40vh; border-radius:12px; margin-bottom:18px;">
+                <div id="banner-modal-title" style="font-size:1.2rem; font-weight:bold; margin-bottom:8px; color:#333;"></div>
+                <div id="banner-modal-desc" style="font-size:1rem; color:#444;"></div>
+            </div>
+        </div>
+        <button id="showBannerBtn" class="banner-toggle-btn" style="display:none;position:fixed;top:8px;right:16px;z-index:1100;" onclick="showBanner()" title="Hiện banner">
+            <i class="fas fa-angle-down"></i>
+        </button>
+        <script>
+            function showBannerModal(img, title, desc) {
+                if (document.getElementById('eventBanner').style.display === 'none') return;
+                document.getElementById('banner-modal-img').src = img.src;
+                document.getElementById('banner-modal-title').innerHTML = title;
+                document.getElementById('banner-modal-desc').innerHTML = desc;
+                document.getElementById('banner-modal').style.display = 'flex';
+            }
+            function hideBannerModal() {
+                document.getElementById('banner-modal').style.display = 'none';
+            }
+            function hideBanner() {
+                document.getElementById('eventBanner').style.display = 'none';
+                document.getElementById('showBannerBtn').style.display = 'block';
+                hideBannerModal();
+            }
+            function showBanner() {
+                document.getElementById('eventBanner').style.display = 'flex';
+                document.getElementById('showBannerBtn').style.display = 'none';
+            }
+        </script>
+    </div>
+    {% endif %}
+
+<!-- Nút full màn hình hiển thị trên mọi thiết bị -->
+<button id="fullscreen-btn" style="position:fixed;right:50px;bottom:60px;z-index:9999;display:flex;width:44px;height:44px;border-radius:50%;background:#1976d2;color:#fff;border:none;box-shadow:0 2px 8px rgba(0,0,0,0.15);align-items:center;justify-content:center;font-size:1.5em;">
+    <i class="fas fa-expand"></i>
+</button>
+
+<body id="page-top" class="sidebar-toggled {% if japan_event %}event-{{ japan_event }}{% endif %}">
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion toggled" id="accordionSidebar">
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{% url 'index' %}">
+                <div class="sidebar-brand-icon rainbow-logo-border" style="padding:4px;  display:inline-block;">
+                    <img src="{% static 'img/logo.png' %}" alt="Company Logo" style="width: 90px; height: 35px; ">
+                </div>
+            </a>
+            <hr class="sidebar-divider my-0">
+
+            <!-- 製造部 -->
+            <li class="nav-item">
+                <a class="nav-link collapsed nav-link-seizou" href="#" data-toggle="collapse" data-target="#collapseSeizou" aria-expanded="false" aria-controls="collapseSeizou">
+                    <i class="fas fa-industry"></i>
+                    <span>製造部</span>
+                </a>
+                <div id="collapseSeizou" class="collapse" aria-labelledby="headingSeizou" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        
+                        <a class="collapse-item" href="{% url 'index' %}"><i class="fas fa-home"></i> ホームページ</a>
+                        <a class="collapse-item" href="{% url 'phe_duyet:index' %}"><i class="fas fa-file-alt"></i> 承認</a>
+                       
+                        <a class="collapse-item" href="{% url 'baotri_index' %}"><i class="fas fa-cogs"></i> 金型メンテナンス</a>
+                        <a class="collapse-item" href="{% url 'index_qa' %}"><i class="fas fa-image"></i> 材料投入管理</a>
+                        <a class="collapse-item" href="{% url 'iot:iot_index' %}"><i class="fas fa-infinity"></i> IoT</a>
+                        <a class="collapse-item" href="{% url 'nhap_lieu:index' %}"><i class="fas fa-database"></i> 自動入力データ</a>
+                        <!-- Nhóm 情報 -->
+                        <a class="collapse-item collapsed" href="#" data-toggle="collapse" data-target="#collapseInfo" aria-expanded="false" aria-controls="collapseInfo">
+                            <i class="fas fa-info-circle"></i> 情報
+                        </a>
+                        <div id="collapseInfo" class="collapse ml-3" aria-labelledby="headingInfo" data-parent="#collapseSeizou">
+                            <a class="collapse-item" href="{% url 'phe_duyet:manage_messages' %}"><i class="fas fa-envelope"></i> メッセージ管理</a>
+                            <a class="collapse-item" href="{% url 'news_create' %}"><i class="fas fa-newspaper"></i> 投稿作成</a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <hr class="sidebar-divider">
+
+            <!-- 管理部 -->
+            <li class="nav-item">
+                <a class="nav-link collapsed nav-link-kanri" href="#" data-toggle="collapse" data-target="#collapseKanri" aria-expanded="false" aria-controls="collapseKanri">
+                    <i class="fas fa-building"></i>
+                    <span>管理部</span>
+                </a>
+                <div id="collapseKanri" class="collapse" aria-labelledby="headingKanri" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        
+                        <a class="collapse-item" href="{% url 'menu:list' %}"><i class="fas fa-utensils"></i> 社員ランチメニュー</a>
+                        <a class="collapse-item" href="{% url 'learn:index' %}"><i class="fas fa-graduation-cap"></i> 社員教育（管理課）</a>
+                    </div>
+                </div>
+            </li>
+            <hr class="sidebar-divider d-none d-md-block">
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+            <!-- Main Content -->
+            <div id="content">
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+                    <!-- Topbar Search -->
+                    <form class="d-none d-sm-inline-block form-inline mr-auto ml-md-3 my-2 my-md-0 mw-100 navbar-search">
+                        <div class="input-group">
+                            <input type="text" class="form-control bg-light border-0 small" placeholder="検索..."
+                                aria-label="Search" aria-describedby="basic-addon2">
+                            <div class="input-group-append">
+                                <button class="btn btn-primary" type="button">
+                                    <i class="fas fa-search fa-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+                        <!-- Nav Item - Search Dropdown (Visible Only XS) -->
+                        <li class="nav-item dropdown no-arrow d-sm-none">
+                            <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-search fa-fw"></i>
+                            </a>
+                            <!-- Dropdown - Messages -->
+                            <div class="dropdown-menu dropdown-menu-right p-3 shadow animated--grow-in"
+                                aria-labelledby="searchDropdown">
+                                <form class="form-inline mr-auto w-100 navbar-search">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control bg-light border-0 small"
+                                            placeholder="検索..." aria-label="Search"
+                                            aria-describedby="basic-addon2">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button">
+                                                <i class="fas fa-search fa-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </li>
+                        <!-- Nav Item - Alerts -->
+                        <li class="nav-item dropdown no-arrow mx-1">
+                            <a class="nav-link dropdown-toggle" href="#" id="alertsDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-bell fa-fw"></i>
+                                <!-- Counter - Alerts -->
+                                <span class="badge badge-danger badge-counter">{{ approve_button_count }}</span>
+                            </a>
+                            <!-- Dropdown - Alerts -->
+                            <div class="dropdown-list dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="alertsDropdown">
+                                <h6 class="dropdown-header">
+                                    アラートセンター
+                                </h6>
+                                <a class="dropdown-item text-center small text-gray-500" href="#">すべてのアラートを表示</a>
+                            </div>
+                        </li>
+                        <!-- Nav Item - Messages -->
+                        <li class="nav-item dropdown no-arrow mx-1">
+                            <a class="nav-link dropdown-toggle" href="#" id="messagesDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-envelope fa-fw"></i>
+                                <!-- Counter - Messages -->
+                                <span class="badge badge-danger badge-counter">
+                                    {{ unread_messages_count }}
+                                </span>
+                            </a>
+                            <!-- Dropdown - Messages -->
+                            <div class="dropdown-list dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="messagesDropdown">
+                                <h6 class="dropdown-header">
+                                    メッセージセンター
+                                </h6>
+                                {% with messages=request.user.phe_duyet_received_messages.all %}
+                                    {% for message in messages %}
+                                        <a class="dropdown-item d-flex align-items-center" href="#">
+                                            <div class="dropdown-list-image mr-3">
+                                                {% if message.sender.userprofile.avatar %}
+                                                    <img class="rounded-circle" src="{{ message.sender.userprofile.avatar.url }}" alt="Avatar">
+                                                {% else %}
+                                                    <img class="rounded-circle" src="{% static 'avatars/default.jpg' %}" alt="Avatar">
+                                                {% endif %}
+                                                <div class="status-indicator bg-success"></div>
+                                            </div>
+                                            <div class="font-weight-bold">
+                                                <div class="text-truncate">{{ message.subject }}</div>
+                                                <div class="small text-gray-500">{{ message.sender.username }} · {{ message.timestamp }}</div>
+                                            </div>
+                                        </a>
+                                    {% endfor %}
+                                {% endwith %}
+                                <a class="dropdown-item text-center small text-gray-500" href="{% url 'phe_duyet:inbox' %}">もっと読む</a>
+                            </div>
+                        </li>
+                        <div class="topbar-divider d-none d-sm-block"></div>
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ request.user.username }}</span>
+                                {% if request.user.userprofile and request.user.userprofile.avatar %}
+                                    <img class="img-profile rounded-circle" src="{{ request.user.userprofile.avatar.url }}">
+                                {% else %}
+                                    <img class="img-profile rounded-circle" src="{% static 'avatars/default.jpg' %}">
+                                {% endif %}
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                <a class="dropdown-item" href="{% url 'profile' %}">
+                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    プロフィール
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button class="dropdown-item" type="submit">
+                                        <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                        ログアウト
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                    </ul>
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Begin Page Content -->
+                <div class="container-fluid">
+                    {% if messages %}
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            {% for message in messages %}
+                                {{ message }}
+                            {% endfor %}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    {% endif %}
+                    {% block content %}{% endblock %}
+                </div>
+                <!-- /.container-fluid -->
+            </div>
+            <!-- End of Main Content -->
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+    
+    <!-- Bootstrap CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        document.getElementById('fullscreen-btn').onclick = toggleFullscreen;
+    </script>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    <p>&copy; 2025 Giang HAYASHI TECHNO CO., LTD. Built with <a href="https://www.djangoproject.com/" target="_blank">Django</a> and <a href="https://www.python.org/" target="_blank">Python</a>.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Chỉ tự động full màn hình nếu chưa ở chế độ full màn hình
+            if (!document.fullscreenElement) {
+                // Một số trình duyệt yêu cầu thao tác người dùng mới cho phép full màn hình
+                // Thử gọi requestFullscreen, nếu bị chặn thì không làm gì
+                try {
+                    document.documentElement.requestFullscreen();
+                } catch (e) {
+                    // Bị chặn bởi trình duyệt, không làm gì
+                }
+            }
+        });
+    </script>
+</body>
+</html>

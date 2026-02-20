@@ -1,0 +1,1273 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\baotri\start_task.html -->
+{% extends "trang_chu/base.html" %}
+{% block title %}メンテナンス作業{% endblock %}
+
+{% block content %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<div class="container-fluid px-2 px-md-5">
+    <h1 class="main-title mb-3">
+        金型: {{ task.name }}
+    </h1>
+    <h2 class="card shadow mb-4 text-right" style="font-size:1.5rem;">
+        管理番号: {{ task_code }}
+    </h2>
+    <div class="mb-3 text-center">
+        <span id="elapsed-label" class="fw-bold text-primary" style="font-size:1.2rem;">
+            経過時間: <span id="elapsed-timer">00:00:00</span>
+        </span>
+    </div>
+    <input type="hidden" id="start-time-ts" value="{{ start_time_ts }}">
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="end_time" id="end-time">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center">No.</th>
+                                <th class="text-center">作業名</th>
+                                <th class="text-center">説明</th>
+                                <th class="text-center">参考写真</th>
+                                <th class="text-center">実際の写真</th>
+                                <th class="text-center">入力データ</th>
+                                <th class="text-center">確認</th>
+                                <th class="text-center">備考</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detail in task_details %}
+                            <tr>
+                                <td class="text-center">{{ detail.order }}</td>
+                                <td>{{ detail.item }}</td>
+                                <td>{{ detail.description }}</td>
+                                <td class="text-center">
+                                    {% if detail.reference_image %}
+                                    <img src="{{ detail.reference_image.url }}" alt="参考写真" class="img-fluid rounded shadow-sm zoom-image" style="max-height:100px;">
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div>
+                                        <img id="photo-preview-{{ detail.id }}"
+                                            class="img-fluid mt-2 photo-preview"
+                                            style="max-height:200px;"
+                                            src="{% for code_detail in task_code_details %}{% if code_detail.detail.id == detail.id and code_detail.actual_image %}{{ code_detail.actual_image.url }}{% endif %}{% endfor %}">
+                                        {% if not code_detail.actual_image %}
+                                        <p class="text-muted mt-2">写真なし</p>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-secondary open-camera mt-2 w-100" data-id="{{ detail.id }}">
+                                            <i class="fas fa-video"></i> Open Camera
+                                        </button>
+                                    </div>
+                                    <div id="camera-container-{{ detail.id }}" class="camera-container mt-2" style="display:none;">
+                                        <select id="camera-select-{{ detail.id }}" class="form-control mb-2"></select>
+                                        <video id="camera-preview-{{ detail.id }}" autoplay style="width:100%;max-height:200px;"></video>
+                                        <button type="button" class="btn btn-primary capture-photo mt-2 w-100" data-id="{{ detail.id }}">
+                                            <i class="fas fa-camera"></i> 撮る
+                                        </button>
+                                        <canvas id="canvas-{{ detail.id }}" style="display:none;"></canvas>
+                                    </div>
+                                    <input type="hidden" name="actual_image_{{ detail.id }}" id="actual_image_{{ detail.id }}">
+                                </td>
+                                <td>
+                                    <input type="text" name="actual_size_{{ detail.id }}" class="form-control" placeholder="寸法を記入して" value="{% for code_detail in task_code_details %}{% if code_detail.detail.id == detail.id %}{{ code_detail.actual_size }}{% endif %}{% endfor %}">
+                                </td>
+                                <td class="text-center">
+                                    <label class="switch">
+                                        <input type="checkbox" name="confirm_{{ detail.id }}" {% for code_detail in task_code_details %}{% if code_detail.detail.id == detail.id and code_detail.is_confirmed %}checked{% endif %}{% endfor %}>
+                                        <span class="slider round"></span>
+                                    </label>
+                                </td>
+                                <td>
+                                    <textarea name="result_{{ detail.id }}" class="form-control" placeholder="備考">{% for code_detail in task_code_details %}{% if code_detail.detail.id == detail.id %}{{ code_detail.result }}{% endif %}{% endfor %}</textarea>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <button type="submit" class="btn btn-success w-100" id="save-button">保存</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Camera -->
+<div id="camera-modal" class="camera-modal" style="display: none;">
+    <div class="camera-modal-content">
+        <!-- Nút chọn camera -->
+        <select id="camera-select-modal" class="form-control mb-2" style="width: 100%;"></select>
+        
+        <!-- Vùng hiển thị camera -->
+        <video id="camera-preview-modal" autoplay style="width: 100%; max-height: 400px; object-fit: cover;"></video>
+        
+        <!-- Nút chụp ảnh -->
+        <button type="button" class="btn btn-success capture-photo-modal mt-2" style="font-size: 20px;width: 100px; height: 60px;"> 
+            <i class="fas fa-camera"></i> 撮る
+        </button>
+        
+        <!-- Nút đóng modal -->
+        <button type="button" class="btn btn-secondary close-camera-modal mt-2">閉じる</button>
+        
+        <!-- Canvas để xử lý ảnh -->
+        <canvas id="canvas-modal" style="display: none;"></canvas>
+    </div>
+</div>
+
+<!-- Modal xác nhận 9 điểm -->
+<div id="pattern-modal-xla" style="display:none;position:fixed;z-index:20001;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:24px 16px;border-radius:14px;box-shadow:0 0 18px #0008;text-align:center;position:relative;max-width:90vw;">
+    <div style="
+      font-size:1.5rem;
+      font-weight:bold;
+      margin-bottom:12px;
+      color:#fff;
+      background:linear-gradient(90deg,#007bff 0%,#00c6ff 100%);
+      padding:10px 0 10px 0;
+      border-radius:8px;
+      box-shadow:0 2px 8px #007bff44;
+      letter-spacing:2px;
+      text-shadow:0 2px 8px #007bff55;
+    ">
+      全てのネジが締め付け済みか確認してください
+    </div>
+    <div style="color:#555;margin-bottom:10px;">9点を繋いで「✓」（チェックマーク）を描いてください</div>
+    <div id="pattern-area-xla" style="width:140px;height:140px;margin:0 auto;position:relative;touch-action:none;"></div>
+    <div class="mt-2">
+      <br>
+      <button id="clear-pattern-xla" class="btn btn-secondary btn-sm">クリア</button>
+      <button id="submit-pattern-xla" class="btn btn-success btn-sm">確認</button>
+      <button id="cancel-pattern-xla" class="btn btn-danger btn-sm">キャンセル</button>
+    </div>
+    <div id="pattern-msg-xla" style="color:red;margin-top:8px;display:none;">「OK」パターンではありません。もう一度やり直してください。</div>
+  </div>
+</div>
+
+<script>
+window.isFormSubmitted = false;
+</script>
+
+<style>
+  .photo-taken {
+      background-color: #d4edda; /* Màu nền xanh nhạt để đánh dấu */
+  }
+</style>
+
+<style>
+/* Container của switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 20px;
+    }
+
+    /* Ẩn checkbox mặc định */
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    /* Thanh trượt */
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 20px;
+    }
+
+    /* Hình tròn bên trong switch */
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+    }
+
+    /* Khi checkbox được chọn */
+    input:checked + .slider {
+        background-color: #4caf50;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(30px);
+    }
+     /* Vô hiệu hóa thao tác nhấn */
+     .switch input:active + .slider {
+        pointer-events: none; /* Không cho phép nhấn */
+    }
+
+  /* Lớp phủ làm mờ */
+  .camera-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      z-index: 1000;
+      padding-right: 100px; /* Dịch modal vào trong 100px */
+  }
+  .capture-photo-modal {
+      position: absolute;
+      top: 50%; /* Căn giữa theo chiều dọc */
+      right: 20px; /* Cách mép phải 20px */
+      transform: translateY(-50%); /* Đảm bảo căn giữa chính xác */
+  }
+
+
+  /* Làm mờ lớp phía dưới */
+  .camera-modal-content {
+      position: relative;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  #camera-select-modal {
+      margin-bottom: 10px; /* Khoảng cách giữa nút chọn camera và video */
+  }
+
+
+  th.text-center {
+    color: #0056b3 !important;
+    font-size: 1.0rem !important;
+    font-weight: bold;
+ }
+ 
+ .pattern-dot-xla {
+    box-shadow: 0 2px 8px #007bff22;
+    transition: background 0.2s;
+}
+.pattern-dot-xla.selected {
+    background: #007bff !important;
+    color: #fff !important;
+}
+
+
+
+
+  
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const openCameraButtons = document.querySelectorAll('.open-camera');
+    const cameraModal = document.getElementById('camera-modal');
+    const videoModal = document.getElementById('camera-preview-modal');
+    const canvasModal = document.getElementById('canvas-modal');
+    const capturePhotoModal = document.querySelector('.capture-photo-modal');
+    const closeCameraModal = document.querySelector('.close-camera-modal');
+    const cameraSelectModal = document.getElementById('camera-select-modal');
+    const body = document.body;
+
+    // Ẩn select camera và các nút chọn camera khác nếu có
+    if (cameraSelectModal) cameraSelectModal.style.display = 'none';
+    setTimeout(() => {
+        document.querySelectorAll('.btn-info, .btn-warning').forEach(btn => btn.style.display = 'none');
+    }, 300);
+
+    let currentStream = null;
+    let currentFacing = 'environment';
+
+    // Hàm mở camera theo facingMode
+    function openCamera(facing) {
+        currentFacing = facing;
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: facing } }
+        }).then(stream => {
+            videoModal.srcObject = stream;
+            currentStream = stream;
+        }).catch(error => {
+            alert((facing === 'user' ? 'カメラ（前）' : 'カメラ（後）') + 'にアクセスできません: ' + error.message + '\nもう一度お試しください。');
+        });
+    }
+
+    // Đảm bảo nút Camera 前 và nút フォーカス luôn xuất hiện khi mở modal
+    function ensureCameraButtons() {
+        // Nút Camera 前
+        let frontBtn = document.getElementById('btn-front-camera-xla');
+        if (!frontBtn) {
+            frontBtn = document.createElement('button');
+            frontBtn.type = 'button';
+            frontBtn.id = 'btn-front-camera-xla';
+            frontBtn.className = 'btn btn-info mb-2 mr-2';
+            frontBtn.textContent = 'Camera 前';
+            videoModal.parentNode.insertBefore(frontBtn, videoModal);
+            frontBtn.onclick = function() {
+                openCamera('user');
+            };
+        }
+        // Nút フォーカス
+        let focusBtn = document.getElementById('btn-focus-xla');
+        if (!focusBtn) {
+            focusBtn = document.createElement('button');
+            focusBtn.type = 'button';
+            focusBtn.id = 'btn-focus-xla';
+            focusBtn.className = 'btn btn-warning mb-2';
+            focusBtn.textContent = 'フォーカス';
+            videoModal.parentNode.insertBefore(focusBtn, videoModal);
+            focusBtn.onclick = function() {
+                // Thử lấy nét lại bằng cách applyConstraints nếu có, nếu không thì reload stream
+                if (currentStream && currentStream.getVideoTracks().length > 0) {
+                    const track = currentStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities && track.getCapabilities();
+                    if (capabilities && capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                    } else {
+                        // Nếu không hỗ trợ, reload lại camera
+                        openCamera(currentFacing);
+                    }
+                } else {
+                    openCamera(currentFacing);
+                }
+            };
+        }
+    }
+
+    openCameraButtons.forEach(button => {
+        button.style.display = 'inline-block';
+        button.addEventListener('click', function () {
+            const detailId = this.getAttribute('data-id');
+            const hiddenInput = document.getElementById(`actual_image_${detailId}`);
+            const photoPreview = document.getElementById(`photo-preview-${detailId}`);
+            const row = this.closest('tr');
+
+            cameraModal.style.display = 'flex';
+            body.classList.add('blur-background');
+
+            ensureCameraButtons();
+            openCamera('environment');
+
+            capturePhotoModal.onclick = function () {
+                try {
+                    const context = canvasModal.getContext('2d');
+                    canvasModal.width = videoModal.videoWidth;
+                    canvasModal.height = videoModal.videoHeight;
+                    context.drawImage(videoModal, 0, 0, canvasModal.width, canvasModal.height);
+
+                    const imageData = canvasModal.toDataURL('image/jpeg', 0.92); // tăng chất lượng ảnh
+                    photoPreview.src = imageData;
+                    photoPreview.style.display = 'block';
+                    hiddenInput.value = imageData;
+                    row.classList.add('photo-taken');
+                    closeModal();
+                } catch (error) {
+                    alert('写真の取得に失敗しました。もう一度撮影してください。');
+                }
+            };
+        });
+    });
+
+    closeCameraModal.addEventListener('click', closeModal);
+
+    function closeModal() {
+        cameraModal.style.display = 'none';
+        body.classList.remove('blur-background');
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        videoModal.srcObject = null;
+    }
+});
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const saveButton = document.getElementById('save-button');
+        const form = saveButton.closest('form');
+        const endTimeInput = document.getElementById('end-time');
+
+        saveButton.addEventListener('click', function (e) {
+            e.preventDefault(); // Ngăn submit form ngay lập tức
+
+            // Lấy thời gian hiện tại khi nhấn nút "保存"
+            const endTime = new Date().toISOString();
+            endTimeInput.value = endTime;
+
+            // Hiển thị overlay slider xác nhận
+            if (document.getElementById('finish-overlay-xla')) return; // Tránh tạo nhiều overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'finish-overlay-xla';
+            overlay.innerHTML = `
+              <div id="finish-slider-xla">
+                <div style="font-size:1.2rem;font-weight:bold;margin-bottom:8px;">保存が完了しました</div>
+                <div style="color:#555;">右にスライドして終了してください</div>
+                <div id="slider-track-xla">
+                  <div id="slider-label-xla">→ スライドして終了</div>
+                  <div id="slider-thumb-xla"><i class="fas fa-arrow-right"></i></div>
+                </div>
+                <button id="finish-exit-btn-xla" style="margin-top:18px;padding:8px 32px;background:#6c757d;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:bold;transition:background 0.2s;">キャンセル</button>
+              </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Nút thoát
+            document.getElementById('finish-exit-btn-xla').onclick = function() {
+                overlay.remove();
+            };
+
+            // Slider logic
+            const thumb = document.getElementById('slider-thumb-xla');
+            const track = document.getElementById('slider-track-xla');
+            let isDragging = false, startX = 0, currentX = 0, maxX = track.offsetWidth - thumb.offsetWidth;
+            let finished = false;
+
+            function doFinish() {
+                if (finished) return;
+                finished = true;
+                window.isFormSubmitted = true; // Đặt cờ đã submit
+                overlay.remove();
+                form.submit(); // Chỉ submit form khi kéo xong
+            }
+
+            thumb.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX - thumb.offsetLeft;
+                thumb.style.transition = 'none';
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging || finished) return;
+                currentX = Math.min(Math.max(0, e.clientX - startX), maxX);
+                thumb.style.left = currentX + 'px';
+                if (currentX >= maxX) {
+                    doFinish();
+                }
+            });
+            document.addEventListener('mouseup', function() {
+                if (!isDragging || finished) return;
+                if (currentX < maxX) {
+                    thumb.style.transition = 'left 0.3s';
+                    thumb.style.left = '0px';
+                }
+                isDragging = false;
+                document.body.style.userSelect = '';
+            });
+
+            // Touch support
+            thumb.addEventListener('touchstart', function(e) {
+                isDragging = true;
+                startX = e.touches[0].clientX - thumb.offsetLeft;
+                thumb.style.transition = 'none';
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('touchmove', function(e) {
+                if (!isDragging || finished) return;
+                currentX = Math.min(Math.max(0, e.touches[0].clientX - startX), maxX);
+                thumb.style.left = currentX + 'px';
+                if (currentX >= maxX) {
+                    doFinish();
+                }
+            });
+            document.addEventListener('touchend', function() {
+                if (!isDragging || finished) return;
+                if (currentX < maxX) {
+                    thumb.style.transition = 'left 0.3s';
+                    thumb.style.left = '0px';
+                }
+                isDragging = false;
+                document.body.style.userSelect = '';
+            });
+        });
+    });
+</script>
+
+<style>
+    .overlay-xla {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.8);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .enlarged-image-xla {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 12px;
+      box-shadow: 0 0 24px #000;
+      background: #fff;
+      padding: 8px;
+      z-index: 100000;
+      animation: xla-zoom-in 0.2s;
+    }
+    @keyframes xla-zoom-in {
+      from { transform: scale(0.7);}
+      to { transform: scale(1);}
+    }
+    .zoom-image {
+      cursor: zoom-in;
+      transition: box-shadow 0.2s;
+    }
+    .zoom-image:hover {
+      box-shadow: 0 0 10px #007bff;
+      opacity: 0.85;
+    }
+
+    .btn-info { margin-bottom: 10px; }
+    
+  </style>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('click', function(event) {
+      if (event.target.classList.contains('zoom-image')) {
+        // Xóa overlay cũ nếu có
+        document.querySelectorAll('.overlay-xla').forEach(e => e.remove());
+        // Tạo overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay-xla';
+        // Tạo ảnh phóng to
+        const bigImg = document.createElement('img');
+        bigImg.src = event.target.src;
+        bigImg.className = 'enlarged-image-xla';
+        overlay.appendChild(bigImg);
+        document.body.appendChild(overlay);
+        // Đóng khi click overlay hoặc nhấn ESC
+        overlay.addEventListener('click', function() {
+          overlay.remove();
+        });
+        document.addEventListener('keydown', function escHandler(e) {
+          if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', escHandler);
+          }
+        });
+      }
+    });
+  });
+  </script>
+
+<!-- Slider xác nhận hoàn thành -->
+<style>
+    #finish-overlay-xla {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.7);
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    }
+    #finish-slider-xla {
+    width: 350px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 0 24px #0008;
+    padding: 32px 24px;
+    text-align: center;
+    position: relative;
+    }
+    #slider-track-xla {
+    width: 100%;
+    height: 48px;
+    background: #e9ecef;
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    }
+    #slider-thumb-xla {
+    width: 48px;
+    height: 48px;
+    background: #007bff;
+    border-radius: 50%;
+    position: absolute;
+    left: 0; top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: none;
+    }
+    #slider-label-xla {
+    position: absolute;
+    left: 0; top: 0; width: 100%; height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    font-size: 1.1rem;
+    pointer-events: none;
+    font-weight: bold;
+    letter-spacing: 2px;
+    }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const saveButton = document.getElementById('save-button');
+  const endTimeInput = document.getElementById('end-time');
+
+  saveButton.addEventListener('click', function (e) {
+    // Lấy thời gian hiện tại khi nhấn nút "保存"
+    const endTime = new Date().toISOString();
+    endTimeInput.value = endTime;
+
+    // Hiển thị overlay slider xác nhận
+    if (document.getElementById('finish-overlay-xla')) return; // Tránh tạo nhiều overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'finish-overlay-xla';
+    overlay.innerHTML = `
+      <div id="finish-slider-xla">
+        <div style="font-size:1.2rem;font-weight:bold;margin-bottom:8px;">保存が完了しました</div>
+        <div style="color:#555;">右にスライドして終了してください</div>
+        <div id="slider-track-xla">
+          <div id="slider-label-xla">→ スライドして終了</div>
+          <div id="slider-thumb-xla"><i class="fas fa-arrow-right"></i></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    
+
+    // Slider logic
+    const thumb = document.getElementById('slider-thumb-xla');
+    const track = document.getElementById('slider-track-xla');
+    let isDragging = false, startX = 0, currentX = 0, maxX = track.offsetWidth - thumb.offsetWidth;
+    let finished = false; // Thêm biến cờ
+
+    function doFinish() {
+      if (finished) return;
+      finished = true;
+      window.isFormSubmitted = true;
+      overlay.remove();
+      form.submit(); // <-- giữ dòng này, không cần hỏi lại người dùng!
+      
+    }
+
+    thumb.addEventListener('mousedown', function(e) {
+      isDragging = true;
+      startX = e.clientX - thumb.offsetLeft;
+      thumb.style.transition = 'none';
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging || finished) return;
+      currentX = Math.min(Math.max(0, e.clientX - startX), maxX);
+      thumb.style.left = currentX + 'px';
+      if (currentX >= maxX) {
+        doFinish();
+      }
+    });
+    document.addEventListener('mouseup', function() {
+      if (!isDragging || finished) return;
+      if (currentX < maxX) {
+        thumb.style.transition = 'left 0.3s';
+        thumb.style.left = '0px';
+      }
+      isDragging = false;
+      document.body.style.userSelect = '';
+    });
+
+    // Touch support
+    thumb.addEventListener('touchstart', function(e) {
+      isDragging = true;
+      startX = e.touches[0].clientX - thumb.offsetLeft;
+      thumb.style.transition = 'none';
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('touchmove', function(e) {
+      if (!isDragging || finished) return;
+      currentX = Math.min(Math.max(0, e.touches[0].clientX - startX), maxX);
+      thumb.style.left = currentX + 'px';
+      if (currentX >= maxX) {
+        doFinish();
+      }
+    });
+    document.addEventListener('touchend', function() {
+      if (!isDragging || finished) return;
+      if (currentX < maxX) {
+        thumb.style.transition = 'left 0.3s';
+        thumb.style.left = '0px';
+      }
+      isDragging = false;
+      document.body.style.userSelect = '';
+    });
+
+    function finish() {
+      overlay.remove();
+      window.location.href = "{% url 'baotri_index' %}";
+    }
+  });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let isFormSubmitted = false;
+    const form = document.querySelector('form');
+    const formKey = 'baotri_form_autosave';
+
+    // Tự động lưu dữ liệu form mỗi khi thay đổi
+    if (form) {
+        form.addEventListener('input', function() {
+            localStorage.setItem(formKey, new FormData(form).toString());
+        });
+
+        // Khi submit thì xóa dữ liệu tạm
+        form.addEventListener('submit', function() {
+            isFormSubmitted = true;
+            localStorage.removeItem(formKey);
+        });
+
+        // Nếu có dữ liệu tạm, hỏi người dùng có muốn khôi phục không
+        const saved = localStorage.getItem(formKey);
+        if (saved) {
+            if (confirm('前回の未保存データがあります。復元しますか？')) {
+                // Parse lại dữ liệu và gán vào form
+                const params = new URLSearchParams(saved);
+                for (const [key, value] of params.entries()) {
+                    const field = form.elements[key];
+                    if (!field) continue;
+                    if (field.type === 'checkbox' || field.type === 'radio') {
+                        field.checked = true;
+                    } else if (field.tagName === 'TEXTAREA' || field.type === 'text' || field.type === 'hidden') {
+                        field.value = value;
+                    }
+                }
+            } else {
+                localStorage.removeItem(formKey);
+            }
+        }
+    }
+
+    // Cảnh báo khi đóng tab/cửa sổ hoặc reload
+    window.addEventListener('beforeunload', function (e) {
+        if (!window.isFormSubmitted) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const saveButton = document.getElementById('save-button');
+    const endTimeInput = document.getElementById('end-time');
+    const patternModal = document.getElementById('pattern-modal-xla');
+    const patternMsg = document.getElementById('pattern-msg-xla');
+    const form = saveButton.closest('form');
+
+    saveButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        // Hiện modal xác nhận 9 điểm
+        patternModal.style.display = 'flex';
+        patternMsg.style.display = 'none';
+        pattern = [];
+        drawPatternLine();
+    });
+
+    // Xử lý nút xác nhận pattern
+    document.getElementById('submit-pattern-xla').onclick = function() {
+        if (checkPatternOk()) {
+            patternModal.style.display = 'none';
+            showSliderConfirm();
+        } else {
+            patternMsg.style.display = 'block'; // Hiện thông báo lỗi
+        }
+    };
+    document.getElementById('cancel-pattern-xla').onclick = function() {
+        patternModal.style.display = 'none';
+    };
+    document.getElementById('clear-pattern-xla').onclick = function() {
+        pattern = [];
+        drawPatternLine();
+        patternMsg.style.display = 'none';
+    };
+
+    // Hàm hiện slider xác nhận như cũ
+    function showSliderConfirm() {
+        const endTime = new Date().toISOString();
+        endTimeInput.value = endTime;
+
+        if (document.getElementById('finish-overlay-xla')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'finish-overlay-xla';
+        overlay.innerHTML = `
+          <div id="finish-slider-xla">
+            <div style="font-size:1.2rem;font-weight:bold;margin-bottom:8px;">保存が完了しました</div>
+            <div style="color:#555;">右にスライドして終了してください</div>
+            <div id="slider-track-xla">
+              <div id="slider-label-xla">→ スライドして終了</div>
+              <div id="slider-thumb-xla"><i class="fas fa-arrow-right"></i></div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Slider logic giữ nguyên như bạn đã có...
+        const thumb = document.getElementById('slider-thumb-xla');
+        const track = document.getElementById('slider-track-xla');
+        let isDragging = false, startX = 0, currentX = 0, maxX = track.offsetWidth - thumb.offsetWidth;
+        let finished = false;
+
+        function doFinish() {
+            if (finished) return;
+            finished = true;
+            window.isFormSubmitted = true;
+            overlay.remove();
+            form.submit();
+        }
+
+        thumb.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            startX = e.clientX - thumb.offsetLeft;
+            thumb.style.transition = 'none';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging || finished) return;
+            currentX = Math.min(Math.max(0, e.clientX - startX), maxX);
+            thumb.style.left = currentX + 'px';
+            if (currentX >= maxX) {
+                doFinish();
+            }
+        });
+        document.addEventListener('mouseup', function() {
+            if (!isDragging || finished) return;
+            if (currentX < maxX) {
+                thumb.style.transition = 'left 0.3s';
+                thumb.style.left = '0px';
+            }
+            isDragging = false;
+            document.body.style.userSelect = '';
+        });
+
+        // Touch support
+        thumb.addEventListener('touchstart', function(e) {
+            isDragging = true;
+            startX = e.touches[0].clientX - thumb.offsetLeft;
+            thumb.style.transition = 'none';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('touchmove', function(e) {
+            if (!isDragging || finished) return;
+            currentX = Math.min(Math.max(0, e.touches[0].clientX - startX), maxX);
+            thumb.style.left = currentX + 'px';
+            if (currentX >= maxX) {
+                doFinish();
+            }
+        });
+        document.addEventListener('touchend', function() {
+            if (!isDragging || finished) return;
+            if (currentX < maxX) {
+                thumb.style.transition = 'left 0.3s';
+                thumb.style.left = '0px';
+            }
+            isDragging = false;
+            document.body.style.userSelect = '';
+        });
+    }
+
+    // Hàm kiểm tra pattern đúng (1→4→7→5→3)
+    window.checkPatternOk = function() {
+        const correctPattern = [0, 3, 6, 4, 2]; // 1→4→7→5→3
+        return pattern.length === correctPattern.length && pattern.every((v, i) => v === correctPattern[i]);
+    };
+});
+</script>
+
+<!-- Thêm vào sau khi DOMContentLoaded, ngay sau đoạn khai báo biến patternModal... -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // ====== Pattern Lock 9 điểm đơn giản ======
+    const patternArea = document.getElementById('pattern-area-xla');
+    let pattern = [];
+    let isDrawing = false;
+
+    // Tạo 9 điểm
+    function createPatternDots() {
+        patternArea.innerHTML = '';
+        pattern = [];
+        for (let i = 0; i < 9; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'pattern-dot-xla';
+            dot.dataset.index = i;
+            dot.style.position = 'absolute';
+            dot.style.width = '32px';
+            dot.style.height = '32px';
+            dot.style.borderRadius = '50%';
+            dot.style.background = '#e3e6f0';
+            dot.style.border = '2px solid #007bff';
+            dot.style.left = (i % 3) * 54 + 'px';
+            dot.style.top = Math.floor(i / 3) * 54 + 'px';
+            dot.style.display = 'flex';
+            dot.style.alignItems = 'center';
+            dot.style.justifyContent = 'center';
+            dot.style.fontWeight = 'bold';
+            dot.style.fontSize = '1.2rem';
+            dot.textContent = i + 1;
+            patternArea.appendChild(dot);
+        }
+    }
+    createPatternDots();
+
+    // Vẽ đường nối (canvas)
+    let canvasLine = document.createElement('canvas');
+    canvasLine.width = 140;
+    canvasLine.height = 140;
+    canvasLine.style.position = 'absolute';
+    canvasLine.style.left = '0';
+    canvasLine.style.top = '0';
+    patternArea.appendChild(canvasLine);
+
+    function drawPatternLine() {
+        const ctx = canvasLine.getContext('2d');
+        ctx.clearRect(0, 0, 140, 140);
+        if (pattern.length < 2) return;
+        ctx.strokeStyle = '#007bff';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let i = 0; i < pattern.length; i++) {
+            const idx = pattern[i];
+            const x = (idx % 3) * 54 + 16;
+            const y = Math.floor(idx / 3) * 54 + 16;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    // Xử lý sự kiện chuột/cảm ứng
+    patternArea.addEventListener('mousedown', function(e) {
+        isDrawing = true;
+        pattern = [];
+        drawPatternLine();
+    });
+    patternArea.addEventListener('mouseup', function(e) {
+        isDrawing = false;
+    });
+    patternArea.addEventListener('mouseleave', function(e) {
+        isDrawing = false;
+    });
+    patternArea.addEventListener('mousemove', function(e) {
+        if (!isDrawing) return;
+        const rect = patternArea.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        for (let i = 0; i < 9; i++) {
+            const cx = (i % 3) * 54 + 16;
+            const cy = Math.floor(i / 3) * 54 + 16;
+            if (Math.hypot(cx - x, cy - y) < 20 && !pattern.includes(i)) {
+                pattern.push(i);
+                drawPatternLine();
+            }
+        }
+    });
+
+    // Touch support
+    patternArea.addEventListener('touchstart', function(e) {
+        isDrawing = true;
+        pattern = [];
+        drawPatternLine();
+    });
+    patternArea.addEventListener('touchend', function(e) {
+        isDrawing = false;
+    });
+    patternArea.addEventListener('touchmove', function(e) {
+        if (!isDrawing) return;
+        const rect = patternArea.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        for (let i = 0; i < 9; i++) {
+            const cx = (i % 3) * 54 + 16;
+            const cy = Math.floor(i / 3) * 54 + 16;
+            if (Math.hypot(cx - x, cy - y) < 20 && !pattern.includes(i)) {
+                pattern.push(i);
+                drawPatternLine();
+            }
+        }
+    });
+
+    // Nút clear
+    document.getElementById('clear-pattern-xla').onclick = function() {
+        pattern = [];
+        drawPatternLine();
+        patternMsg.style.display = 'none';
+    };
+
+    // Hàm kiểm tra pattern đúng (1→4→7→5→3)
+    window.checkPatternOk = function() {
+        const correctPattern = [0, 3, 6, 4, 2]; // 1→4→7→5→3
+        return pattern.length === correctPattern.length && pattern.every((v, i) => v === correctPattern[i]);
+    };
+
+    // Khi mở modal, reset pattern
+    document.getElementById('pattern-modal-xla').addEventListener('show', function() {
+        pattern = [];
+        drawPatternLine();
+    });
+});
+</script>
+
+<!-- ...existing code... -->
+
+<script>
+let allowLeave = false;
+
+// Chặn các hành động rời trang (bao gồm cả click link nội bộ)
+function handleLeave(e) {
+    if (!window.isFormSubmitted && !allowLeave) {
+        e.preventDefault();
+        showCustomLeaveModal(e);
+        return false;
+    }
+}
+
+// Chặn reload/tab close
+window.addEventListener('beforeunload', function (e) {
+    if (!window.isFormSubmitted && !allowLeave) {
+        showCustomLeaveModal(e);
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    }
+});
+
+// Chặn click vào các link nội bộ
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('a').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            if (!window.isFormSubmitted && !allowLeave && link.target !== '_blank' && link.href && !link.href.startsWith('javascript:')) {
+                handleLeave(e);
+            }
+        });
+    });
+});
+
+function showCustomLeaveModal(e) {
+    if (document.getElementById('custom-leave-modal')) return; // Đã có modal
+    const modal = document.createElement('div');
+    modal.id = 'custom-leave-modal';
+    modal.innerHTML = `
+        <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:32px 24px;border-radius:12px;box-shadow:0 0 24px #0008;text-align:center;min-width:320px;">
+                <div style="font-size:1.2rem;font-weight:bold;margin-bottom:16px;">このページから移動しますか？<br>未保存のデータは失われます。</div>
+                <button id="custom-leave-ok" class="btn btn-danger" style="margin-right:16px;">移動する</button>
+                <button id="custom-leave-cancel" class="btn btn-secondary">キャンセル</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('custom-leave-ok').onclick = function() {
+        allowLeave = true;
+        modal.remove();
+        if (e && e.type === 'beforeunload') {
+            // Cho phép reload/tab close
+            window.isFormSubmitted = true;
+            window.location.reload();
+        } else if (e && e.target && e.target.href) {
+            // Cho phép click link
+            window.isFormSubmitted = true;
+            window.location.href = e.target.href;
+        }
+    };
+    document.getElementById('custom-leave-cancel').onclick = function() {
+        allowLeave = false;
+        modal.remove();
+    };
+}
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const startTimeInput = document.getElementById('start-time-ts');
+    const form = document.querySelector('form');
+    let isAutoSaved = false;
+
+    if (startTimeInput && startTimeInput.value) {
+        const startTime = new Date(parseInt(startTimeInput.value, 10) * 1000);
+
+        function updateElapsed() {
+            const now = new Date();
+            const elapsed = Math.floor((now - startTime) / 1000);
+            if (elapsed >= 21600 && !isAutoSaved) { // 6 tiếng
+                isAutoSaved = true;
+                if (form) {
+                    form.submit();
+                }
+            }
+        }
+        setInterval(updateElapsed, 60 * 1000);
+    }
+});
+</script>
+
+
+
+<!-- ...existing code... -->
+
+<!-- Popup xác nhận siết ốc vít -->
+<div id="popup-ocvit" style="display:none;position:fixed;z-index:99999;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:32px 24px;border-radius:12px;box-shadow:0 0 24px #0008;text-align:center;min-width:320px;max-width:90vw;">
+    <div style="font-size:1.2rem;font-weight:bold;margin-bottom:16px;">
+      30分ごとに確認：<br>全てのネジがしっかり締め付けられていますか？
+    </div>
+     <!-- Hai ảnh động GIF minh họa siết ốc vít, lặp lại liên tục -->
+    <div style="display:flex;justify-content:center;gap:24px;margin-bottom:16px;">
+      <img src="/static/baotri/siet_ocvit2.gif" alt="Siết ốc vít 1" style="max-width:250px;max-height:200px;">
+      <img src="/static/baotri/siet_ocvit1.gif" alt="Siết ốc vít 2" style="max-width:200px;max-height:200px;">
+    </div>
+    <br>
+    <button id="btn-xacnhan-ocvit" class="btn btn-success" style="padding:8px 32px;font-size:1.1rem;">確認しました</button>
+  </div>
+</div>
+
+<script>
+function showOcvitPopup() {
+    const popup = document.getElementById('popup-ocvit');
+    popup.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('btn-xacnhan-ocvit').onclick = function() {
+        popup.style.display = 'none';
+        document.body.style.overflow = '';
+    };
+}
+
+// Hiện popup ngay khi vào trang
+showOcvitPopup();
+
+// Sau đó cứ mỗi 30 phút lại hiện lại popup
+setInterval(showOcvitPopup, 30 * 60 * 1000);
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const startTimeInput = document.getElementById('start-time-ts');
+    const elapsedTimer = document.getElementById('elapsed-timer');
+    if (startTimeInput && elapsedTimer && startTimeInput.value) {
+        const startTime = new Date(parseInt(startTimeInput.value, 10) * 1000);
+
+        function updateElapsed() {
+            const now = new Date();
+            const elapsed = Math.floor((now - startTime) / 1000);
+            const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            elapsedTimer.textContent = `${h}:${m}:${s}`;
+        }
+        updateElapsed();
+        setInterval(updateElapsed, 1000);
+    }
+});
+</script>
+
+<style>
+.main-title {
+    color: #007bff;
+    font-size: 2.2rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 2rem;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 8px rgba(0,123,255,0.08);
+    border-bottom: 3px solid #007bff;
+    padding-bottom: 0.5rem;
+    background: linear-gradient(90deg, #e3f2fd 0%, #fff 100%);
+    border-radius: 8px 8px 0 0;
+}
+@media (max-width: 768px) {
+    .main-title { font-size: 1.3rem; }
+    .card { margin: 0 2px; }
+    .table-responsive { font-size: 0.95rem; }
+    th, td { padding: 0.3rem !important; }
+}
+
+#camera-preview-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+@media (max-width: 600px) {
+    #camera-preview-modal {
+        max-height: 120px;
+    }
+}
+@media (min-width: 601px) and (max-width: 900px) {
+    #camera-preview-modal {
+        max-height: 150px;
+    }
+}
+@media (min-width: 901px) {
+    #camera-preview-modal {
+        max-height: 180px;
+    }
+}
+
+/* ...existing code... */
+
+.camera-modal-content {
+    background-color: #fff;
+    padding: 6px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    max-width: 500px;      /* Giảm max-width modal */
+    width: 94vw;
+    margin: 0 auto;
+    min-height: unset;
+    height: auto;          /* Modal chỉ cao vừa đủ nội dung */
+}
+
+#camera-preview-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 60px;      /* Giảm mạnh chiều cao camera */
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 6px;
+}
+
+@media (max-width: 600px) {
+    .camera-modal-content {
+        max-width: 98vw;
+        padding: 2px;
+    }
+    #camera-preview-modal {
+        max-height: 40px;
+    }
+}
+/* ...existing code... */
+
+</style>
+
+
+
+{% endblock %}

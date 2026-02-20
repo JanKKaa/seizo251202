@@ -1,0 +1,123 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\iot\plan_status.html -->
+{% extends "trang_chu/base.html" %}
+{% block content %}
+{% load humanize %}
+<h2 class="text-center my-3" style="font-size:1.1em; font-weight:bold;">生産計画一覧</h2>
+
+<div class="mb-2 d-flex flex-wrap gap-1 justify-content-left align-items-center">
+    <a href="{% url 'iot:iot_index' %}" class="btn btn-outline-secondary btn-xs px-1 py-0" style="font-size:0.8em;">
+        <i class="fa-solid fa-arrow-left"></i> 戻る
+    </a>
+</div>
+
+<div class="d-flex flex-wrap justify-content-center align-items-center mb-2" style="gap:0.5em;">
+    <a href="{% url 'iot:upload_production_plan' %}" class="btn btn-outline-success btn-xs px-1 py-0" style="font-size:0.8em;">
+        <i class="fa-solid fa-upload"></i> 生産計画アップロード
+    </a>
+    {% if plan_month_year %}
+        <span class="badge bg-success" style="font-size:0.85em; padding:0.15em 0.5em;">
+            計画月：{{ plan_month_year }}
+        </span>
+    {% endif %}
+    {% if plan_created_date_production %}
+        <span class="badge bg-info" style="font-size:0.85em; padding:0.15em 0.5em;">
+            生産CSV：{{ plan_created_date_production }}
+        </span>
+    {% endif %}
+    {% if plan_created_date_material %}
+        <span class="badge bg-warning" style="font-size:0.85em; padding:0.15em 0.5em;">
+            原材料CSV：{{ plan_created_date_material }}
+        </span>
+    {% endif %}
+</div>
+
+{% load tz %}
+{% now "j" as today_day %}
+
+<div class="table-responsive" style="max-height: 60vh;">
+    <table class="table table-bordered table-hover table-sm align-middle text-center" style="font-size:0.85em;">
+        <thead class="table-primary sticky-top">
+            <tr>
+                <th style="min-width: 60px;">成形機</th>
+                {% for day in days_list %}
+                    <th style="min-width: 40px;">{{ day }}日</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_rows %}
+            <tr>
+                <td class="fw-bold" style="font-size:0.95em;">{{ row.machine }}</td>
+                {% for cell_list in row.days %}
+                    <td class="position-relative p-1" style="min-width:40px;">
+                        {% if cell_list %}
+                            {% for cell in cell_list %}
+                                <div class="rounded bg-primary text-white py-1 px-1 mb-1" style="font-size: 0.75em; line-height:1.2;">
+                                    {{ cell.product_name }}
+                                </div>
+                                <div class="rounded bg-warning text-dark py-1 px-1 mb-1" style="font-size: 0.7em; font-weight: bold; line-height:1.2;">
+                                    {% if row.machine == "100" %}
+                                        {{ cell.plan_shot|intcomma }}枚
+                                    {% elif row.machine in material_machines %}
+                                        {{ cell.plan_shot|intcomma }}kg
+                                    {% else %}
+                                        {{ cell.plan_shot|intcomma }}個
+                                    {% endif %}
+                                </div>
+                                {% if row.machine == "100" %}
+                                <form method="post" action="{% url 'iot:delete_pallet_plan' %}"
+                                      class="position-absolute" style="top:2px; right:2px; z-index:10;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="plan_id" value="{{ cell.id }}">
+                                    <button type="submit" class="btn btn-xs btn-danger p-0 px-1" style="font-size:0.7em; line-height:1;">
+                                        ×
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if cell.cell_note and row.machine != "100" %}
+                                    <div class="rounded bg-info text-white py-1 px-1 mb-1" style="font-size: 0.75em;">
+                                        {{ cell.cell_note }}
+                                        <form method="post" action="{% url 'delete_plan_note' %}" style="display:inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="plan_id" value="{{ cell.id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger ms-2" style="font-size:0.7em;">メモ削除</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {% if row.machine == "100" %}
+                                <!-- 空セル時は表示なし -->
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="mb-3 card p-2 shadow-sm" style="font-size:0.95em;">
+    <h5 class="mb-2" style="font-size:1em;">パレット回収計画（手動登録）</h5>
+    <form class="row g-2 align-items-end" method="post" action="{% url 'iot:add_pallet_plan' %}">
+        {% csrf_token %}
+        <div class="col-5 col-md-4">
+            <label class="form-label" style="font-size:0.9em;">日付</label>
+            <input type="date" name="plan_date" value="{{ today_iso }}" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-3 col-md-3">
+            <label class="form-label" style="font-size:0.9em;">パレット数</label>
+            <input type="number" min="1" name="plan_shot" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-4 col-md-3">
+            <label class="form-label" style="font-size:0.9em;">メモ</label>
+            <input type="text" name="product_name" class="form-control form-control-sm" placeholder="例：午前回収">
+        </div>
+        <div class="col-12 col-md-2 mt-2 mt-md-0">
+            <button type="submit" class="btn btn-primary w-100 btn-sm">登録</button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

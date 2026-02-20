@@ -1,0 +1,404 @@
+<!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\bangcap_list.html -->
+{% extends "learn/base_learn.html" %}
+{% block title %}資格証明書一覧{% endblock %}
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">資格証明書一覧</h2>
+    <!-- Thống kê tổng số bằng cấp và năng lực tổng thể -->
+    <div class="alert alert-primary mb-3" id="company-summary" style="font-size:1.02rem;">
+        <!-- Nội dung sẽ được cập nhật bằng JavaScript -->
+        集計中...
+    </div>
+    <div class="d-flex flex-wrap align-items-center mb-3" style="gap: 0.5rem;">
+        <form method="get" class="flex-grow-1" style="max-width:600px; min-width:220px;">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="キーワード・氏名で検索..." value="{{ search_query|default:'' }}">
+                <button class="btn btn-primary" type="submit">検索</button>
+                <a href="{% url 'learn:bangcap_list' %}" class="btn btn-secondary">クリア</a>
+            </div>
+        </form>
+        <a href="{% url 'learn:bangcap_upload' %}" class="btn btn-success ms-2" style="white-space:nowrap;">新規アップロード</a>
+    </div>
+    {% if bangcaps %}
+        {% if user.is_authenticated and user.username == 'kanri' %}
+            {% regroup bangcaps by nhan_vien as nv_list %}
+            <div class="row">
+            {% for group in nv_list %}
+                <div class="col-12 mb-4">
+                    <div class="fw-bold fs-5 mb-2 border-bottom pb-1">
+                        <i class="fas fa-user-circle me-2"></i>{{ group.grouper.ten }}
+                    </div>
+                    <div class="row">
+                        {% for bc in group.list %}
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <div class="card bangcap-card h-100 shadow-lg animate__animated animate__fadeIn
+                                {% if bc.cap_do == '特急' %} border-cap-tokkyu
+                                {% elif bc.cap_do == '1級' %} border-cap-1
+                                {% elif bc.cap_do == '2級' %} border-cap-2
+                                {% elif bc.cap_do == '3級' %} border-cap-3
+                                {% elif bc.cap_do == '4級' %} border-cap-4
+                                {% else %} border-light{% endif %}
+                            ">
+                                <div class="card-header text-center fw-bold fs-5 py-3" style="background:rgba(0,0,0,0.03);">
+                                    {{ bc.loai_bang }}
+                                </div>
+                                <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                                    <span class="badge badge-cap fs-4 mb-3
+                                        {% if bc.cap_do == '特急' %} badge-tokkyu
+                                        {% elif bc.cap_do == '1級' %} badge-1
+                                        {% elif bc.cap_do == '2級' %} badge-2
+                                        {% elif bc.cap_do == '3級' %} badge-3
+                                        {% elif bc.cap_do == '4級' %} badge-4
+                                        {% else %} bg-light text-dark{% endif %}
+                                    ">
+                                        {{ bc.cap_do }}
+                                    </span>
+                                    <div class="w-100 mb-2">
+                                        <i class="fas fa-user me-1 text-secondary"></i>
+                                        <span class="fw-bold">氏名:</span> {{ bc.nhan_vien.ten }}
+                                    </div>
+                                    <div class="w-100 mb-2">
+                                        <i class="fas fa-calendar-alt me-1 text-secondary"></i>
+                                        <span class="fw-bold">発行日:</span> {{ bc.ngay_cap|default:"-" }}
+                                    </div>
+                                    <div class="w-100 mb-2">
+                                        <i class="fas fa-sticky-note me-1 text-secondary"></i>
+                                        <span class="fw-bold">備考:</span> {{ bc.ghi_chu|default:"-" }}
+                                    </div>
+                                    <div class="w-100 mb-2">
+                                        <i class="fas fa-file-alt me-1 text-secondary"></i>
+                                        <span class="fw-bold">ファイル:</span>
+                                        <a href="{{ bc.file.url }}" target="_blank" class="link-primary">ダウンロード</a>
+                                    </div>
+                                </div>
+                                <div class="card-footer d-flex justify-content-end align-items-center">
+                                    {% if user.is_authenticated and user.username == 'kanri' %}
+                                        <a href="{% url 'learn:bangcap_edit' bc.pk %}" class="btn btn-warning btn-sm me-2">編集</a>
+                                        <a href="{% url 'learn:bangcap_delete' bc.pk %}" class="btn btn-danger btn-sm">削除</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="row">
+                {% for bc in bangcaps %}
+                <div class="col-md-4 mb-4">
+                    <div class="card bangcap-card h-100 shadow-lg animate__animated animate__fadeIn
+                        {% if bc.cap_do == '特急' %} border-cap-tokkyu
+                        {% elif bc.cap_do == '1級' %} border-cap-1
+                        {% elif bc.cap_do == '2級' %} border-cap-2
+                        {% elif bc.cap_do == '3級' %} border-cap-3
+                        {% elif bc.cap_do == '4級' %} border-cap-4
+                        {% else %} border-light{% endif %}
+                    ">
+                        <div class="card-header text-center fw-bold fs-5 py-3" style="background:rgba(0,0,0,0.03);">
+                            {{ bc.loai_bang }}
+                        </div>
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                            <span class="badge badge-cap fs-4 mb-3
+                                {% if bc.cap_do == '特急' %} badge-tokkyu
+                                {% elif bc.cap_do == '1級' %} badge-1
+                                {% elif bc.cap_do == '2級' %} badge-2
+                                {% elif bc.cap_do == '3級' %} badge-3
+                                {% elif bc.cap_do == '4級' %} badge-4
+                                {% else %} bg-light text-dark{% endif %}
+                            ">
+                                {{ bc.cap_do }}
+                            </span>
+                            <div class="w-100 mb-2">
+                                <i class="fas fa-user me-1 text-secondary"></i>
+                                <span class="fw-bold">氏名:</span> {{ bc.nhan_vien.ten }}
+                            </div>
+                            <div class="w-100 mb-2">
+                                <i class="fas fa-calendar-alt me-1 text-secondary"></i>
+                                <span class="fw-bold">発行日:</span> {{ bc.ngay_cap|default:"-" }}
+                            </div>
+                            <div class="w-100 mb-2">
+                                <i class="fas fa-sticky-note me-1 text-secondary"></i>
+                                <span class="fw-bold">備考:</span> {{ bc.ghi_chu|default:"-" }}
+                            </div>
+                            <div class="w-100 mb-2">
+                                <i class="fas fa-file-alt me-1 text-secondary"></i>
+                                <span class="fw-bold">ファイル:</span>
+                                <a href="{{ bc.file.url }}" target="_blank" class="link-primary">ダウンロード</a>
+                            </div>
+                        </div>
+                        <div class="card-footer d-flex justify-content-end align-items-center">
+                            {% if user.is_authenticated and user.username == 'kanri' %}
+                                <a href="{% url 'learn:bangcap_edit' bc.pk %}" class="btn btn-warning btn-sm me-2">編集</a>
+                                <a href="{% url 'learn:bangcap_delete' bc.pk %}" class="btn btn-danger btn-sm">削除</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% else %}
+        <p>資格証明書がありません。</p>
+    {% endif %}
+</div>
+<br>
+{% if radar_data and selected_nv %}
+<div class="mb-4">
+    <h4 class="text-center">{{ selected_nv.ten }}さんの資格分布</h4>
+    <div style="max-width:320px; margin:0 auto;">
+        <canvas id="radarChart" width="280" height="280"></canvas>
+    </div>
+    <div class="alert alert-info mt-3" id="radar-summary" style="font-size:0.98rem;"></div>
+</div>
+<br>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<!-- Hiệu ứng animate.css -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<!-- Custom badge & border style -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% if radar_data and selected_nv %}
+<script>
+const radarLabels = {{ radar_data.labels|safe }};
+const radarValues = {{ radar_data.values|safe }};
+const radarLevels = {{ radar_data.levels|safe }};
+
+const ctx = document.getElementById('radarChart').getContext('2d');
+const radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+        labels: radarLabels,
+        datasets: [
+            {
+                label: '資格数',
+                data: radarValues,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+            },
+            {
+                label: '最高級レベル',
+                data: radarLevels,
+                backgroundColor: 'rgba(255, 206, 86, 0.1)',
+                borderColor: 'rgba(255, 206, 86, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(255, 206, 86, 1)',
+            }
+        ]
+    },
+    options: {
+        responsive: false,
+        plugins: {
+            legend: { position: 'top' },
+            title: { display: false }
+        },
+        scales: {
+            r: {
+                angleLines: { display: true },
+                suggestedMin: 0,
+                suggestedMax: 5,
+                pointLabels: { font: { size: 12 } }
+            }
+        }
+    }
+});
+
+// 日本語で自動コメント生成
+function getRadarSummaryJP(labels, values, levels) {
+    const total = values.reduce((a, b) => a + b, 0);
+    const maxLevel = Math.max(...levels);
+    let comment = "";
+
+    if (total >= labels.length * 4) {
+        comment = "全体的に非常に高いスキルを持っています。リーダーや管理職としての活躍が期待できます。";
+    } else if (maxLevel >= 4) {
+        comment = "特定分野で高い専門性を持っています。専門職や指導的な役割に適しています。";
+    } else if (total >= labels.length * 2) {
+        comment = "安定したスキルを持ち、日常業務を十分にこなせます。さらなる成長も期待できます。";
+    } else {
+        comment = "今後さらなるスキルアップや資格取得により、キャリアの幅が広がります。";
+    }
+
+    // 追加のキャリア提案
+    if (maxLevel >= 4 && total >= labels.length * 3) {
+        comment += " 今後はマネジメントやプロジェクトリーダーへの挑戦もおすすめします。";
+    } else if (total < labels.length * 2) {
+        comment += " 必要に応じて関連資格の取得を検討しましょう。";
+    }
+    return comment;
+}
+
+document.getElementById('radar-summary').innerText = getRadarSummaryJP(radarLabels, radarValues, radarLevels);
+</script>
+{% endif %}
+
+{% if bangcaps_list %}
+    {{ bangcaps_list|json_script:"bangcaps-data" }}
+    <script>
+    const loaiBangNangLuc = {
+        "QC検定": {
+            "特急": "QC検定・特急：全社的な品質戦略の立案・推進、品質監査の主導、他部門への品質教育・指導ができる。",
+            "1級": "QC検定・1級：品質管理システムの構築・改善、工程異常の根本原因分析、品質会議のリーダーができる。",
+            "2級": "QC検定・2級：QC七つ道具を活用したデータ分析、現場の品質改善活動の推進ができる。",
+            "3級": "QC検定・3級：日常的な品質点検、簡単な不良分析、標準作業の維持ができる。",
+            "4級": "QC検定・4級：品質の基礎知識を理解し、上司の指示のもとで品質活動に参加できる。",
+            "default": "QC検定：品質管理、製品の品質分析・評価、品質改善の能力。"
+        },
+        "電気系資格": {
+            "特急": "電気系資格・特急：大規模電気設備の設計・施工管理、トラブル発生時の即時対応、後進の指導ができる。",
+            "1級": "電気系資格・1級：複雑な電気回路の設計・改修、保守計画の立案、現場責任者ができる。",
+            "2級": "電気系資格・2級：標準的な電気設備の点検・修理、作業手順の作成ができる。",
+            "3級": "電気系資格・3級：日常点検、簡単な配線作業、上司の指示で作業ができる。",
+            "4級": "電気系資格・4級：電気の基礎知識を有し、補助作業ができる。",
+            "default": "電気系資格：電気設備の保守・点検・安全管理の能力。"
+        },
+        "プラスチック成形技能": {
+            "特急": "プラスチック成形技能・特急：成形条件の最適化、金型設計の指導、トラブル時の迅速な原因究明と対策ができる。",
+            "1級": "プラスチック成形技能・1級：複雑な成形品の条件設定、品質安定化、後輩指導ができる。",
+            "2級": "プラスチック成形技能・2級：標準的な成形作業、設備点検、簡単な不良対応ができる。",
+            "3級": "プラスチック成形技能・3級：基本的な成形機操作、材料交換、日常点検ができる。",
+            "4級": "プラスチック成形技能・4級：成形現場の補助作業、基礎知識の習得段階。",
+            "default": "プラスチック成形技能：成形工程の管理、品質維持、トラブル対応の能力。"
+        },
+        "国家資格": {
+            "特急": "国家資格・特急：国家レベルの専門知識・技能を活かし、プロジェクトリーダーや教育担当ができる。",
+            "1級": "国家資格・1級：高度な専門業務の遂行、現場責任者や指導者として活躍できる。",
+            "2級": "国家資格・2級：標準的な専門業務の独立遂行ができる。",
+            "3級": "国家資格・3級：基本的な専門作業を上司の指示で実施できる。",
+            "4級": "国家資格・4級：専門分野の基礎知識を有し、補助作業ができる。",
+            "default": "国家資格：専門分野における国家認定の知識・技能。"
+        },
+        "講習研修修了証": {
+            "特急": "講習研修修了証・特急：高度な研修内容を修了し、社内講師や教育担当として活躍できる。",
+            "1級": "講習研修修了証・1級：応用的な研修内容を修了し、現場での指導ができる。",
+            "2級": "講習研修修了証・2級：標準的な研修内容を修了し、日常業務に活かせる。",
+            "3級": "講習研修修了証・3級：基礎的な研修内容を修了し、補助作業ができる。",
+            "4級": "講習研修修了証・4級：入門的な研修内容を修了し、基本作業ができる。",
+            "default": "講習研修修了証：各種研修・講習の修了による基礎知識・実務力。"
+        },
+        "クレーン運転": {
+            "特急": "クレーン運転・特急：大型クレーンの操作・現場指導、特殊作業の責任者ができる。",
+            "1級": "クレーン運転・1級：高度なクレーン操作、安全管理、現場リーダーができる。",
+            "2級": "クレーン運転・2級：標準的なクレーン操作、日常点検ができる。",
+            "3級": "クレーン運転・3級：基本的なクレーン操作、補助作業ができる。",
+            "4級": "クレーン運転・4級：クレーン操作の基礎知識を有し、見習い作業ができる。",
+            "default": "クレーン運転：クレーン操作、安全運転、現場作業の能力。"
+        },
+        "日本語能力": {
+            "特急": "日本語能力・特急：専門的な交渉・契約・会議の進行ができる。",
+            "1級": "日本語能力・1級：ビジネス文書作成、社内外の調整業務ができる。",
+            "2級": "日本語能力・2級：日常業務の日本語コミュニケーションが問題なくできる。",
+            "3級": "日本語能力・3級：日常会話、簡単な業務連絡ができる。",
+            "4級": "日本語能力・4級：基礎的な日本語理解、簡単な指示の理解ができる。",
+            "default": "日本語能力：日本語でのコミュニケーション・業務遂行能力。"
+        },
+        "英語能力": {
+            "特急": "英語能力・特急：国際会議・交渉・契約書作成ができる。",
+            "1級": "英語能力・1級：ビジネスメール、会議参加、海外顧客対応ができる。",
+            "2級": "英語能力・2級：日常業務の英語コミュニケーションができる。",
+            "3級": "英語能力・3級：日常会話、簡単な業務連絡ができる。",
+            "4級": "英語能力・4級：基礎的な英語理解、簡単な指示の理解ができる。",
+            "default": "英語能力：英語でのコミュニケーション・国際業務対応力。"
+        },
+        "中国語能力": {
+            "特急": "中国語能力・特急：中国語での専門的な交渉・契約・会議の進行ができる。",
+            "1級": "中国語能力・1級：ビジネス文書作成、社内外の調整業務ができる。",
+            "2級": "中国語能力・2級：日常業務の中国語コミュニケーションができる。",
+            "3級": "中国語能力・3級：日常会話、簡単な業務連絡ができる。",
+            "4級": "中国語能力・4級：基礎的な中国語理解、簡単な指示の理解ができる。",
+            "default": "中国語能力：中国語でのコミュニケーション・国際業務対応力。"
+        },
+        "IT関係資格": {
+            "特急": "IT関係資格・特急：大規模システムの設計・構築・運用、IT戦略の立案ができる。",
+            "1級": "IT関係資格・1級：複雑なシステム開発・運用、プロジェクトリーダーができる。",
+            "2級": "IT関係資格・2級：標準的なIT業務、システム保守・運用ができる。",
+            "3級": "IT関係資格・3級：基本的なIT作業、簡単なプログラム修正ができる。",
+            "4級": "IT関係資格・4級：ITの基礎知識を有し、補助作業ができる。",
+            "default": "IT関係資格：ITシステム運用、プログラミング、情報セキュリティの能力。"
+        },
+        "その他": {
+            "default": "その他：上記以外の専門的な知識・技能。"
+        }
+    };
+
+    const bangcaps = JSON.parse(document.getElementById('bangcaps-data').textContent);
+
+    // Thống kê tổng số bằng cấp theo từng loại
+    let loaiBangStats = {};
+    bangcaps.forEach(bc => {
+        const loai = bc.loai_bang;
+        if (!loaiBangStats[loai]) {
+            loaiBangStats[loai] = { count: 0, levels: [] };
+        }
+        loaiBangStats[loai].count += 1;
+        loaiBangStats[loai].levels.push(bc.cap_do);
+    });
+
+    // Map cấp độ sang số
+    const levelMap = { "特急": 5, "1級": 4, "2級": 3, "3級": 2, "4級": 1 };
+
+    // Tạo nội dung thống kê chi tiết từng loại bằng cấp và từng cấp độ
+    let detail = "";
+    Object.keys(loaiBangStats).forEach(loai => {
+        const stat = loaiBangStats[loai];
+        // Tính trung bình cấp độ cho loại này
+        const avg = stat.levels.map(lv => levelMap[lv] || 0).reduce((a, b) => a + b, 0) / (stat.levels.length || 1);
+        // Làm tròn xuống để lấy cấp độ gần nhất
+        const avgLevelNum = Math.round(avg);
+        // Tìm tên cấp độ tương ứng số
+        const numToLevel = {5: "特急", 4: "1級", 3: "2級", 2: "3級", 1: "4級"};
+        const avgLevelName = numToLevel[avgLevelNum] || "default";
+        // Lấy mô tả đúng cấp độ trung bình
+        let desc = (loaiBangNangLuc[loai] && loaiBangNangLuc[loai][avgLevelName]) ? loaiBangNangLuc[loai][avgLevelName] : (loaiBangNangLuc[loai]?.default || "");
+        detail += `<li><b>${loai}</b>：${stat.count}件　平均レベル：${avg.toFixed(2)}<br>
+        <span class="text-secondary small">・${avgLevelName}：${desc}</span>
+    </li>`;
+    });
+
+    // Tổng hợp chung
+    let total = bangcaps.length;
+    let levelSum = 0;
+    let levelCount = 0;
+    bangcaps.forEach(bc => {
+        if (levelMap[bc.cap_do]) {
+            levelSum += levelMap[bc.cap_do];
+            levelCount += 1;
+        }
+    });
+    let avgLevel = levelCount ? (levelSum / levelCount) : 0;
+    let summary = `資格証明書合計：<b>${total}件</b>　／　平均レベル：<b>${avgLevel.toFixed(2)}</b>`;
+
+    if (avgLevel >= 4.5) {
+        summary += "　→　会社全体の専門性は非常に高いです。新規事業や難易度の高いプロジェクトにも十分対応可能です。";
+    } else if (avgLevel >= 3.5) {
+        summary += "　→　会社全体のスキルは高水準です。多様な業務に柔軟に対応できます。";
+    } else if (avgLevel >= 2.5) {
+        summary += "　→　標準的なスキル構成です。今後さらなるスキルアップを目指しましょう。";
+    } else {
+        summary += "　→　全体的なスキルアップや資格取得の推進が必要です。";
+    }
+
+    // Hiển thị lên giao diện
+    document.getElementById('company-summary').innerHTML =
+        summary + "<ul class='mt-2 mb-0 ps-3'>" + detail + "</ul>";
+    </script>
+{% endif %}
+
+
+{% if messages %}
+  <div class="container" style="max-width: 600px;">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}        

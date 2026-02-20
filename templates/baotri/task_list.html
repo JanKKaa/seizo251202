@@ -1,0 +1,42 @@
+<!-- filepath: c:\seizo0\trang_chu\templates\baotri\task_list.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}製品リスト{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">製品リスト</h1>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm">
+                <thead class="thead-light">
+                    <tr>
+                        <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
+                        <th class="small text-center font-weight-bold" style="width: 20%;">製品名</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">コード</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">作成者</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">アクション</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td class="small text-center">{{ forloop.counter }}</td>
+                        <td class="small">{{ task.name }}</td>
+                        <td class="small text-center">{{ task.code }}</td>
+                        <td class="small">{{ task.creator.first_name }} {{ task.creator.last_name }}</td>
+                        <td class="small text-center">
+                            <a href="{% url 'task_detail' task.id %}" class="btn btn-info btn-sm">詳細</a>
+                            {% if request.user.is_superuser %}
+                            <a href="{% url 'delete_task' task.id %}" class="btn btn-danger btn-sm" onclick="return confirm('削除してよろしいでしょうか?');">削除</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

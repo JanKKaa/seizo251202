@@ -1,0 +1,121 @@
+<!-- filepath: c:\seizo0\trang_chu\templates\baotri\add_task.html -->
+{% extends "trang_chu/base.html" %}
+
+{% block title %}新規作成{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-gray-800">新規作成</h1>
+<!-- Nút trở về trang index -->
+        <a href="{% url 'baotri_index' %}" class="btn btn-secondary mb-3">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+
+{% if success_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ success_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <!-- Form thêm nhiệm vụ -->
+        <form method="post" enctype="multipart/form-data"> <!-- Hỗ trợ upload file -->
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm">
+                    <tbody>
+                        <tr>
+                            <th class="small text-right align-middle" style="width: 30%;">製品名</th>
+                            <td>{{ form.name }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">金型No.</th>
+                            <td>{{ form.code }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">機械番号</th>
+                            <td>{{ form.machine_count }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">取数</th>
+                            <td>{{ form.quantity }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">材料</th>
+                            <td>{{ form.material }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">頻度</th>
+                            <td>{{ form.maintenance_frequency }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">製品写真</th>
+                            <td>{{ form.task_image }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">金型写真</th>
+                            <td>{{ form.product_image }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary">作成</button>
+                <a href="{% url 'task_list' %}" class="btn btn-secondary">キャンセル</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Danh sách nhiệm vụ hiện có -->
+<div class="card shadow mb-4 mt-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">現在のリスト</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm">
+                <thead class="thead-light">
+                    <tr>
+                        <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
+                        <th class="small text-center font-weight-bold" style="width: 20%;">項目</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">金型No.</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">作成者</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">作業</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td class="small text-center">{{ forloop.counter }}</td>
+                        <td class="small">{{ task.name }}</td>
+                        <td class="small text-center">{{ task.code }}</td>
+                        <td class="small">
+                            {% if task.creator %}
+                                {% if task.creator.first_name or task.creator.last_name %}
+                                    {{ task.creator.first_name }} {{ task.creator.last_name }}
+                                {% else %}
+                                    {{ task.creator.username }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="small text-center">
+                            {% if request.user.is_superuser %}
+                            <a href="{% url 'task_detail' task.id %}" class="btn btn-info btn-sm">メンテナンス作業</a>
+                            
+                            <a href="{% url 'delete_task' task.id %}" class="btn btn-danger btn-sm" onclick="return confirm('削除しますか？確認お願いします！');">
+                                削除
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

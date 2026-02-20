@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A3 landscape;
+            margin: 15mm 10mm 15mm 10mm;
+        }
+        body {
+            font-family: "Meiryo", "Yu Gothic", "Arial", sans-serif;
+            font-size: 11px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            table-layout: fixed;
+            word-break: break-all;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 3px 4px;
+            text-align: center;
+            font-size: 10px;
+            overflow: hidden;
+            word-break: break-all;
+        }
+        th {
+            background: #e3eafc;
+        }
+        td:nth-child(3), th:nth-child(3) {
+            min-width: 120px;
+            max-width: 220px;
+            white-space: normal;
+        }
+        .checked { color: #1cc88a; font-weight: bold; }
+        .unchecked { color: #aaa; }
+        .kanji-red { color: #e74c3c; }
+        .kanji-gray { color: #555; }
+        .bg-day { background: #f8f9fa; }
+        .bg-night { background: #e3f2fd; }
+        h3 { margin-top: 30px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h2 style="margin-bottom:10px;">注文管理（全員分） {{ year }}年{{ month }}月</h2>
+
+    <!-- 日勤（昼間） -->
+    <h3>日勤（昼間）</h3>
+    <table class="bg-day">
+        <thead>
+            <tr>
+                <th>社員番号</th>
+                <th>氏名</th>
+                <th>料理名</th>
+                {% for d in days %}
+                    <th>{{ d.day }}</th>
+                {% endfor %}
+                <th>注文数</th>
+                <th>合計金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data_day %}
+                <tr>
+                    <td>{{ row.ma_so }}</td>
+                    <td>{{ row.ten }}</td>
+                    <td>{{ row.mon_an }}</td>
+                    {% for ordered in row.orders %}
+                        <td>
+                            {% if ordered > 0 %}
+                                <span class="checked">&#9679;</span>
+                                {% if ordered > 1 %}
+                                    <span style="font-size:0.9em;color:#e74c3c;">×{{ ordered }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="unchecked">&#9675;</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>{{ row.so_luong }}</td>
+                    <td>{{ row.total }} 円</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- 夜勤（夜間） -->
+    <h3>夜勤（夜間）</h3>
+    <table class="bg-night">
+        <thead>
+            <tr>
+                <th>社員番号</th>
+                <th>氏名</th>
+                <th>料理名</th>
+                {% for d in days %}
+                    <th>{{ d.day }}</th>
+                {% endfor %}
+                <th>注文数</th>
+                <th>合計金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data_night %}
+                <tr>
+                    <td>{{ row.ma_so }}</td>
+                    <td>{{ row.ten }}</td>
+                    <td>{{ row.mon_an }}</td>
+                    {% for ordered in row.orders %}
+                        <td>
+                            {% if ordered > 0 %}
+                                <span class="checked">&#9679;</span>
+                                {% if ordered > 1 %}
+                                    <span style="font-size:0.9em;color:#e74c3c;">×{{ ordered }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="unchecked">&#9675;</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>{{ row.so_luong }}</td>
+                    <td>{{ row.total }} 円</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- 工作課 -->
+    <h3>工作課</h3>
+    <table class="bg-day">
+        <thead>
+            <tr>
+                <th>社員番号</th>
+                <th>氏名</th>
+                <th>料理名</th>
+                {% for d in days %}
+                    <th>{{ d.day }}</th>
+                {% endfor %}
+                <th>注文数</th>
+                <th>合計金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data_koujika %}
+                <tr>
+                    <td>{{ row.ma_so }}</td>
+                    <td>{{ row.ten }}</td>
+                    <td>{{ row.mon_an }}</td>
+                    {% for ordered in row.orders %}
+                        <td>
+                            {% if ordered > 0 %}
+                                <span class="checked">&#9679;</span>
+                                {% if ordered > 1 %}
+                                    <span style="font-size:0.9em;color:#e74c3c;">×{{ ordered }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="unchecked">&#9675;</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>{{ row.so_luong }}</td>
+                    <td>{{ row.total }} 円</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- 客様 -->
+    <h3>客様</h3>
+    <table class="bg-day">
+        <thead>
+            <tr>
+                <th>社員番号</th>
+                <th>氏名</th>
+                <th>料理名</th>
+                {% for d in days %}
+                    <th>{{ d.day }}</th>
+                {% endfor %}
+                <th>注文数</th>
+                <th>合計金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data_kyakusama %}
+                <tr>
+                    <td>{{ row.ma_so }}</td>
+                    <td>{{ row.ten }}</td>
+                    <td>{{ row.mon_an }}</td>
+                    {% for ordered in row.orders %}
+                        <td>
+                            {% if ordered > 0 %}
+                                <span class="checked">&#9679;</span>
+                                {% if ordered > 1 %}
+                                    <span style="font-size:0.9em;color:#e74c3c;">×{{ ordered }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="unchecked">&#9675;</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>{{ row.so_luong }}</td>
+                    <td>{{ row.total }} 円</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- 注文集計（全期間） -->
+    <h3 style="margin-top:35px;">注文集計（全期間）</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>料理名</th>
+                <th>注文数</th>
+                <th>単価</th>
+                <th>合計金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in summary_list %}
+            <tr>
+                <td>{{ row.ten }}</td>
+                <td>{{ row.so_luong }}</td>
+                <td>{{ row.gia|floatformat:0 }} 円</td>
+                <td>{{ row.tong_tien|floatformat:0 }} 円</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

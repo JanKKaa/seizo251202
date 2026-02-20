@@ -1,0 +1,377 @@
+{% load humanize %}
+<style>
+  .center2-full-wrapper {
+    width: 100%;
+    height: auto;      /* trước: 100% */
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow: visible;
+  }
+  .center2-full-card {
+    width: 100%;
+    height: auto;      /* trước: 100% */
+    margin: 0 auto;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+    max-width: none;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* THU NHỎ NỘI DUNG CÒN 80% */
+    transform: scale(0.9);
+    transform-origin: top center;
+  }
+  .card-body1 {
+    width: 100%;
+    height: auto;      /* trước: 100% */
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .container.py-3 {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100%;
+    max-width: 100%;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.2rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .center2-full-wrapper,
+  .center2-full-card,
+  .card-body1,
+  .container.py-3,
+  .card-grid {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  .product-progress-card {
+    position: relative;
+    border-radius: 0.7rem;
+    box-shadow: 0 2px 12px rgba(33,150,243,0.08);
+    background: #fff;
+    margin-bottom: 0.4rem;
+    padding: 0.6rem 0.7rem;
+    min-width: 0;
+    width: 100%;
+    max-width: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1.5px solid #90caf9;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .product-progress-card:hover {
+    box-shadow: 0 4px 18px rgba(33,150,243,0.18);
+    border-color: #1976d2;
+  }
+
+  /* DONE: card giữ kích thước như bình thường, đổi màu xanh lá */
+  .product-progress-card.done-card {
+    width: 100%;
+    max-width: 100px;
+    padding: 0.6rem 0.7rem;
+    opacity: 1;
+    border-color: #43a047;
+    box-shadow: 0 2px 12px rgba(67,160,71,0.15);
+  }
+  .product-progress-card.done-card .fw-bold {
+    font-size: 0.6rem;
+    color: #2e7d32;
+  }
+  .product-progress-card.done-card .progress-info {
+    font-size: 0.7rem;
+    color: #2e7d32;
+  }
+  .product-progress-card.done-card .progress-bar-bg {
+    height: 1.3rem;
+  }
+  .product-progress-card.done-card .progress-bar-fill {
+    background: linear-gradient(90deg,#43a047 0%,#66bb6a 100%);
+  }
+
+  .product-progress-card .mb-2 {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.18rem !important;
+    gap: 0.3rem;
+  }
+  .product-progress-card .fw-bold {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #1976d2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+    display: block;
+    transition: font-size 0.2s;
+  }
+  .product-progress-card .fw-bold.long-name {
+    font-size: 0.82rem; /* Giảm font nếu tên dài */
+  }
+  .progress-info {
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+    color: #607d8b;
+    font-weight: 500;
+  }
+  .progress-bar-bg {
+    background: #e3eaf3;
+    border-radius: 0.7rem;
+    height: 1.3rem;
+    margin-bottom: 0.1rem;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 0.7rem;
+    font-weight: bold;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 1.5rem;
+    font-size: 0.7rem;
+    transition: width 0.7s, background 0.3s;
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  /* Màu động cho thanh phần trăm */
+  .progress-bar-fill {
+    background: linear-gradient(90deg,
+      #e53935 0%,
+      #00d9ff 70%,
+      #43a047 100%);
+  }
+
+  .center2-full-wrapper,
+  .center2-full-card,
+  .card-body1,
+  .container.py-3,
+  .card-grid {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  .product-machine-badge{
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    font-size: 0.4rem;   /* nhỏ hơn chút */
+    font-weight: 700;
+    color: RGB(0, 71, 171);
+    padding: 0px 0px;
+    line-height: 1;
+  }
+</style>
+
+<div class="center2-full-wrapper">
+  <div class="center2-full-card">
+    <div class="card-body1">
+      <!-- Thông báo kế hoạch thu pallet (máy 100) nếu có -->
+      {% for row in progress_list %}
+        
+        {% if row.machine == "100" and row.total_plan > 0 %}
+          <div class="alert alert-warning text-center mb-2" style="font-size:1.1em;">
+            <i class="fa-solid fa-box"></i> 本日パレット回収計画あり
+          </div>
+        {% endif %}
+      {% endfor %}
+      <div class="mb-4" style="margin-bottom:0.7rem !important;">
+        <h5 class="fw-bold text-primary text-center" style="font-size:1.1rem;margin-bottom:0.7rem;">
+          本日（{{ today|date:"Y年m月d日" }})→
+          {% if tomorrow %}
+            翌日（{{ tomorrow|date:"Y年m月d日" }}）の計画比較
+          {% else %}
+            <span class="text-danger">翌日の計画がありません</span>
+          {% endif %}
+        </h5>
+        {% if tomorrow %}
+          <div class="row justify-content-center" style="gap:0.3rem;">
+            {% for row in compare_list %}
+              {% if row.status != "không thay đổi" and row.machine_int and row.machine_int < 200 %}
+                <div class="col-auto" style="padding:0;">
+                  
+                    <div class="card-body px-2 py-2 d-flex flex-column align-items-center justify-content-center text-center" style="padding:0.5rem 0.3rem !important;">
+                      
+                        <span class="fw-bold text-truncate d-inline-block badge bg-warning text-dark" style="font-size:0.75rem; padding:0.2em 0.7em;">
+                          {{ row.machine }}号機 :  {{ row.tomorrow_product|default:"計画なし" }}
+                        </span>
+                      
+                    </div>
+                  
+                </div>
+              {% endif %}
+            {% empty %}
+              <div class="col-12">
+                <div class="alert alert-info text-center">本日・翌日の計画データがありません.</div>
+              </div>
+            {% endfor %}
+          </div>
+          
+        {% else %}
+          <div class="alert alert-warning mt-3" style="margin-bottom:0;">
+            本日以降, まだ計画が登録されていません.
+          </div>
+        {% endif %}
+      </div>
+      <div class="container py-3">
+        <h4 id="month-label"
+            class="fw-bold text-success mb-4 text-left"
+            style="font-size:1rem;margin-bottom:0.5rem;">
+          {{ month_label }} 生産進捗ダッシュボード
+        </h4>
+        <div class="card-grid" id="progress-grid">
+          {% for row in progress_list %}
+          {% with percent=row.percent plan=row.total_plan actual=row.produced_qty %}
+            <div class="product-progress-card {% if percent|floatformat:0|add:'0' >= 100 %}done-card{% endif %}">
+              <span class="product-machine-badge">{{ row.machine }}号</span>
+
+              <div class="mb-2">
+                <span class="fw-bold text-truncate" style="max-width:100%;">{{ row.product_name }}</span>
+              </div>
+              <div class="progress-info" style="font-size:0.6rem;">
+                <b>{{ actual|intcomma }}/{{ plan|intcomma }}</b>　
+              </div>
+              <div class="progress-bar-bg">
+                <div
+                  class="progress-bar-fill"
+                  style="
+                    width:{{ percent|floatformat:0 }}%;
+                    background: linear-gradient(90deg,
+                      #e53935 0%,
+                      {% if percent < 80 %}
+                        #35d0e5 {{ percent|floatformat:0 }}%,
+                        #ffb300 {{ percent|floatformat:0 }}%,
+                        #ffb300 100%
+                      {% elif percent < 100 %}
+                        #ffb300 0%,
+                        #ffb300 {{ percent|floatformat:0 }}%,
+                        #43a047 {{ percent|floatformat:0 }}%,
+                        #43a047 100%
+                      {% else %}
+                        #43a047 0%,
+                        #43a047 100%
+                      {% endif %}
+                    );
+                  "
+                >
+                  {% if percent|floatformat:0|add:'0' >= 100 %}完了{% else %}{{ percent }}%{% endif %}
+                </div>
+              </div>
+            </div>
+          {% endwith %}
+          {% empty %}
+            <div class="alert alert-info text-center">今月の生産計画データがありません.</div>
+          {% endfor %}
+        </div>
+        <div class="mt-2 text-end text-secondary" style="font-size:0.85rem;">
+          ※「実績数量」はショット数 × 個取り数で計算しています.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function formatNumber(n) {
+    if (n == null) return "0";
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function buildCard(row) {
+    const percent = row.percent || 0;
+    const plan = row.total_plan || 0;
+    const actual = row.produced_qty || 0;
+
+    let bg;
+    if (percent < 80) {
+      bg = `linear-gradient(90deg,
+        #e53935 0%,
+        #e53935 ${percent}%,
+        #ffb300 ${percent}%,
+        #ffb300 100%)`;
+    } else if (percent < 100) {
+      bg = `linear-gradient(90deg,
+        #ffb300 0%,
+        #ffb300 ${percent}%,
+        #43a047 ${percent}%,
+        #43a047 100%)`;
+    } else {
+      bg = `linear-gradient(90deg,#43a047 0%,#43a047 100%)`;
+    }
+
+    const doneClass = percent >= 100 ? " done-card" : "";
+    const percentText = percent >= 100 ? "完了" : `${percent}%`;
+
+    return `
+      <div class="product-progress-card${doneClass}">
+        <span class="product-machine-badge">${row.machine || ""}号</span>
+        <div class="mb-2">
+          <span class="fw-bold text-truncate" style="max-width:100%;">${row.product_name || ""}</span>
+        </div>
+        <div class="progress-info" style="font-size:0.6rem;">
+          <b>${formatNumber(actual)}/${formatNumber(plan)}</b>　
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill"
+               style="width:${percent}%; background:${bg};">
+            ${percentText}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function refreshProgress() {
+    fetch("{% url 'iot:monthly_progress_json' %}")
+      .then(r => r.json())
+      .then(data => {
+        const label = document.getElementById("month-label");
+        if (label) {
+          label.textContent = data.month_label + " 生産進捗ダッシュボード";
+        }
+        const grid = document.getElementById("progress-grid");
+        if (!grid) return;
+        const list = data.progress_list || [];
+        if (!list.length) {
+          grid.innerHTML = '<div class="alert alert-info text-center">今月の生産計画データがありません.</div>';
+        } else {
+          grid.innerHTML = list.map(buildCard).join("");
+        }
+      })
+      .catch(console.error);
+  }
+
+  document.addEventListener("DOMContentLoaded", refreshProgress);
+  setInterval(refreshProgress, 30000);  // 30s cập nhật 1 lần
+})();
+</script>

@@ -1,0 +1,47 @@
+{% extends "trang_chu/base.html" %}
+{% block title %}金型寿命編集{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h3>金型寿命編集</h3>
+    {% if error_list %}
+        <div class="alert alert-danger">
+            {% for err in error_list %}
+                <div>{{ err }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="mold_code" class="form-label">金型品番</label>
+            <input type="text" name="mold_code" id="mold_code" class="form-control" value="{{ molding.mold.code|default_if_none:'' }}">
+        </div>
+        <div class="mb-3">
+            <label for="mold_name" class="form-label">金型名</label>
+            <input type="text" name="mold_name" id="mold_name" class="form-control" value="{{ molding.mold.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="condname" class="form-label">成形条件名</label>
+            <input type="text" name="condname" id="condname" class="form-control" value="{{ molding.condname }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="total_shot" class="form-label">ショット数</label>
+            <input type="number" name="total_shot" id="total_shot" class="form-control" min="0" value="{{ molding.total_shot }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="lifetime" class="form-label">金型寿命 (ショット)</label>
+            <input type="number" name="lifetime" id="lifetime" class="form-control" min="1" value="{{ molding.lifetime }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="status" class="form-label">状態</label>
+            <select name="status" id="status" class="form-control" required>
+                <option value="active" {% if molding.mold.status == "active" %}selected{% endif %}>生産中</option>
+                <option value="inactive" {% if molding.mold.status == "inactive" %}selected{% endif %}>生産終了</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="{% url 'iot:molding' %}" class="btn btn-secondary">戻る</a>
+    </form>
+</div>
+{% endblock %}

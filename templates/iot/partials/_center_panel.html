@@ -1,0 +1,544 @@
+{% load humanize %}
+
+
+<div class="dashboard-center-area center-panel" id="center-area">
+  <div class="dashboard-center-viewport" style="overflow:visible;">
+    <div class="dashboard-center-scale-wrapper">
+      <div class="dashboard-center-scale scale-level-0" id="center-scale">
+        <!-- Nhà máy 1 (trên) -->
+        <div class="mb-1" style="margin-bottom: 4px !important;">
+          <div class="d-flex align-items-center gap-2">
+            
+            <h4 class="machine-section-title text-success mb-0 d-flex align-items-center gap-2" id="title-f1" style="font-size:1.05em; min-width:90px;">
+              第一工場
+              {% if plan_summary_f1 %}
+                <span class="badge bg-primary" title="本日の計画がある機械数">
+                  計画: {{ plan_summary_f1.count }}台
+                </span>
+              {% endif %}
+            </h4>
+          </div>
+          {% if plan_summary_f1 and plan_summary_f1.names %}
+            <div class="text-muted" style="font-size:.82em; line-height:1.4;">
+              <i class="bi bi-calendar2-check me-1"></i>
+              {{ plan_summary_f1.names|join:"、 " }}
+            </div>
+          {% endif %}
+          <div class="factory-block" id="factory1-block" style="padding-top:2px;padding-bottom:2px;">
+            <div class="factory-grid" id="factory1-grid" style="margin-bottom:0;padding-bottom:0;"></div>
+            <div class="factory-grid" id="esp32-grid" style="margin-top:0;padding-top:0;"></div>
+          </div>
+          <div id="hidden-summary-factory1" class="hidden-summary"></div>
+        </div>
+        
+        <!-- Nhà máy 2 (dưới) -->
+        <div class="mb-1" style="margin-bottom: 4px !important;">
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <span class="badge bg-info small" id="countdownScreen2" style="visibility:hidden;"></span>
+            <h4 class="machine-section-title text-primary mb-0 d-flex align-items-center gap-2" id="title-f2" style="font-size:1.05em; min-width:90px;">
+              第二工場
+              {% if plan_summary_f2 %}
+                <span class="badge bg-primary" title="本日の計画がある機械数">
+                  計画: {{ plan_summary_f2.count }}台
+                </span>
+              {% endif %}
+            </h4>
+          </div>
+          {% if plan_summary_f2 and plan_summary_f2.names %}
+            <div class="text-muted" style="font-size:.82em; line-height:1.4;">
+              <i class="bi bi-calendar2-check me-1"></i>
+              {{ plan_summary_f2.names|join:"、 " }}
+            </div>
+          {% endif %}
+          <div class="factory-block" id="factory2-block" style="padding-top:2px;padding-bottom:2px;">
+            <div class="factory-grid" id="factory2-grid"></div>
+          </div>
+          <div id="hidden-summary-factory2" class="hidden-summary"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-center-bottom-scale">
+    <div class="d-flex align-items-center justify-content-center gap-2" style="min-height:32px;">
+      <div class="d-flex align-items-end gap-1" id="alarm-top5-summary"></div>
+    </div>
+  </div>
+
+  <div class="change-4m-popup-backdrop" id="change-4m-popup-backdrop" hidden>
+    <div class="change-4m-popup-dialog" role="dialog" aria-modal="true" aria-labelledby="change-4m-popup-title">
+      <div class="change-4m-popup-header">
+        <h5 id="change-4m-popup-title" class="mb-0">
+          <i class="bi bi-clipboard-pulse me-1"></i>4M情報一覧
+        </h5>
+        <button type="button" class="btn-close" id="change-4m-popup-close" aria-label="Close"></button>
+      </div>
+      <div class="change-4m-popup-body">
+        <div id="change-4m-popup-empty" class="text-muted small text-center py-3" hidden>
+          現在、表示できる4M情報はありません。
+        </div>
+        <div class="list-group small" id="change-4m-popup-list" role="list"></div>
+      </div>
+    </div>
+    
+  </div>
+  <div class="chatwork-popup-backdrop" id="chatwork-popup-backdrop" hidden>
+    <div class="chatwork-popup-dialog" role="dialog" aria-modal="true" aria-labelledby="chatwork-popup-title">
+      <div class="chatwork-popup-header">
+        <h5 id="chatwork-popup-title" class="mb-0">
+          <i class="fab fa-chat me-1"></i>Chatwork 新着メッセージ
+        </h5>
+        <button type="button" class="btn-close" id="chatwork-popup-close" aria-label="Close"></button>
+      </div>
+      <div class="chatwork-popup-body">
+        <div id="chatwork-popup-empty" class="text-muted small text-center py-3" hidden>
+          現在、表示できるChatworkメッセージはありません。
+        </div>
+        <div class="list-group small" id="chatwork-popup-list" role="list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .dashboard-center-bottom-scale {
+    transform: scale(0.8);
+    transform-origin: bottom center;
+    width: 100%;
+  }
+
+  .alarm-top5-bar {
+    display:flex; align-items:center; justify-content:center; gap:5px;
+    min-height:25px; padding:3px 5px; border-radius:10px;
+
+    /* Glassmorphism */
+    background: linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.06));
+    border:1px solid rgba(255,255,255,.35);
+    color:#fff;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px -12px rgba(0,0,0,.35);
+  }
+  .alarm-top5-bar .title {
+    display:flex; align-items:center; gap:6px;    font-weight:700; color:#ff6b6b; /* đỏ dịu mắt */
+    font-size:.8em; white-space:nowrap; text-shadow:0 1px 2px rgba(0,0,0,.25);
+  }
+  .alarm-top5-bar .title i { font-size:0.9rem; }
+  .alarm-top5-bar #alarm-top5-summary {
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    font-size:.8em;
+  }
+  .alarm-chip {
+    display:flex; align-items:center; gap:6px; padding:3px 8px; border-radius:8px;
+    background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28); color:#fff;
+  }
+  .alarm-chip .name { font-weight:600; }
+  .alarm-chip .count { opacity:.95; }
+  @media (max-width:900px){
+    .alarm-top5-bar { gap:8px; padding:5px 8px; border-radius:8px; }
+    .alarm-top5-bar .title { font-size:.88em; }
+    .alarm-top5-bar #alarm-top5-summary { font-size:.85em; gap:5px; }
+    .alarm-chip { padding:2px 6px; border-radius:7px; }
+  }
+
+  .change-4m-popup-trigger {
+    display:flex;
+    justify-content:center;
+    margin:6px 0 10px;
+  }
+  .change-4m-popup-backdrop {
+    position:fixed;
+    inset:0;
+    background:rgba(14,22,33,0.45);
+    backdrop-filter:blur(6px);
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:48px 16px;
+    z-index:1200;
+  }
+  .change-4m-popup-dialog {
+    width: min(720px, 98vw);
+    background:#fff;
+    border-radius:18px;
+    box-shadow:0 32px 64px rgba(45,136,255,0.18),0 2px 8px rgba(0,0,0,0.10);
+    overflow:hidden;
+    animation:change4mPopIn .22s cubic-bezier(.4,2,.6,1);
+    border:3px solid rgba(255, 136, 56, 0.7);
+  }
+  .change-4m-popup-header {
+    padding:24px 32px;
+    background:linear-gradient(90deg,#e3f2ff 0%,#f6fbff 100%);
+    border-bottom:2px solid rgba(255, 152, 56, 0.2);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+  }
+  .change-4m-popup-title {
+    font-size:2.2em;
+    font-weight:700;
+    color:#1f6feb;
+    letter-spacing:1px;
+    text-shadow:0 2px 8px rgba(255, 129, 56, 0.25);
+  }
+  .change-4m-popup-body {
+    padding: 28px 32px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: #fff;
+  }
+  .change-4m-popup-item {
+    border:2px solid rgba(56,149,255,.18);
+    background:linear-gradient(90deg,#f2f8ff 0%,#fff 100%);
+    box-shadow:0 2px 12px rgba(56,149,255,.08);
+  }
+  .change-4m-popup-item.highlight {
+    border-left:8px solid #eb591f;
+    background:linear-gradient(90deg,#e4f0ff 0%,#fff 100%);
+    color:#1f6feb;
+    box-shadow:0 4px 24px rgba(56,149,255,.25);
+  }
+  .change-4m-popup-meta {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 12px;
+    font-size: 1em;
+    color: #6c757d;
+  }
+  .change-4m-popup-meta .bi-clock-history,
+  .change-4m-popup-period,
+  .change-4m-popup-meta span:has(.bi-clock-history) {
+    font-size: 0.85em;
+    color: #f9ba90 !important; /* xanh dương nhạt */
+    opacity: 0.7;
+    font-weight: normal;
+  }
+  .change-4m-popup-period {
+    margin-left: 4px;
+  }
+  .change-4m-popup-tags span {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 999px;
+    background: rgba(255, 173, 96, 0.75);
+    color: #fff;
+    font-size: 1em;
+    margin: 0 4px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  @keyframes change4mPopIn {
+    from { opacity:0; transform:translateY(12px) scale(.98); }
+    to { opacity:1; transform:translateY(0) scale(1); }
+  }
+
+  .glass-4m-btn {
+    display:inline-flex;
+    align-items:center;
+    gap:.1rem;
+    padding:.1rem 0.8rem;
+    border-radius:999px;
+    border:1px solid rgba(255, 146, 96, 0.45);
+    background:rgba(230, 19, 12, 0.08);
+    color:#0c7ce6;
+    font-weight:600;
+    letter-spacing:.06em;
+    backdrop-filter:blur(14px);
+    
+    text-transform:uppercase;
+    transition:all .2s ease;
+  }
+  .glass-4m-btn i,
+  .glass-4m-btn .label {
+    color:#0c7ce6;
+  }
+  .glass-4m-btn:hover {
+    background:rgba(12,124,230,.18);
+    border-color:rgba(255, 173, 96, 0.75);
+    color:#3fa9ff;
+    transform:translateY(-1px);
+    box-shadow:0 14px 30px rgba(230, 128, 12, 0.45);
+  }
+  .glass-4m-btn:hover i,
+  .glass-4m-btn:hover .label {
+    color:#3fa9ff;
+  }
+
+  .chatwork-popup-backdrop {
+    position:fixed;
+    inset:0;
+    background:rgba(14,22,33,0.45);
+    backdrop-filter:blur(6px);
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:48px 16px;
+    z-index:1200;
+  }
+  .chatwork-popup-dialog {
+    width: min(1200px, 98vw);
+    background:#fff;
+    border-radius:18px;
+    box-shadow:0 32px 64px rgba(45,136,255,0.18),0 2px 8px rgba(0,0,0,0.10);
+    overflow:hidden;
+    animation:change4mPopIn .22s cubic-bezier(.4,2,.6,1);
+    border:3px solid rgba(56,149,255,.7);
+  }
+  .chatwork-popup-header {
+    padding:18px 24px;
+    background:linear-gradient(90deg,#e3f2ff 0%,#f6fbff 100%);
+    border-bottom:2px solid rgba(56,149,255,.2);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+  }
+  .chatwork-popup-title {
+    font-size: 1.1em; /* Giảm size tiêu đề */
+    font-weight: 700;
+    color: #1f6feb;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 8px rgba(56,149,255,.25);
+  }
+  .chatwork-popup-body {
+    padding: 18px 24px;
+    min-height: 60px;
+    background: #fff;
+  }
+  #chatwork-popup-list .list-group-item {
+    font-size: 1.4em !important; /* Tăng size nội dung tin nhắn */
+    line-height: 1.7em;
+    color: rgba(3, 32, 112, 1);
+  }
+
+  #chatwork-popup-list .fw-bold {
+    font-size: 1em; /* Giữ size nhỏ cho thời gian/người gửi */
+    color: #1062ddff;
+  }
+</style>
+
+{% if plan_summary_f1 and plan_summary_f1.names %}
+{{ plan_summary_f1.names|json_script:"__pmf1" }}
+<script>
+  window.plannedMachinesF1 = JSON.parse(document.getElementById('__pmf1').textContent);
+</script>
+{% endif %}
+{% if plan_summary_f2 and plan_summary_f2.names %}
+{{ plan_summary_f2.names|json_script:"__pmf2" }}
+<script>
+  window.plannedMachinesF2 = JSON.parse(document.getElementById('__pmf2').textContent);
+</script>
+{% endif %}
+
+<script>
+let popupTimer = null;
+let popupInterval = null;   // Giữ lại theo yêu cầu của anh
+
+function pollChange4MPopup() {
+  fetch('/iot/api/change-4m/')
+    .then(r => r.json())
+    .then(data => {
+      const now = new Date();
+      const entries = (Array.isArray(data.entries) ? data.entries : []).filter(entry => {
+        if (!entry.stop_at) return true;
+        const stopAtDate = new Date(entry.stop_at.replace(/\//g, '-').replace(' ', 'T') + ':00');
+        return stopAtDate > now;
+      });
+
+      window._4mEntries = entries; // chỉ lưu
+    });
+}
+window.pollChange4MPopup = pollChange4MPopup;
+
+function showChange4MPopupIfNeededInterval() {
+  if (window.alarmCount == 0 && document.getElementById('screen1').style.display !== 'none') {
+    const entries = window._4mEntries || [];
+    showChange4MPopupIfNeeded(entries);
+  } else {
+    // Nếu có alarm hoặc sang màn hình 2 → đóng popup
+    document.getElementById('change-4m-popup-backdrop').hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  pollChange4MPopup();
+  setInterval(pollChange4MPopup, 30000); // cập nhật entries mỗi 30s
+
+  // Kiểm tra mở popup mỗi 10 phút
+  popupInterval = setInterval(showChange4MPopupIfNeededInterval, 600000);
+});
+</script>
+
+<script>
+window.renderChange4MPopup = function(entries) {
+  console.log('renderChange4MPopup called', entries);
+  const list = document.getElementById('change-4m-popup-list');
+  const empty = document.getElementById('change-4m-popup-empty');
+  if (!list || !empty) return;
+
+  if (!entries || entries.length === 0) {
+    empty.hidden = false;
+    list.innerHTML = '';
+    return;
+  }
+
+  empty.hidden = true;
+  list.innerHTML = entries.map(entry => `
+    <div class="list-group-item change-4m-popup-item${entry.highlight ? ' highlight' : ''}">
+      <div class="fw-bold">${entry.code || '4M'}: ${entry.message}</div>
+      <div>${entry.detail || ''}</div>
+      <div class="change-4m-popup-meta">
+        <span><i class="bi bi-person"></i> ${entry.reporter || ''}</span>
+        <span><i class="bi bi-clock-history"></i> ${entry.timestamp || ''}</span>
+        ${entry.stop_at ? `<span class="change-4m-popup-period">~ ${entry.stop_at}</span>` : ''}
+        ${entry.tags && entry.tags.length ? `<span class="change-4m-popup-tags">${entry.tags.map(t => `<span>${t}</span>`).join('')}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+};
+</script>
+
+<script>
+function showChange4MPopupIfNeeded(entries) {
+  const backdrop = document.getElementById('change-4m-popup-backdrop');
+
+  // Nếu popup đang mở → không mở lại
+  if (!backdrop.hidden) return;
+
+  // Điều kiện mở popup
+  if (entries.length > 0 && window.alarmCount == 0) {
+    backdrop.hidden = false;
+    if (window.renderChange4MPopup) window.renderChange4MPopup(entries);
+    document.body.classList.add('modal-open');
+
+    if (popupTimer) clearTimeout(popupTimer);
+    popupTimer = setTimeout(() => {
+      backdrop.hidden = true;
+      document.body.classList.remove('modal-open');
+    }, 60000); // 1 phút
+  }
+}
+</script>
+
+<!-- GIỮ NGUYÊN TOÀN BỘ CODE CHATWORK BÊN DƯỚI -->
+<script>
+let lastChatworkMsg = localStorage.getItem('lastChatworkMsg') || '';
+let chatworkPopupTimer = null;
+
+function renderChatworkPopup(msgData) {
+  const backdrop = document.getElementById('chatwork-popup-backdrop');
+  const list = document.getElementById('chatwork-popup-list');
+  const empty = document.getElementById('chatwork-popup-empty');
+  if (!backdrop || !list || !empty) return;
+
+  if (!msgData || !msgData.message) {
+    empty.hidden = false;
+    list.innerHTML = '';
+  } else {
+    empty.hidden = true;
+    const formattedMsg = msgData.message.replace(/\n/g, '<br>');
+    list.innerHTML = `
+      <div class="list-group-item">
+        <div class="fw-bold">
+          ${msgData.time || ''}
+          ${msgData.sender ? `<span class="badge bg-secondary ms-2">${msgData.sender}</span>` : ""}
+        </div>
+        <div>${formattedMsg}</div>
+      </div>
+    `;
+  }
+
+  backdrop.hidden = false;
+  document.body.classList.add('modal-open');
+  window.dispatchEvent(new Event('openChatworkPopup'));
+
+  if (chatworkPopupTimer) clearTimeout(chatworkPopupTimer);
+  chatworkPopupTimer = setTimeout(() => {
+    backdrop.hidden = true;
+    document.body.classList.remove('modal-open');
+  }, 60000);
+
+  if (msgData && msgData.message) {
+    localStorage.setItem('lastChatworkMsg', msgData.message);
+    lastChatworkMsg = msgData.message;
+  }
+}
+
+function pollChatworkPopup() {
+  fetch('/iot/api/chatwork/latest/')
+    .then(r => r.json())
+    .then(data => {
+      if (data.message && data.message !== lastChatworkMsg) {
+        renderChatworkPopup(data);
+      } else if (!data.message) {
+        lastChatworkMsg = '';
+        localStorage.removeItem('lastChatworkMsg');
+      }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('chatwork-popup-open');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const res = await fetch('/iot/api/chatwork/latest/');
+      const data = await res.json();
+      renderChatworkPopup(data);
+    });
+  }
+
+  const closeBtn = document.getElementById('chatwork-popup-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      document.getElementById('chatwork-popup-backdrop').hidden = true;
+      document.body.classList.remove('modal-open');
+    });
+  }
+});
+
+setInterval(pollChatworkPopup, 60000);
+document.addEventListener('DOMContentLoaded', pollChatworkPopup);
+</script>
+
+<script>
+window.dispatchEvent(new Event('open4MPopup'));
+window.dispatchEvent(new Event('openChatworkPopup'));
+</script>
+
+<script>
+let lastMessageId = localStorage.getItem('lastMessageId') || '';
+
+function checkNewMessageAndNotify(groups) {
+  const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  if (dates.length === 0) return;
+  const latestMsgs = groups[dates[0]];
+  if (!latestMsgs || latestMsgs.length === 0) return;
+  const latestMsg = latestMsgs[0];
+
+  if (latestMsg.message_id && latestMsg.message_id !== lastMessageId) {
+    alert("Chatwork!新しいメッセージがあります。");
+    localStorage.setItem('lastMessageId', latestMsg.message_id);
+    lastMessageId = latestMsg.message_id;
+  }
+}
+
+function fetchAndRender() {
+  fetch('/iot/api/chatwork/grouped/')
+    .then(r => r.json())
+    .then(data => {
+      allGroups = data.groups || {};
+      renderCalendar(allGroups);
+      checkNewMessageAndNotify(allGroups);
+    });
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  pollChange4MPopup();
+  setInterval(pollChange4MPopup, 30000);
+});
+</script>

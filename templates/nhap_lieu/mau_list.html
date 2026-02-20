@@ -1,0 +1,57 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}入力テンプレート一覧{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-primary">入力テンプレート一覧</h2>
+    <div class="mb-3">
+        <a href="{% url 'nhap_lieu:mau_nhaplieu' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> 新しいテンプレートを追加
+        </a>
+    </div>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center" style="width: 60px;">#</th>
+                    <th class="text-center">プログラム名</th>
+                    <th class="text-center">作成者</th>
+                    <th class="text-center">作成日</th>
+                    <th class="text-center" style="width: 120px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mau in mau_list %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td>{{ mau.ten_chuong_trinh }}</td>
+                    <td>{{ mau.nguoi_thiet_ke.get_full_name|default:mau.nguoi_thiet_ke.username }}</td>
+                    <td class="text-center">{{ mau.ngay_tao|date:"Y/m/d H:i" }}</td>
+                    <td class="text-center">
+                        <a href="{% url 'nhap_lieu:mau_nhaplieu' %}?edit={{ mau.ten_chuong_trinh }}" class="btn btn-sm btn-primary me-1">
+                            <i class="fas fa-edit"></i> 編集
+                        </a>
+                        <form method="post" action="{% url 'nhap_lieu:mau_xoa' mau.ten_chuong_trinh %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('本当にこのテンプレートを削除しますか？');">
+                                <i class="fas fa-trash"></i> 削除
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">入力テンプレートはまだありません。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

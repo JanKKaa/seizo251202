@@ -1,0 +1,181 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}自動入力{% endblock %}
+
+{% block content %}
+<style>
+    body { background: #f5f6fa; }
+    .apple-card { border-radius: 24px; box-shadow: 0 4px 32px 0 rgba(60,60,60,0.07); border: none; background: #fff; }
+    .apple-btn { border-radius: 24px; font-weight: 500; padding: 0.75rem 2.5rem; font-size: 1.1rem; transition: background 0.2s; }
+    .apple-btn-success { background: #0071e3; color: #fff; border: none; }
+    .apple-btn-success:hover { background: #005bb5; color: #fff; }
+    .apple-btn-outline { border-radius: 24px; border: 1.5px solid #0071e3; color: #0071e3; background: #fff; font-weight: 500; transition: background 0.2s, color 0.2s; }
+    .apple-btn-outline:hover { background: #0071e3; color: #fff; }
+    .apple-label { font-weight: 600; font-size: 1.08rem; color: #222; }
+    .apple-input { border-radius: 16px; font-size: 1.08rem; padding: 0.7rem 1.2rem; border: 1.5px solid #e0e0e0; background: #f9f9f9; transition: border 0.2s; }
+    .apple-input:focus { border: 1.5px solid #0071e3; background: #fff; box-shadow: 0 0 0 0.1rem #0071e340; }
+    .apple-title { font-size: 2.2rem; font-weight: 700; letter-spacing: -1px; color: #222; margin-bottom: 0.5rem; }
+    .apple-desc { color: #555; font-size: 1.1rem; margin-bottom: 2rem; }
+    .apple-divider { border-top: 1.5px solid #e0e0e0; margin: 2rem 0; }
+</style>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-11 col-md-12">
+            <div class="card apple-card p-4 w-100">
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-keyboard fa-3x text-primary mb-2"></i>
+                        <div class="apple-title">自動入力</div>
+                        <div class="apple-desc">
+                            ワンクリックでコンピュータに自動入力コマンドを送信します。<br>
+                            <span class="text-muted" style="font-size:0.98em;">受信側のPCで <b>auto_input_api.py</b> が実行中であることを確認してください。</span>
+                        </div>
+                    </div>
+                    <form method="post" id="nhap-lieu-form" autocomplete="off">
+                        {% csrf_token %}
+                        <div class="row g-4 gx-5 mb-3">
+                            <!-- Cột 1: Lựa chọn -->
+                            <div class="col-md-5">
+                                <div class="mb-3">
+                                    <label class="apple-label mb-1">入力プログラム</label>
+                                    <select class="form-select apple-input" name="ten_chuong_trinh" id="select-chuong-trinh" required>
+                                        <option value="">-- プログラムを選択 --</option>
+                                        {% for ct in chuong_trinh_list %}
+                                            <option value="{{ ct.ten_chuong_trinh }}" {% if selected and selected.ten_chuong_trinh == ct.ten_chuong_trinh %}selected{% endif %}>
+                                                {{ ct.ten_chuong_trinh }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="apple-label mb-1">受信PC</label>
+                                    <select class="form-select apple-input" name="may_tinh" id="select-may-tinh" required>
+                                        <option value="">-- PCを選択 --</option>
+                                        {% for may in may_tinh_list %}
+                                            <option value="{{ may.id }}" {% if selected_may and selected_may.id == may.id %}selected{% endif %}>
+                                                {{ may.ten_hien_thi|default:may.ten_may }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Cột 2: Nội dung 5 dòng -->
+                            <div class="col-md-7">
+                                <div class="row g-3">
+                                    {% for i in "12345" %}
+                                    <div class="col-12">
+                                        <label class="apple-label mb-1">行 {{ i }}</label>
+                                        <input type="text" class="form-control apple-input" name="dong{{ i }}" value="">
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Thêm vùng nhập thời gian chờ trước nút gửi -->
+                        <div class="d-flex justify-content-center align-items-center gap-3 mb-3 mt-4">
+                            <label for="delay-seconds" class="apple-label mb-0">待機時間（秒）:</label>
+                            <input type="number" id="delay-seconds" class="form-control apple-input" value="5" min="0" style="width:80px;">
+                            <button type="submit" class="apple-btn apple-btn-success" id="submit-btn">
+                                <i class="fas fa-paper-plane"></i> 入力コマンドを送信
+                            </button>
+                            <div id="delay-message" class="text-info fw-bold" style="display:none;"></div>
+                        </div>
+                    </form>
+                    {% if message %}
+                    <div class="alert alert-info mt-3 text-center">{{ message }}</div>
+                    {% endif %}
+                    <div class="apple-divider"></div>
+                    <div class="d-flex justify-content-center gap-3 flex-wrap">
+                        <a href="{% url 'nhap_lieu:quanly_may' %}" class="apple-btn apple-btn-outline">
+                            <i class="fas fa-desktop"></i> PC管理
+                        </a>
+                        <a href="{% url 'nhap_lieu:mau_list' %}" class="apple-btn apple-btn-outline">
+                            <i class="fas fa-list-ol"></i> テンプレート一覧
+                        </a>
+                        <a href="{% url 'nhap_lieu:mau_nhaplieu' %}" class="apple-btn apple-btn-outline">
+                            <i class="fas fa-plus"></i> 新しいテンプレート追加
+                        </a>
+                    </div>
+                    <div id="may-dich-result" class="alert alert-success mt-3 text-center" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if quy_tac_list %}
+    <div class="alert alert-secondary py-2 px-3 mb-2" style="font-size:1.05rem;">
+        <b>プログラムルール概要:</b>
+        <ul class="mb-0 ps-3">
+            {% for item in quy_tac_list %}
+                <li>{{ item }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+<script>
+document.getElementById('nhap-lieu-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    // Lấy số giây chờ từ input
+    let countdown = parseInt(document.getElementById('delay-seconds').value) || 0;
+    const delayMsg = document.getElementById('delay-message');
+    delayMsg.style.display = 'block';
+    delayMsg.textContent = `${countdown}秒後に入力を開始します...`;
+
+    const interval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+            delayMsg.textContent = `${countdown}秒後に入力を開始します...`;
+        } else {
+            clearInterval(interval);
+            delayMsg.textContent = "入力コマンドを送信中...";
+            // Gửi AJAX thay vì submit form truyền thống
+            const formData = new FormData(e.target);
+            fetch(window.location.pathname, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": formData.get('csrfmiddlewaretoken'),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("HTTP status " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                btn.disabled = false;
+                delayMsg.style.display = 'none';
+                const resultDiv = document.getElementById('may-dich-result');
+                if (data.clipboard) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = "受信PCからの結果: " + data.clipboard;
+                } else if (data.message) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = data.message;
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = "コマンドを送信しました。返却データはありません。";
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                delayMsg.style.display = 'none';
+                const resultDiv = document.getElementById('may-dich-result');
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = "受信PCへのコマンド送信またはデータ受信時のエラー: " + err;
+            });
+        }
+    }, 1000);
+});
+
+document.getElementById('select-chuong-trinh').addEventListener('change', function() {
+    const val = this.value;
+    if (val) {
+        window.location = "?ten_chuong_trinh=" + encodeURIComponent(val);
+    }
+});
+</script>
+{% endblock %}
