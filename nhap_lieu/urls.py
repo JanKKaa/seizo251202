@@ -12,6 +12,7 @@ urlpatterns = [
     path("quanly-may/", views.quanly_may, name="quanly_may"),
     path("api/cap-nhat-ket-qua/", views.api_cap_nhat_ket_qua, name="api_cap_nhat_ket_qua"),
     path("api/latest-result/", views.api_get_latest_result, name="api_get_latest_result"),
+    path("api/job-status/<str:ma_job>/", views.api_job_status, name="api_job_status"),
     path("api/latest-by-ip/", views.api_get_latest_by_ip, name="api_get_latest_by_ip"),
     path("api/sse-latest-result/", views.sse_latest_result, name="sse_latest_result"),
 ]

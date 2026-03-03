@@ -8,6 +8,7 @@ import time
 import pyautogui
 import pyperclip
 import requests
+import urllib3
 
 app = Flask(__name__)
 
@@ -16,7 +17,7 @@ PATH_EXE = os.getenv("INPUT_EXE_PATH", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC\S
 WORKING_DIR = os.getenv("INPUT_WORKING_DIR", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC")
 URL_DJANGO_CALLBACK = os.getenv(
     "DJANGO_CALLBACK_URL",
-    "http://192.168.10.71:8000/nhap-lieu/api/cap-nhat-ket-qua/",
+    "https://192.168.10.250/nhap_lieu/api/cap-nhat-ket-qua/",
 )
 
 # select area (screen coords)
@@ -29,6 +30,11 @@ APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "12"))
 PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "2"))
 CALLBACK_TIMEOUT = float(os.getenv("CALLBACK_TIMEOUT", "5"))
 CALLBACK_RETRIES = int(os.getenv("CALLBACK_RETRIES", "3"))
+CALLBACK_VERIFY_SSL = os.getenv("CALLBACK_VERIFY_SSL", "0").strip() in {"1", "true", "True", "yes", "YES"}
+PROCESS_KILL_NAME = os.getenv("INPUT_PROCESS_NAME", os.path.basename(PATH_EXE))
+
+if not CALLBACK_VERIFY_SSL:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 pyautogui.FAILSAFE = True
 JOB_LOCK = threading.Lock()
@@ -84,7 +90,12 @@ def post_callback(payload: dict):
     last_error = None
     for i in range(CALLBACK_RETRIES):
         try:
-            response = requests.post(URL_DJANGO_CALLBACK, json=payload, timeout=CALLBACK_TIMEOUT)
+            response = requests.post(
+                URL_DJANGO_CALLBACK,
+                json=payload,
+                timeout=CALLBACK_TIMEOUT,
+                verify=CALLBACK_VERIFY_SSL,
+            )
             if 200 <= response.status_code < 300:
                 return True, response.status_code
             last_error = f"HTTP {response.status_code}: {response.text}"
@@ -96,16 +107,70 @@ def post_callback(payload: dict):
     return False, last_error
 
 
+def force_close_target_app(process=None):
+    """Đóng app đích chắc chắn, kể cả khi subprocess handle không trỏ đúng process UI."""
+    try:
+        if process and process.poll() is None:
+            process.terminate()
+            time.sleep(1)
+            if process.poll() is None:
+                process.kill()
+    except Exception:
+        pass
+
+    # Fallback: kill theo tên tiến trình (ổn định hơn với app kiểu launcher).
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", PROCESS_KILL_NAME],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def build_callback_payload(
+    *,
+    job_id: str,
+    ten_chuong_trinh: str,
+    ip: str,
+    status: str,
+    ma_nhap_lieu: str = "",
+    full_text: str = "",
+    error: str = "",
+):
+    return {
+        "job_id": job_id,
+        "ma_job": job_id,  # backward-compatible alias
+        "ten_chuong_trinh": ten_chuong_trinh or "",
+        "ma_nhap_lieu": ma_nhap_lieu or "",
+        "full_text": full_text or "",
+        "ip": ip or "",
+        "status": status,
+        "error": error or "",
+    }
+
+
 @app.route("/send_input", methods=["POST"])
 def send_input():
     if not JOB_LOCK.acquire(blocking=False):
         return jsonify({"message": "BUSY", "status": "Đang bận xử lý job khác"}), 409
 
     process = None
+    job_id = ""
+    ten_chuong_trinh = ""
+    workstation_ip = request.host.split(":")[0]
     try:
         data = request.get_json(force=True) or {}
         quy_tac = data.get("quy_tac", [])
         delay = float(data.get("delay", 0.1))
+        job_id = str(data.get("job_id") or data.get("ma_job") or "").strip()
+        ten_chuong_trinh = str(data.get("ten_chuong_trinh") or "").strip()
+
+        if not job_id:
+            return jsonify({"message": "Thiếu job_id", "status": "error"}), 400
 
         if not isinstance(quy_tac, list) or not quy_tac:
             return jsonify({"message": "Không có dữ liệu để nhập"}), 400
@@ -131,34 +196,40 @@ def send_input():
         full_text = copy_selected_text().strip()
         ma_nhap_lieu = extract_invoice_number(full_text)
 
-        payload_back = {
-            "ma_nhap_lieu": ma_nhap_lieu,
-            "full_text": full_text,
-            "ip": request.host.split(":")[0],
-            "status": "Hoàn thành",
-        }
+        payload_back = build_callback_payload(
+            job_id=job_id,
+            ten_chuong_trinh=ten_chuong_trinh,
+            ip=workstation_ip,
+            status="success",
+            ma_nhap_lieu=ma_nhap_lieu,
+            full_text=full_text,
+        )
         ok, callback_info = post_callback(payload_back)
 
         return jsonify(
             {
                 "message": "OK",
-                "status": "Thành công",
+                "status": "success",
+                "job_id": job_id,
                 "data_ocr": ma_nhap_lieu,
                 "callback_ok": ok,
                 "callback_info": callback_info,
             }
         )
     except Exception as exc:
-        return jsonify({"message": f"Lỗi: {exc}"}), 500
+        err_msg = str(exc)
+        if job_id:
+            payload_back = build_callback_payload(
+                job_id=job_id,
+                ten_chuong_trinh=ten_chuong_trinh,
+                ip=workstation_ip,
+                status="failed",
+                error=err_msg,
+            )
+            post_callback(payload_back)
+        return jsonify({"message": f"Lỗi: {err_msg}", "status": "failed", "job_id": job_id}), 500
     finally:
-        try:
-            if process and process.poll() is None:
-                process.terminate()
-                time.sleep(1)
-                if process.poll() is None:
-                    process.kill()
-        except Exception:
-            pass
+        force_close_target_app(process)
         JOB_LOCK.release()
 
 

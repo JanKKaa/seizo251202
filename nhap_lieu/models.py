@@ -2,6 +2,44 @@
 from django.contrib.auth.models import User
 
 
+class PhienNhapLieu(models.Model):
+    """Theo dõi 1 lần gửi lệnh nhập liệu từ Django -> máy trạm."""
+
+    ma_job = models.CharField(max_length=64, unique=True, db_index=True)
+    chuong_trinh = models.ForeignKey("ChuongTrinhNhapLieu", on_delete=models.SET_NULL, null=True, blank=True)
+    may_tinh = models.ForeignKey("MayTinh", on_delete=models.SET_NULL, null=True, blank=True)
+    ip_may = models.CharField(max_length=45, db_index=True)
+    payload_json = models.TextField(blank=True)
+    trang_thai = models.CharField(
+        max_length=20,
+        db_index=True,
+        choices=[
+            ("queued", "Đang chờ"),
+            ("sending", "Đang gửi"),
+            ("sent", "Đã gửi"),
+            ("done", "Hoàn thành"),
+            ("failed", "Lỗi"),
+        ],
+        default="queued",
+    )
+    thong_bao = models.TextField(blank=True)
+    ma_nhap_lieu = models.TextField(blank=True)
+    full_text = models.TextField(blank=True)
+    ngay_tao = models.DateTimeField(auto_now_add=True, db_index=True)
+    ngay_cap_nhat = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-ngay_tao"]
+        verbose_name_plural = "Phiên nhập liệu"
+        indexes = [
+            models.Index(fields=["ip_may", "-ngay_tao"]),
+            models.Index(fields=["trang_thai", "-ngay_tao"]),
+        ]
+
+    def __str__(self):
+        return f"{self.ma_job} - {self.ip_may} ({self.trang_thai})"
+
+
 class ChuongTrinhNhapLieu(models.Model):
     ten_chuong_trinh = models.CharField(max_length=255, unique=True)
     dong1 = models.CharField(max_length=255, blank=True)
@@ -38,6 +76,7 @@ class KetQuaNhapLieu(models.Model):
 
     chuong_trinh = models.ForeignKey(ChuongTrinhNhapLieu, on_delete=models.CASCADE, null=True, blank=True)
     may_tinh = models.ForeignKey(MayTinh, on_delete=models.CASCADE, null=True, blank=True)
+    phien = models.ForeignKey(PhienNhapLieu, on_delete=models.SET_NULL, null=True, blank=True, related_name="ket_qua_list")
     ip_may = models.CharField(max_length=45, db_index=True, help_text="IP máy gửi dữ liệu")
     ma_nhap_lieu = models.TextField(help_text="Dữ liệu text được copy từ app")
     full_text = models.TextField(blank=True, help_text="Toàn bộ text (nếu có)")

@@ -114,6 +114,68 @@
     </div>
 {% endif %}
 <script>
+const jobStatusUrlTemplate = "{% url 'nhap_lieu:api_job_status' '__JOB_ID__' %}";
+
+function buildJobStatusUrl(jobId) {
+    return jobStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(jobId));
+}
+
+function pollJobStatus(jobId, resultDiv, btn, delayMsg) {
+    const startedAt = Date.now();
+    const timeoutMs = 120000;
+    const intervalMs = 1000;
+
+    const timer = setInterval(() => {
+        fetch(buildJobStatusUrl(jobId), { method: "GET" })
+            .then((response) => {
+                if (!response.ok) throw new Error("HTTP status " + response.status);
+                return response.json();
+            })
+            .then((data) => {
+                const job = data.job || {};
+                const status = job.trang_thai || "";
+                const maNhapLieu = job.ma_nhap_lieu || "";
+                const thongBao = job.thong_bao || "";
+
+                if (status === "done") {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    delayMsg.style.display = 'none';
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = "alert alert-success mt-3 text-center";
+                    resultDiv.textContent = maNhapLieu
+                        ? `受信PC結果: ${maNhapLieu} (Job: ${jobId})`
+                        : `完了しました (Job: ${jobId})`;
+                    return;
+                }
+
+                if (status === "failed") {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    delayMsg.style.display = 'none';
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = "alert alert-danger mt-3 text-center";
+                    resultDiv.textContent = `エラー: ${thongBao || "処理失敗"} (Job: ${jobId})`;
+                    return;
+                }
+
+                delayMsg.textContent = `処理中... (${status || "待機"}) [Job: ${jobId}]`;
+            })
+            .catch((err) => {
+                if (Date.now() - startedAt > timeoutMs) {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    delayMsg.style.display = 'none';
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = "alert alert-warning mt-3 text-center";
+                    resultDiv.textContent = "タイムアウト: ジョブ状態の確認に失敗しました。";
+                } else {
+                    delayMsg.textContent = `状態確認中... (${err})`;
+                }
+            });
+    }, intervalMs);
+}
+
 document.getElementById('nhap-lieu-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
@@ -146,18 +208,18 @@ document.getElementById('nhap-lieu-form').addEventListener('submit', function(e)
                 return response.json();
             })
             .then(data => {
-                btn.disabled = false;
-                delayMsg.style.display = 'none';
                 const resultDiv = document.getElementById('may-dich-result');
-                if (data.clipboard) {
+                if (data.job && data.job.ma_job) {
                     resultDiv.style.display = 'block';
-                    resultDiv.textContent = "受信PCからの結果: " + data.clipboard;
-                } else if (data.message) {
-                    resultDiv.style.display = 'block';
-                    resultDiv.textContent = data.message;
+                    resultDiv.className = "alert alert-info mt-3 text-center";
+                    resultDiv.textContent = `ジョブ送信済み。結果待ち... (Job: ${data.job.ma_job})`;
+                    pollJobStatus(data.job.ma_job, resultDiv, btn, delayMsg);
                 } else {
+                    btn.disabled = false;
+                    delayMsg.style.display = 'none';
                     resultDiv.style.display = 'block';
-                    resultDiv.textContent = "コマンドを送信しました。返却データはありません。";
+                    resultDiv.className = "alert alert-info mt-3 text-center";
+                    resultDiv.textContent = data.message || "コマンドを送信しました。";
                 }
             })
             .catch(err => {

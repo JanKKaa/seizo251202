@@ -126,7 +126,7 @@ def nhanvien_update(request, pk):
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def nhanvien_delete(request, pk):
-    nv = get_object_or_400(NhanVien, pk=pk)
+    nv = get_object_or_404(NhanVien, pk=pk)
     if request.method == 'POST':
         nv.delete()
         messages.success(request, '社員情報が削除されました。')
