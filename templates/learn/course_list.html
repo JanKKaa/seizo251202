@@ -1,25 +1,55 @@
-{% extends "learn/base_learn.html" %}
+﻿{% extends "learn/base_learn.html" %}
 {% block title %}コース一覧{% endblock %}
 
 {% block content %}
-
-<div class="container-fluid">
-    <h1 class="h3 mb-4 text-gray-800">講習・研修参加状況一覧</h1>
-
-    <!-- 検索フォーム -->
-    <form method="get" class="mb-3" style="max-width:400px;">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="キーワードで検索..." value="{{ search_query|default:'' }}">
-            <button class="btn btn-primary" type="submit">検索</button>
-            <a href="{% url 'learn:course_list' %}" class="btn btn-secondary">クリア</a>
+<div class="learn-page">
+    <section class="learn-hero">
+        <h1 class="learn-hero-title">講習・研修参加状況一覧</h1>
+        <p class="learn-hero-sub">研修コース検索、申請、承認待ちの確認を一画面で管理します。</p>
+        <div class="learn-kpi-grid mt-3">
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">総コース数</span>
+                <span class="learn-kpi-value">{{ page_obj.paginator.count|default:0 }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">現在ページ</span>
+                <span class="learn-kpi-value">{{ page_obj.number|default:1 }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">承認待ち件数</span>
+                <span class="learn-kpi-value">{{ enrollments_to_approve|length }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">表示行数</span>
+                <span class="learn-kpi-value">{{ courses|length }}</span>
+            </div>
         </div>
-    </form>
-    
-    <!-- Danh sách khóa học với nút đăng ký và xóa -->
-    <div class="card shadow mb-4">
-        <div class="card-body">
-            <div class="table-responsive ">
-                <table class="table table-bordered table-hover table-sm align-middle mb-0" id="dataTable" width="100%" cellspacing="0">
+    </section>
+
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">コース検索</h2>
+            <span class="learn-note">キーワードでタイトル・内容を絞り込み</span>
+        </div>
+        <div class="learn-panel-body">
+            <form method="get" class="learn-search">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="キーワードで検索..." value="{{ search_query|default:'' }}">
+                    <button class="btn btn-primary" type="submit">検索</button>
+                    <a href="{% url 'learn:course_list' %}" class="btn btn-outline-secondary">クリア</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">コース一覧</h2>
+            <span class="learn-note">対象: {{ page_obj.paginator.count|default:0 }} 件</span>
+        </div>
+        <div class="learn-panel-body">
+            <div class="learn-table-wrap table-responsive">
+                <table class="table table-hover table-sm align-middle learn-table" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">#</th>
@@ -28,9 +58,9 @@
                             <th style="width: 9%;">開始日</th>
                             <th style="width: 9%;">終了日</th>
                             <th style="width: 8%;">申請者</th>
-                            <th style="width: 8%;">資料</th> <!-- Thêm cột tài liệu -->
-                            <th style="width: 8%;">アクション</th>
-                            <th style="width: 8%;">ステータス</th>
+                            <th style="width: 8%;">申込済資料</th>
+                            <th style="width: 12%;">アクション</th>
+                            <th style="width: 10%;">ステータス</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -38,20 +68,17 @@
                         <tr>
                             <td class="text-center">{{ forloop.counter }}</td>
                             <td>
-                                <a href="#" data-bs-toggle="modal" data-bs-target="#courseModal{{ course.id }}">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#courseModal{{ course.id }}" class="fw-semibold text-decoration-none">
                                     {{ course.title }}
                                 </a>
                             </td>
                             <td>{{ course.description|truncatechars:50 }}</td>
                             <td>{{ course.start_date|date:"Y-m-d" }}</td>
                             <td>{{ course.end_date|date:"Y-m-d" }}</td>
-                           <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\learn\course_list.html -->
-                            <td>
-                                {{ course.creator_name }}
-                            </td>
+                            <td>{{ course.creator_name }}</td>
                             <td>
                                 {% if course.material %}
-                                    <a href="{{ course.material.url }}" target="_blank" title="資料">
+                                    <a href="{{ course.material.url }}" target="_blank" title="資料" class="text-decoration-none">
                                         {% with url=course.material.url|lower %}
                                             {% if ".pdf" in url %}
                                                 <i class="fas fa-file-pdf fa-lg text-danger"></i>
@@ -67,86 +94,102 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if course.status == 'waiting' %}
-                                    <span class="badge bg-warning text-dark">待ち</span>
-                                {% elif course.status == 'expired' %}
-                                    <span class="badge bg-secondary">終了</span>
-                                {% else %}
-                                    <a href="{% url 'learn:enroll_course' course.id %}" class="btn btn-primary btn-sm">登録</a>
-                                {% endif %}
-                                {% if user.is_authenticated and user.username == 'kanri' %}
-                                    <a href="{% url 'learn:course_edit' course.id %}" class="btn btn-warning btn-sm">編集</a>
-                                    <a href="{% url 'learn:course_delete' course.id %}" class="btn btn-danger btn-sm">削除</a>
-                                {% elif user.is_authenticated and course.creator == user %}
-                                    <a href="{% url 'learn:course_edit' course.id %}" class="btn btn-warning btn-sm">編集</a>
-                                {% endif %}
+                                <div class="learn-action-stack">
+                                    {% if course.status == 'waiting' %}
+                                        <span class="learn-chip learn-chip-warn">待ち</span>
+                                    {% elif course.status == 'expired' %}
+                                        <span class="learn-chip learn-chip-neutral">終了</span>
+                                    {% else %}
+                                        <a href="{% url 'learn:enroll_course' course.id %}" class="btn btn-primary btn-sm">登録</a>
+                                    {% endif %}
+
+                                    {% if user.is_authenticated and user.username == 'kanri' %}
+                                        <a href="{% url 'learn:course_edit' course.id %}" class="btn btn-warning btn-sm">編集</a>
+                                        <a href="{% url 'learn:course_delete' course.id %}" class="btn btn-danger btn-sm">削除</a>
+                                    {% elif user.is_authenticated and course.creator == user %}
+                                        <a href="{% url 'learn:course_edit' course.id %}" class="btn btn-warning btn-sm">編集</a>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
                                 {% if course.status == 'waiting' %}
-                                    待ち
+                                    <span class="learn-chip learn-chip-warn">待ち</span>
                                 {% elif course.status == 'expired' %}
-                                    終了
+                                    <span class="learn-chip learn-chip-neutral">終了</span>
                                 {% else %}
                                     {% for enrollment in user_enrollments %}
                                         {% if enrollment.course == course %}
-                                            {% if enrollment.status == 'pending_supervisor' %}上司承認待ち{% endif %}
-                                            {% if enrollment.status == 'pending_kanri' %}管理課承認待ち{% endif %}
-                                            {% if enrollment.status == 'approved' %}承認済み{% endif %}
-                                            {% if enrollment.status == 'rejected' %}見送り{% endif %}
+                                            {% if enrollment.status == 'pending_supervisor' %}
+                                                <span class="learn-chip learn-chip-warn">上司承認待ち</span>
+                                            {% endif %}
+                                            {% if enrollment.status == 'pending_kanri' %}
+                                                <span class="learn-chip learn-chip-warn">管理課承認待ち</span>
+                                            {% endif %}
+                                            {% if enrollment.status == 'approved' %}
+                                                <span class="learn-chip learn-chip-success">承認済み</span>
+                                            {% endif %}
+                                            {% if enrollment.status == 'rejected' %}
+                                                <span class="learn-chip learn-chip-danger">見送り</span>
+                                            {% endif %}
                                         {% endif %}
                                     {% endfor %}
                                 {% endif %}
                             </td>
                         </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4 text-muted">データがありません。</td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            <!-- PHÂN TRANG -->
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">
-                                <span aria-hidden="true">&laquo;</span>
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">&laquo;</span>
-                        </li>
-                    {% endif %}
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
-                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                            <li class="page-item"><a class="page-link" href="?q={{ search_query }}&page={{ num }}">{{ num }}</a></li>
+
+            <div class="learn-pager">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
                         {% endif %}
-                    {% endfor %}
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.next_page_number }}" aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">&raquo;</span>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?q={{ search_query }}&page={{ num }}">{{ num }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ search_query }}&page={{ page_obj.next_page_number }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
         </div>
-    </div>
-    
+    </section>
+
     {% if show_approval_table %}
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">承認待ち登録</h6>
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">承認待ち登録</h2>
+            <span class="learn-note">承認対象 {{ enrollments_to_approve|length }} 件</span>
         </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered" width="100%" cellspacing="0">
+        <div class="learn-panel-body">
+            <div class="learn-table-wrap table-responsive">
+                <table class="table learn-table" width="100%" cellspacing="0">
                     <thead>
                         <tr>
                             <th>社員番号</th>
@@ -171,7 +214,7 @@
                                 {% if enrollment.status == 'pending_kanri' %}管理課承認待ち{% endif %}
                             </td>
                             <td>
-                                <form method="post" style="display:inline;">
+                                <form method="post" class="d-inline">
                                     {% csrf_token %}
                                     <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
                                     <input type="hidden" name="action" value="" class="action-input">
@@ -180,41 +223,35 @@
                                     <button type="submit" class="btn btn-danger btn-sm reject-btn">見送り</button>
                                 </form>
                                 {% if enrollment.supervisor_comment %}
-                                    <div class="mt-1 small text-muted">
-                                        <span class="fw-bold">上司コメント:</span> {{ enrollment.supervisor_comment }}
-                                    </div>
+                                    <div class="mt-1 small text-muted"><span class="fw-bold">上司コメント:</span> {{ enrollment.supervisor_comment }}</div>
                                 {% endif %}
                                 {% if enrollment.kanri_comment %}
-                                    <div class="mt-1 small text-muted">
-                                        <span class="fw-bold">管理者コメント:</span> {{ enrollment.kanri_comment }}
-                                    </div>
+                                    <div class="mt-1 small text-muted"><span class="fw-bold">管理者コメント:</span> {{ enrollment.kanri_comment }}</div>
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="5">承認待ちの登録はありません。</td>
-                        </tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">承認待ちの登録はありません。</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
+    </section>
     {% endif %}
-    
-    <!-- Modals for each course -->
+
     {% for course in courses %}
     <div class="modal fade" id="courseModal{{ course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ course.id }}" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="courseModalLabel{{ course.id }}">コース詳細</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p><strong>タイトル:</strong> {{ course.title }}</p>
                     <p><strong>理由:</strong> {{ course.description }}</p>
-                    <p><strong>外部リンク:</strong> 
+                    <p><strong>外部リンク:</strong>
                         {% if course.external_url %}
                             <a href="{{ course.external_url }}" target="_blank">{{ course.external_url }}</a>
                         {% else %}
@@ -228,7 +265,7 @@
                     <p><strong>定員:</strong> {{ course.capacity }}</p>
                     <p><strong>場所:</strong> {{ course.location }}</p>
                     <p><strong>対象:</strong> {{ course.target }}</p>
-                    <p><strong>アクティブ:</strong> 
+                    <p><strong>アクティブ:</strong>
                         {% if course.is_active %}
                             <span class="badge bg-success">有効</span>
                         {% else %}
@@ -262,31 +299,29 @@
     </div>
     {% endfor %}
 </div>
-<br>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.querySelectorAll('.approve-btn').forEach(btn => {
-    btn.addEventListener('click', function(e){
+    btn.addEventListener('click', function(){
         this.closest('form').querySelector('.action-input').value = 'approve';
     });
 });
 document.querySelectorAll('.reject-btn').forEach(btn => {
-    btn.addEventListener('click', function(e){
+    btn.addEventListener('click', function(){
         this.closest('form').querySelector('.action-input').value = 'reject';
     });
 });
 </script>
 {% if messages %}
-  <div class="container" style="max-width: 600px;">
+<div class="container" style="max-width: 640px;">
     {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
+    </div>
     {% endfor %}
-  </div>
+</div>
 {% endif %}
-
 {% endblock %}

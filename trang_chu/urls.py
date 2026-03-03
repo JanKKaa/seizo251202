@@ -1,4 +1,4 @@
-"""
+﻿"""
 URL configuration for trang_chu project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
@@ -37,7 +37,8 @@ urlpatterns = [
     path('baotri/', include('baotri.urls')),  # Thêm đường dẫn cho ứng dụng baotri
     path('quet_anh/', include('quet_anh.urls')),
     path('iot/', include(('iot.urls', 'iot'), namespace='iot')),  # cần dạng này
-    path('nhap_lieu/', include('nhap_lieu.urls')),  # Đúng với cấu trúc của bạn
+    path('nhap_lieu/', include('nhap_lieu.urls')),  # underscore route
+    path('nhap-lieu/', include(('nhap_lieu.urls', 'nhap_lieu_alias'), namespace='nhap_lieu_alias')),  # alias route cho Flask callback
     path('menu/', include('menu.urls')),  # Đúng với cấu trúc của bạn
     path('learn/', include('learn.urls', namespace='learn')),
 ]

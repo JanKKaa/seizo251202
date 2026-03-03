@@ -1,131 +1,166 @@
-{% extends "learn/base_learn.html" %}
+﻿{% extends "learn/base_learn.html" %}
 {% block title %}承認履歴{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-3">承認履歴一覧</h2>
-    <form method="get" class="mb-3" style="max-width:400px;">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="キーワードで検索..." value="{{ request.GET.q }}">
-            <button class="btn btn-primary" type="submit">検索</button>
-            <a href="{% url 'learn:approval_history_list' %}" class="btn btn-secondary">クリア</a>
+<div class="learn-page">
+    <section class="learn-hero">
+        <h1 class="learn-hero-title">承認履歴一覧</h1>
+        <p class="learn-hero-sub">申請・レポート承認の履歴を時系列で確認できます。</p>
+        <div class="learn-kpi-grid mt-3">
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">履歴件数</span>
+                <span class="learn-kpi-value">{{ page_obj.paginator.count|default:0 }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">現在ページ</span>
+                <span class="learn-kpi-value">{{ page_obj.number|default:1 }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">表示件数</span>
+                <span class="learn-kpi-value">{{ histories|length }}</span>
+            </div>
+            <div class="learn-kpi">
+                <span class="learn-kpi-label">検索語</span>
+                <span class="learn-kpi-value" style="font-size:0.9rem; line-height:1.3;">{{ request.GET.q|default:"-" }}</span>
+            </div>
         </div>
-    </form>
-    <table class="table table-bordered table-sm table-hover align-middle">
-         <colgroup>
-            <col style="width: 14%;">
-            <col style="width: 7%;">
-            <col style="width: 12%;">
-            <col style="width: 35%;">
-            <col style="width: 8%;">
-            <col style="width: 10%;">
-            <col style="width: 25%;">
-        </colgroup>
-        <thead>
-            <tr>
-                <th>日時</th>
-                <th>社員番号</th>
-                <th>氏名</th>
-                <th>コース</th>
-                
-                <th>種別</th>
-                <th>承認者</th>
-                <th>コメント</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for history in histories %}
-            <tr>
-                <td>{{ history.acted_at|date:"Y-m-d H:i" }}</td>
-                <td>{{ history.enrollment.user.username }}</td>
-                <td>
-                    {% for n in nhanviens %}
-                        {% if n.ma_so == history.enrollment.user.username %}
-                            {{ n.ten }}
+    </section>
+
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">履歴検索</h2>
+            <span class="learn-note">キーワードで社員・コース・コメントを検索</span>
+        </div>
+        <div class="learn-panel-body">
+            <form method="get" class="learn-search">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="キーワードで検索..." value="{{ request.GET.q }}">
+                    <button class="btn btn-primary" type="submit">検索</button>
+                    <a href="{% url 'learn:approval_history_list' %}" class="btn btn-outline-secondary">クリア</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">履歴テーブル</h2>
+            <span class="learn-note">最新順で表示</span>
+        </div>
+        <div class="learn-panel-body">
+            <div class="learn-table-wrap table-responsive">
+                <table class="table table-sm table-hover align-middle learn-table">
+                    <colgroup>
+                        <col style="width: 14%;">
+                        <col style="width: 8%;">
+                        <col style="width: 12%;">
+                        <col style="width: 30%;">
+                        <col style="width: 10%;">
+                        <col style="width: 11%;">
+                        <col style="width: 15%;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>社員番号</th>
+                            <th>氏名</th>
+                            <th>コース</th>
+                            <th>種別</th>
+                            <th>承認者</th>
+                            <th>コメント</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for history in histories %}
+                        <tr>
+                            <td>{{ history.acted_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ history.enrollment.user.username }}</td>
+                            <td>
+                                {% for n in nhanviens %}
+                                    {% if n.ma_so == history.enrollment.user.username %}
+                                        {{ n.ten }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#courseModal{{ history.enrollment.course.id }}">
+                                    {{ history.enrollment.course.title }}
+                                </button>
+                            </td>
+                            <td>
+                                {% if history.action == "approve_report" %}
+                                    <span class="learn-chip learn-chip-warn">レポート</span>
+                                {% elif history.action == "approve_enrollment" %}
+                                    <span class="learn-chip learn-chip-success">申込</span>
+                                {% else %}
+                                    <span class="learn-chip learn-chip-neutral">その他</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if history.acted_by %}
+                                    {% for n in nhanviens %}
+                                        {% if n.ma_so == history.acted_by.username %}
+                                            {{ n.ten }}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    管理部
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if history.comment %}
+                                    <div class="small text-muted">{{ history.comment }}</div>
+                                {% else %}
+                                    <div class="small text-muted">-</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">履歴がありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="learn-pager">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center my-3">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ request.GET.q }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
                         {% endif %}
-                    {% endfor %}
-                </td>
-                <td>
-                    <button type="button" class="btn btn-link p-0" data-bs-toggle="modal" data-bs-target="#courseModal{{ history.enrollment.course.id }}">
-                        {{ history.enrollment.course.title }}
-                    </button>
-                </td>
-                
-                <td>
-                    {% if history.action == "approve_report" %}
-                        レポート
-                    {% elif history.action == "approve_enrollment" %}
-                        申込
-                    {% else %}
-                        その他
-                    {% endif %}
-                </td>
-                <td>
-                    {% if history.acted_by %}
-                        {% for n in nhanviens %}
-                            {% if n.ma_so == history.acted_by.username %}
-                                {{ n.ten }}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?q={{ request.GET.q }}&page={{ num }}">{{ num }}</a></li>
                             {% endif %}
                         {% endfor %}
-                        {# Nếu không tìm thấy trong NhanVien thì fallback #}
-                        {% if not nhanviens|dictsort:"ma_so"|yesno:"1,0" %}
-                            {{ history.acted_by.get_full_name|default:history.acted_by.username }}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ request.GET.q }}&page={{ page_obj.next_page_number }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
                         {% endif %}
-                    {% else %}
-                        管理部
-                    {% endif %}
-                </td>
-                <td>
-                    {% if history.comment %}
-                        <div class="small text-muted">{{ history.comment }}</div>
-                    {% else %}
-                        <div class="small text-muted">-</div>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="8" class="text-center">履歴がありません。</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center my-3">
-            {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                    </a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">&laquo;</span>
-                </li>
-            {% endif %}
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                    <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
-                {% endif %}
-            {% endfor %}
-            {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                    </a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">&raquo;</span>
-                </li>
-            {% endif %}
-        </ul>
-    </nav>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </section>
 </div>
 
-{# MODALS for course detail #}
 {% for history in histories %}
 <div class="modal fade" id="courseModal{{ history.enrollment.course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ history.enrollment.course.id }}" aria-hidden="true">
     <div class="modal-dialog">
@@ -189,17 +224,16 @@
         </div>
     </div>
 </div>
-<br>
 {% endfor %}
 
 {% if messages %}
-  <div class="container" style="max-width: 600px;">
+<div class="container" style="max-width: 640px;">
     {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" style="word-break:break-word; white-space:pre-line;">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
+    </div>
     {% endfor %}
-  </div>
+</div>
 {% endif %}
 {% endblock %}

@@ -1,4 +1,4 @@
-{% extends "learn/base_learn.html" %}
+﻿{% extends "learn/base_learn.html" %}
 {% load static %}
 
 {% block title %}ダッシュボード{% endblock %}
@@ -6,7 +6,7 @@
 {% block content %}
 <!-- Thông báo nổi bật nếu có -->
 {% if messages %}
-    <div class="container mt-4">
+    <div class="container">
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} text-center fs-5 fw-bold" style="z-index:9999;">
                 {{ message }}
@@ -168,7 +168,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
-        padding-top: 40px;
+        padding-top: 0px;
         padding-bottom: 40px;
     }
     .glass-card {
@@ -306,7 +306,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
-        padding-top: 40px;
+        padding-top: 0px;
         padding-bottom: 40px;
     }
     .glass-card {
@@ -572,25 +572,29 @@
     <div class="glass-card">
         <h1>講習・研修ダッシュボード</h1>
         <div class="accordion" id="mainAccordion">
-            <!-- 検定 
+             
             <div class="accordion-item mb-2">
                 <h2 class="accordion-header" id="headingKentei">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKentei" aria-expanded="true" aria-controls="collapseKentei">
-                        <i class="fas fa-certificate"></i> 検定
+                        <i class="fas fa-certificate"></i> 講習会
                     </button>
                 </h2>
                 <div id="collapseKentei" class="accordion-collapse collapse" aria-labelledby="headingKentei" data-bs-parent="#mainAccordion">
-                    <div class="accordion-body btn-group-vertical">
-                        <a href="https://webdesk.jsa.or.jp/common/W10K0500/index/qc/" target="_blank" class="btn btn-custom"><i class="fas fa-flask"></i>QC検定</a>
-                        <a href="https://nagano-pma.jp/" target="_blank" class="btn btn-custom"><i class="fas fa-cogs"></i>プラスチック成形試験</a>
+                    <div class="accordion-body d-flex flex-column gap-2">
+                        <a href="http://www.nagano-roudoukijyunkyoukai.or.jp/training/"
+                        target="_blank"
+                        class="btn btn-light text-start shadow-sm custom-link">
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            長野労働基準協会
+                        </a>
                     </div>
                 </div>
-            </div> -->
-            <!-- 講習研修 -->
+            </div> 
+            
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingKenshu">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKenshu" aria-expanded="false" aria-controls="collapseKenshu">
-                        <i class="fas fa-chalkboard-teacher"></i> 講習研修
+                        <i class="fas fa-chalkboard-teacher"></i> オンラインセミナー
                     </button>
                 </h2>
                <div id="collapseKenshu" class="accordion-collapse collapse" aria-labelledby="headingKenshu" data-bs-parent="#mainAccordion">
