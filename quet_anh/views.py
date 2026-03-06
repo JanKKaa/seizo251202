@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponseForbidden, JsonResponse
 from django.urls import reverse
 from .forms import QAResultForm
-from .models import QAResult, QADeviceInfo
+from .models import QAResult, QADeviceInfo, QAAutoInputLedger
 from .forms import QADeviceInfoForm
 from django.contrib import messages
 from django.core.mail import send_mail
@@ -22,10 +22,12 @@ import numpy as np
 import re
 from django.db.models import Q
 from django.utils import timezone
+from datetime import timedelta
 import difflib
 from collections import defaultdict
 from django.utils.timezone import localtime
 import json
+from nhap_lieu.models import PhienNhapLieu
 
 def preprocess_image(image):
     img = np.array(image.convert('L'))
@@ -479,3 +481,109 @@ def latest_vision_events(request):
         })
 
     return JsonResponse({"vision_events": events, "date": today.strftime("%Y-%m-%d")})
+
+
+def _pick_related_qa_result(phien):
+    """Ghép job nhập liệu với bản ghi quét ảnh gần nhất theo thời gian."""
+    if getattr(phien, "qa_result_id", None):
+        return phien.qa_result
+
+    ref_time = phien.ngay_tao
+    window_start = ref_time - timedelta(minutes=30)
+    window_end = ref_time + timedelta(minutes=30)
+    return (
+        QAResult.objects.filter(created_at__range=(window_start, window_end))
+        .select_related("device")
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def sync_auto_input_ledger(limit=200):
+    """Đồng bộ sổ cái từ các phiên nhập liệu mới/cập nhật."""
+    phien_qs = (
+        PhienNhapLieu.objects.select_related("chuong_trinh", "may_tinh")
+        .order_by("-ngay_tao")[:limit]
+    )
+
+    for phien in phien_qs:
+        ledger, _ = QAAutoInputLedger.objects.get_or_create(
+            phien_nhap_lieu=phien,
+            defaults={"job_id": phien.ma_job},
+        )
+
+        qa_result = ledger.qa_result or _pick_related_qa_result(phien)
+        if qa_result and not ledger.qa_result:
+            ledger.qa_result = qa_result
+
+        ledger.job_id = phien.ma_job
+        ledger.job_status = phien.trang_thai or ""
+        ledger.job_message = phien.thong_bao or ""
+        ledger.workstation_ip = phien.ip_may or ""
+        ledger.ma_nhap_lieu = phien.ma_nhap_lieu or ""
+        ledger.full_text = phien.full_text or ""
+
+        if qa_result:
+            ledger.qa_machine_number = qa_result.machine_number or ""
+            ledger.qa_device_name = qa_result.device.name if qa_result.device else ""
+            ledger.qa_material = qa_result.device.material if qa_result.device else ""
+            ledger.qa_product = qa_result.device.product if qa_result.device else ""
+            ledger.qa_ratio = qa_result.device.ratio if qa_result.device else ""
+            ledger.qa_operator_name = qa_result.operator_name or ""
+            ledger.qa_result_status = qa_result.result or ""
+            ledger.qa_match_ratio = qa_result.match_ratio
+            ledger.qa_input_weight = qa_result.input_weight
+
+        ledger.save()
+
+
+@login_required
+def auto_input_ledger_list(request):
+    sync_auto_input_ledger(limit=300)
+
+    qs = QAAutoInputLedger.objects.select_related("qa_result", "phien_nhap_lieu").all()
+    keyword = request.GET.get("keyword", "").strip()
+    date = request.GET.get("date", "").strip()
+    status = request.GET.get("status", "").strip()
+
+    if keyword:
+        qs = qs.filter(
+            Q(job_id__icontains=keyword)
+            | Q(workstation_ip__icontains=keyword)
+            | Q(ma_nhap_lieu__icontains=keyword)
+            | Q(qa_machine_number__icontains=keyword)
+            | Q(qa_device_name__icontains=keyword)
+            | Q(qa_material__icontains=keyword)
+            | Q(qa_product__icontains=keyword)
+            | Q(qa_operator_name__icontains=keyword)
+            | Q(job_message__icontains=keyword)
+        )
+
+    if status:
+        qs = qs.filter(job_status=status)
+
+    if date:
+        parsed = parse_date(date)
+        if parsed:
+            qs = qs.filter(created_at__date=parsed)
+
+    qs = qs.order_by("-created_at")
+    paginator = Paginator(qs, 15)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "ledgers": page_obj,
+        "keyword": keyword,
+        "date": date,
+        "status": status,
+        "status_choices": [
+            ("queued", "Đang chờ"),
+            ("sending", "Đang gửi"),
+            ("sent", "Đã gửi"),
+            ("done", "Hoàn thành"),
+            ("failed", "Lỗi"),
+        ],
+    }
+    return render(request, "quet_anh/auto_input_ledger.html", context)

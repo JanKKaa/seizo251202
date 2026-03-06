@@ -8,6 +8,7 @@ class PhienNhapLieu(models.Model):
     ma_job = models.CharField(max_length=64, unique=True, db_index=True)
     chuong_trinh = models.ForeignKey("ChuongTrinhNhapLieu", on_delete=models.SET_NULL, null=True, blank=True)
     may_tinh = models.ForeignKey("MayTinh", on_delete=models.SET_NULL, null=True, blank=True)
+    qa_result = models.ForeignKey("quet_anh.QAResult", on_delete=models.SET_NULL, null=True, blank=True, related_name="phien_nhap_lieu_list")
     ip_may = models.CharField(max_length=45, db_index=True)
     payload_json = models.TextField(blank=True)
     trang_thai = models.CharField(

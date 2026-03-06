@@ -166,15 +166,27 @@ LOGOUT_REDIRECT_URL = 'login'
 LOGIN_URL = 'login'
 
 
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'sv10181.xserver.jp'
+# EMAIL_PORT = 587  # Thử sử dụng cổng 587 thay vì 995
+# EMAIL_USE_TLS = True  # Đảm bảo sử dụng TLS
+# EMAIL_USE_SSL = False  # Đặt False nếu sử dụng TLS
+# EMAIL_HOST_USER = 'pts@hayashi-p.co.jp'
+# EMAIL_HOST_PASSWORD = 'Hayashi798701'
+# DEFAULT_FROM_EMAIL = 'pts@hayashi-p.co.jp'
+# EMAIL_TIMEOUT = 10  # tránh treo kết nối SMTP
+
+
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'sv10181.xserver.jp'
-EMAIL_PORT = 587  # Thử sử dụng cổng 587 thay vì 995
-EMAIL_USE_TLS = True  # Đảm bảo sử dụng TLS
-EMAIL_USE_SSL = False  # Đặt False nếu sử dụng TLS
-EMAIL_HOST_USER = 'pts@hayashi-p.co.jp'
-EMAIL_HOST_PASSWORD = '798701ht'
-DEFAULT_FROM_EMAIL = 'pts@hayashi-p.co.jp'
-EMAIL_TIMEOUT = 10  # tránh treo kết nối SMTP
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = 'hayashitechno01@gmail.com'
+EMAIL_HOST_PASSWORD = 'mkmy ikqb tooq xbtz'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 # Giới hạn kích thước tệp tải lên (tính bằng byte)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB

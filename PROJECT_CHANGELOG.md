@@ -58,3 +58,39 @@ Tai lieu nay chi ghi thay doi lon de handoff nhanh.
 - Rollback:
   - revert commit liên quan `nhap_lieu`
   - rollback migration `nhap_lieu 0002_ketquanhaplieu`
+
+### [2026-03-03] Hoan thien luong quet_anh -> nhap_lieu -> may tram va so cai realtime
+- Pham vi:
+  - `nhap_lieu/models.py`, `nhap_lieu/views.py`, `nhap_lieu/urls.py`, `nhap_lieu/admin.py`
+  - `nhap_lieu/workstation_flask_api.py`
+  - `quet_anh/models.py`, `quet_anh/views.py`, `quet_anh/urls.py`, `quet_anh/apps.py`, `quet_anh/admin.py`, `quet_anh/signals.py`
+  - `templates/nhap_lieu/index.html`, `templates/quet_anh/index_qa.html`, `templates/quet_anh/auto_input_ledger.html`
+  - migration moi: `nhap_lieu/0003`, `nhap_lieu/0004`, `quet_anh/0009`
+- Noi dung:
+  - Bo sung `PhienNhapLieu` + `job_id` de theo doi tung job nhap lieu.
+  - May tram Flask chuan hoa callback: gui `job_id`, `status`, `ma_nhap_lieu`, `full_text`, `ip`; callback dung HTTPS noi bo.
+  - Xu ly timeout job `sent` tu dong chuyen `failed` de tranh treo.
+  - Bo sung fallback dong bo ket qua ngay tu response may tram khi callback async bi cham.
+  - Tao so cai `QAAutoInputLedger` trong app `quet_anh`, co tim kiem tu khoa, loc ngay, loc trang thai, phan trang.
+  - Them signal realtime: khi `PhienNhapLieu`/`KetQuaNhapLieu` doi trang thai se cap nhat so cai ngay.
+  - Them lien ket 1-1: `PhienNhapLieu.qa_result` de map truc tiep voi ket qua quet anh (uu tien map truc tiep, fallback theo thoi gian neu thieu du lieu).
+  - Them nut vao man hinh `index_qa`: `自動入力台帳`.
+- Anh huong:
+  - Luong thuc te da test thanh cong, may tram chay va dong app duoc.
+  - Da co mot so job cu bi treo `sent` va da dong tay thanh `failed`.
+  - Tu nay job moi khong can dong tay neu callback/timeout dung luong.
+- Lenh da chay:
+  - `python manage.py makemigrations nhap_lieu`
+  - `python manage.py migrate nhap_lieu`
+  - `python manage.py makemigrations quet_anh`
+  - `python manage.py migrate quet_anh`
+  - `python manage.py check`
+- Luu y van hanh:
+  - Callback may tram phai dung:
+    - `https://192.168.10.250/nhap_lieu/api/cap-nhat-ket-qua/`
+  - Neu dung cert noi bo, may tram dang de `verify=False` (co the bat lai bang env `CALLBACK_VERIFY_SSL=1` khi ha tang cert san sang).
+  - Trang HTML moi/chinh sua uu tien hien thi tieng Nhat.
+- Ke hoach tiep theo (ngay mai):
+  - Lam endpoint/bridge trong `quet_anh` de goi `nhap_lieu` tu dong ngay sau khi OCR+kg hop le (khong thao tac tay trung gian).
+  - Truyen `qa_result_id` day du trong luong goi job de dam bao map 1-1 tuyet doi.
+  - Bo sung trang tong quan KPI cho so cai (done/failed/sent theo ngay, theo may tram, theo nguyen lieu).

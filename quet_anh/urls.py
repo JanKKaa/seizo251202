@@ -13,5 +13,6 @@ urlpatterns = [
     path('device/delete/<int:pk>/', views.delete_qa_device, name='delete_qa_device'),
 
     path('dashboard/', views.dashboard_qa, name='dashboard_qa'),
+    path('auto-input-ledger/', views.auto_input_ledger_list, name='auto_input_ledger_list'),
     path("api/latest-events/", views.latest_vision_events, name="vision_latest_events"),
 ]

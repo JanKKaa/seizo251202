@@ -6,6 +6,7 @@ import uuid
 import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.apps import apps
 from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse, StreamingHttpResponse
@@ -102,6 +103,12 @@ def index(request):
                 if not any((dong1.strip(), dong2.strip(), dong3.strip(), dong4.strip(), dong5.strip())):
                     message = "Vui lòng nhập ít nhất một dòng dữ liệu!"
                 else:
+                    qa_result = None
+                    qa_result_id = (request.POST.get("qa_result_id") or "").strip()
+                    if qa_result_id.isdigit():
+                        QAResult = apps.get_model("quet_anh", "QAResult")
+                        qa_result = QAResult.objects.filter(id=int(qa_result_id)).first()
+
                     dong_map = {
                         "Dòng 1": dong1,
                         "Dòng 2": dong2,
@@ -123,12 +130,15 @@ def index(request):
                         "quy_tac": quy_tac_gui,
                         "delay": float(request.POST.get("delay", 0.1)),
                     }
+                    if qa_result:
+                        payload["qa_result_id"] = qa_result.id
 
                     with transaction.atomic():
                         phien = PhienNhapLieu.objects.create(
                             ma_job=ma_job,
                             chuong_trinh=selected,
                             may_tinh=selected_may,
+                            qa_result=qa_result,
                             ip_may=ip,
                             payload_json=json.dumps(payload, ensure_ascii=False),
                             trang_thai="sending",
