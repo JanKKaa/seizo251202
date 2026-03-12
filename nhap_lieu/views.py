@@ -128,6 +128,7 @@ def index(request):
                         "job_id": ma_job,
                         "ten_chuong_trinh": selected.ten_chuong_trinh,
                         "quy_tac": quy_tac_gui,
+                        "kg_value": dong2.strip(),
                         "delay": float(request.POST.get("delay", 0.1)),
                     }
                     if qa_result:

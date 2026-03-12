@@ -1,0 +1,120 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}原材料入庫台帳{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="mb-3">原材料入庫台帳</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="alert alert-info">
+        本台帳は「自動入力台帳」および「画像検査データ」から自動連携されます。新規手入力は無効です。必要時は各行の「編集」から修正してください。
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">検索・一覧</div>
+        <div class="card-body">
+            <form method="get" class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名、コード、ロット、管理番号">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" class="form-control" name="date" value="{{ date }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="confirmed" class="form-control">
+                        <option value="" {% if not confirmed %}selected{% endif %}>確認状態: すべて</option>
+                        <option value="yes" {% if confirmed == "yes" %}selected{% endif %}>上長確認済み</option>
+                        <option value="no" {% if confirmed == "no" %}selected{% endif %}>未確認</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" type="submit">検索</button>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>原材料名</th>
+                            <th>原材料コード</th>
+                            <th>入庫日</th>
+                            <th>識別色</th>
+                            <th>kg</th>
+                            <th>袋順番号</th>
+                            <th>ロット番号</th>
+                            <th>端末管理番号</th>
+                            <th>上長確認</th>
+                            <th>確認者</th>
+                            <th>確認日時</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ row.material_name }}</td>
+                                <td>{{ row.material_code }}</td>
+                                <td>{{ row.stock_in_date|date:"Y-m-d" }}</td>
+                                <td>{{ row.get_lot_color_display }}</td>
+                                <td class="text-end">{{ row.weight_kg }}</td>
+                                <td>{{ row.bag_sequence_no }}</td>
+                                <td>{{ row.lot_number }}</td>
+                                <td>{{ row.workstation_management_no }}</td>
+                                <td>
+                                    {% if row.supervisor_confirmed %}
+                                        <span class="badge bg-success">確認済み</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">未確認</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.supervisor_name }}</td>
+                                <td>{% if row.supervisor_confirmed_at %}{{ row.supervisor_confirmed_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                                <td>
+                                    <a href="{% url 'material_stock_ledger_edit' row.id %}" class="btn btn-sm btn-warning">編集</a>
+                                    <form method="post" action="{% url 'material_stock_ledger_delete' row.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この入庫台帳データを削除しますか？');">削除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="13" class="text-center text-muted">データがありません。</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <nav aria-label="ページネーション" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?keyword={{ keyword }}&date={{ date }}&confirmed={{ confirmed }}&page={{ page_obj.previous_page_number }}">前へ</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">前へ</span></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?keyword={{ keyword }}&date={{ date }}&confirmed={{ confirmed }}&page={{ page_obj.next_page_number }}">次へ</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">次へ</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}

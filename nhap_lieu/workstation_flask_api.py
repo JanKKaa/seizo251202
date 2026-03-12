@@ -26,8 +26,8 @@ SELECT_START_Y = int(os.getenv("SELECT_START_Y", "100"))
 SELECT_END_X = int(os.getenv("SELECT_END_X", "800"))
 SELECT_END_Y = int(os.getenv("SELECT_END_Y", "600"))
 
-APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "12"))
-PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "2"))
+APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "5"))
+PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "1"))
 CALLBACK_TIMEOUT = float(os.getenv("CALLBACK_TIMEOUT", "5"))
 CALLBACK_RETRIES = int(os.getenv("CALLBACK_RETRIES", "3"))
 CALLBACK_VERIFY_SSL = os.getenv("CALLBACK_VERIFY_SSL", "0").strip() in {"1", "true", "True", "yes", "YES"}
@@ -72,6 +72,23 @@ def press_or_type(item: str):
     else:
         pyperclip.copy(item)
         pyautogui.hotkey("ctrl", "v")
+
+
+def normalize_kg_value(raw: str) -> str:
+    value = (raw or "").strip().replace(",", ".")
+    if not value:
+        return ""
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?|\.[0-9]+", value):
+        return ""
+    return value
+
+
+def type_kg_keys(kg_value: str):
+    """Nhập kg bằng từng phím số thay vì paste clipboard."""
+    normalized = normalize_kg_value(kg_value)
+    if not normalized:
+        raise ValueError("kg_value không hợp lệ hoặc rỗng cho token KG_KEYS")
+    pyautogui.write(normalized, interval=0.03)
 
 
 def copy_selected_text() -> str:
@@ -165,6 +182,7 @@ def send_input():
     try:
         data = request.get_json(force=True) or {}
         quy_tac = data.get("quy_tac", [])
+        kg_value = str(data.get("kg_value") or "").strip()
         delay = float(data.get("delay", 0.1))
         job_id = str(data.get("job_id") or data.get("ma_job") or "").strip()
         ten_chuong_trinh = str(data.get("ten_chuong_trinh") or "").strip()
@@ -181,6 +199,10 @@ def send_input():
         process = subprocess.Popen([PATH_EXE], cwd=WORKING_DIR)
         time.sleep(APP_BOOT_WAIT)
 
+        # CLICK vào giữa màn hình để đảm bảo app đích nhận focus trước khi gõ phím
+        screen_w, screen_h = pyautogui.size()
+        pyautogui.click(screen_w // 2, screen_h // 2)
+
         for raw in quy_tac:
             item = str(raw).strip()
             if not item:
@@ -188,6 +210,11 @@ def send_input():
 
             if item in {"CTRL+A", "CTRL+C"}:
                 break
+
+            if item == "KG_KEYS":
+                type_kg_keys(kg_value)
+                time.sleep(delay)
+                continue
 
             press_or_type(item)
             time.sleep(delay)
@@ -235,5 +262,5 @@ def send_input():
 
 if __name__ == "__main__":
     print("=== Workstation Input API ===")
-    print("Flow: open app -> input -> select/copy -> callback Django")
+    print("Flow: open app -> click focus -> input -> select/copy -> callback Django")
     app.run(host="0.0.0.0", port=5000)

@@ -1,12 +1,13 @@
 import base64
 from io import BytesIO
+from decimal import Decimal
+import uuid
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponseForbidden, JsonResponse
 from django.urls import reverse
-from .forms import QAResultForm
-from .models import QAResult, QADeviceInfo, QAAutoInputLedger
-from .forms import QADeviceInfoForm
+from .forms import QAResultForm, QADeviceInfoForm, QAMaterialStockLedgerForm, QAMaterialOutStockLedgerForm
+from .models import QAResult, QADeviceInfo, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
@@ -14,7 +15,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count
 from django.utils.dateparse import parse_date
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from PIL import Image
 import cv2
@@ -27,7 +28,9 @@ import difflib
 from collections import defaultdict
 from django.utils.timezone import localtime
 import json
+import requests
 from nhap_lieu.models import PhienNhapLieu
+from nhap_lieu.models import ChuongTrinhNhapLieu, MayTinh, KetQuaNhapLieu
 
 def preprocess_image(image):
     img = np.array(image.convert('L'))
@@ -37,6 +40,182 @@ def preprocess_image(image):
     img = np.array(pil_img)
     img = cv2.medianBlur(img, 1)
     return Image.fromarray(img)
+
+
+def _upsert_out_stock_from_qa_result(qa_result):
+    if not qa_result:
+        return
+
+    device = qa_result.device
+    material_name = device.material if device else ""
+    material_code = device.material_code if device else ""
+    out_date = timezone.localtime(qa_result.created_at).date()
+
+    row, _ = QAMaterialOutStockLedger.objects.get_or_create(
+        qa_result=qa_result,
+        defaults={
+            "material_name": material_name,
+            "material_code": material_code,
+            "stock_out_date": out_date,
+            "lot_color": qa_result.lot_color or QAMaterialOutStockLedger.LOT_COLOR_GREEN,
+            "weight_kg": qa_result.input_weight or Decimal("0"),
+            "bag_sequence_no": "",
+            "lot_number": qa_result.lot_number or "",
+            "workstation_management_no": "",
+        },
+    )
+
+    changed = False
+    if not row.material_name and material_name:
+        row.material_name = material_name
+        changed = True
+    if not row.material_code and material_code:
+        row.material_code = material_code
+        changed = True
+    if not row.stock_out_date:
+        row.stock_out_date = out_date
+        changed = True
+    if qa_result.lot_color and row.lot_color != qa_result.lot_color:
+        row.lot_color = qa_result.lot_color
+        changed = True
+    if qa_result.lot_number and row.lot_number != qa_result.lot_number:
+        row.lot_number = qa_result.lot_number
+        changed = True
+    if (row.weight_kg is None or row.weight_kg == 0) and qa_result.input_weight is not None:
+        row.weight_kg = qa_result.input_weight
+        changed = True
+
+    if changed:
+        row.save()
+
+
+def _is_valid_ipv4(ip):
+    if not ip:
+        return False
+    pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+    return bool(re.match(pattern, ip))
+
+
+def _auto_send_to_nhap_lieu(qa_result, expected_text=""):
+    """
+    Tự động gửi job sang app nhập liệu dựa trên material_code.
+    Trả về (ok, message, phien_or_none).
+    """
+    if not qa_result or not qa_result.device:
+        return False, "デバイス情報がないため自動入力を実行できません。", None
+
+    material_code = (qa_result.device.material_code or "").strip()
+    if not material_code:
+        return False, "材料コードが未設定のため自動入力を実行できません。", None
+
+    chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=material_code).first()
+    if not chuong_trinh:
+        return False, f"入力プログラム '{material_code}' が見つかりません。", None
+
+    may_tinh = MayTinh.objects.filter(ten_may="server").first()
+    if not may_tinh:
+        return False, "固定送信先 server が見つかりません。", None
+    if may_tinh.trang_thai != "active":
+        return False, "固定送信先 server が非アクティブです。", None
+    if not _is_valid_ipv4(may_tinh.ip):
+        return False, "固定送信先 server のIPが無効です。", None
+
+    try:
+        quy_tac = json.loads(chuong_trinh.quy_tac or "[]")
+    except Exception:
+        quy_tac = []
+
+    # Map nhanh cho placeholder Dòng 1..5
+    dong_map = {
+        "Dòng 1": material_code,
+        "Dòng 2": str(qa_result.input_weight or ""),
+        "Dòng 3": qa_result.lot_number or "",
+        "Dòng 4": qa_result.machine_number or "",
+        "Dòng 5": expected_text or "",
+    }
+    quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
+
+    ma_job = f"job_{uuid.uuid4().hex[:16]}"
+    payload = {
+        "job_id": ma_job,
+        "ten_chuong_trinh": chuong_trinh.ten_chuong_trinh,
+        "quy_tac": quy_tac_gui,
+        "kg_value": str(qa_result.input_weight or "").strip(),
+        "delay": 0.1,
+        "qa_result_id": qa_result.id,
+    }
+
+    phien = PhienNhapLieu.objects.create(
+        ma_job=ma_job,
+        chuong_trinh=chuong_trinh,
+        may_tinh=may_tinh,
+        qa_result=qa_result,
+        ip_may=may_tinh.ip,
+        payload_json=json.dumps(payload, ensure_ascii=False),
+        trang_thai="sending",
+        thong_bao="画像検査から自動送信",
+    )
+
+    try:
+        url = f"http://{may_tinh.ip}:5000/send_input"
+        response = requests.post(url, json=payload, timeout=20)
+        if response.status_code != 200:
+            phien.trang_thai = "failed"
+            phien.thong_bao = f"送信失敗 HTTP {response.status_code}"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, f"自動入力送信失敗: HTTP {response.status_code}", phien
+
+        data = response.json()
+        callback_ok = bool(data.get("callback_ok"))
+        data_ocr = (data.get("data_ocr") or "").strip()
+
+        if callback_ok and data_ocr:
+            if data_ocr == "---":
+                phien.trang_thai = "failed"
+                phien.thong_bao = "管理番号が無効です (---)"
+                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+                return False, "管理番号が取得できませんでした。再実行してください。", phien
+
+            # Callback có thể đã lưu KetQuaNhapLieu cho chính job hiện tại.
+            # Chỉ coi là trùng khi cùng mã đã tồn tại ở job khác.
+            if (
+                KetQuaNhapLieu.objects.filter(ma_nhap_lieu=data_ocr, trang_thai="Thành công")
+                .exclude(phien=phien)
+                .exists()
+            ):
+                phien.trang_thai = "failed"
+                phien.thong_bao = f"管理番号重複: {data_ocr}"
+                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+                return False, f"管理番号が重複しています: {data_ocr}", phien
+
+            phien.trang_thai = "done"
+            phien.ma_nhap_lieu = data_ocr
+            phien.thong_bao = "自動入力完了"
+            phien.save(update_fields=["trang_thai", "ma_nhap_lieu", "thong_bao", "ngay_cap_nhat"])
+            return True, f"自動入力完了: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", phien
+
+        if callback_ok:
+            phien.trang_thai = "failed"
+            phien.thong_bao = "管理番号未取得。処理未完了"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, "入力処理は完了していません（管理番号未取得）。", phien
+
+        phien.trang_thai = "failed"
+        phien.thong_bao = f"Callback lỗi: {data.get('callback_info') or 'unknown'}"
+        phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+        return False, "自動入力のコールバックに失敗しました。", phien
+    except Exception as exc:
+        phien.trang_thai = "failed"
+        phien.thong_bao = f"送信例外: {exc}"
+        phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+        return False, f"自動入力送信エラー: {exc}", phien
+
+
+def _rollback_failed_qa_attempt(qa_result):
+    if not qa_result or not qa_result.pk:
+        return
+    PhienNhapLieu.objects.filter(qa_result=qa_result).exclude(trang_thai="done").delete()
+    qa_result.delete()
 
 @login_required
 def upload_image(request):
@@ -55,6 +234,8 @@ def upload_image(request):
     if request.method == 'POST':
         captured_image = request.POST.get('captured_image')
         input_weight = request.POST.get('input_weight')
+        lot_color = request.POST.get('lot_color', '').strip()
+        lot_number = request.POST.get('lot_number', '').strip()
 
         # ==== BẮT BUỘC: kiểm tra các trường quan trọng ===
         if not captured_image:
@@ -81,6 +262,22 @@ def upload_image(request):
             })
         if not input_weight or str(input_weight).strip() == "":
             messages.error(request, "重量(kg)を入力してください。")
+            device_list = QADeviceInfo.objects.all()
+            return render(request, 'quet_anh/upload.html', {
+                'form': QAResultForm(request.POST),
+                'message': message,
+                'expected_text': expected_text,
+                'device_list': device_list,
+                'device_id': device_id,
+                'device': device,
+            })
+        if lot_color not in {
+            QAResult.LOT_COLOR_GREEN,
+            QAResult.LOT_COLOR_BLACK,
+            QAResult.LOT_COLOR_BLUE,
+            QAResult.LOT_COLOR_RED,
+        }:
+            messages.error(request, "ロット識別色を選択してください。")
             device_list = QADeviceInfo.objects.all()
             return render(request, 'quet_anh/upload.html', {
                 'form': QAResultForm(request.POST),
@@ -209,10 +406,57 @@ def upload_image(request):
                     fail_silently=True
                 )
 
+                messages.error(request, "一致しません。再スキャンしてください。データは保存されません。")
+                form = QAResultForm()
+                device_list = QADeviceInfo.objects.all()
+                return render(request, 'quet_anh/upload.html', {
+                    'form': form,
+                    'expected_text': expected_text,
+                    'is_match': is_match,
+                    'matched_text': matched_text,
+                    'data': ocr_text,
+                    'device_list': device_list,
+                    'device_id': device_id,
+                    'device': device,
+                    'show_back_to_index': False,
+                    'match_ratios': match_ratios,
+                    'min_ratio': min_ratio,
+                })
+
             qa_result.machine_number = machine_number
             qa_result.match_ratio = min_ratio  # Đảm bảo model có trường này
             qa_result.input_weight = input_weight  # Đảm bảo model có trường này
+            qa_result.lot_color = lot_color
+            qa_result.lot_number = lot_number
             qa_result.save()
+
+            # Tự động gọi app nhập liệu nếu ảnh khớp (xuất nguyên liệu)
+            if qa_result.result == "一致":
+                material_code = (qa_result.device.material_code or "").strip() if qa_result.device else ""
+                if not material_code:
+                    messages.warning(request, "材料コード未設定のため、自動入力はスキップしました。画像検査結果のみ保存します。")
+                else:
+                    auto_ok, auto_msg, _ = _auto_send_to_nhap_lieu(qa_result, expected_text=expected_text or "")
+                    if auto_ok:
+                        messages.success(request, auto_msg)
+                    else:
+                        _rollback_failed_qa_attempt(qa_result)
+                        messages.error(request, f"{auto_msg} / 保存しません。再スキャンしてください。")
+                        form = QAResultForm()
+                        device_list = QADeviceInfo.objects.all()
+                        return render(request, 'quet_anh/upload.html', {
+                            'form': form,
+                            'expected_text': expected_text,
+                            'is_match': True,
+                            'matched_text': matched_text,
+                            'data': ocr_text,
+                            'device_list': device_list,
+                            'device_id': device_id,
+                            'device': device,
+                            'show_back_to_index': False,
+                            'match_ratios': match_ratios,
+                            'min_ratio': min_ratio,
+                        })
 
             form = QAResultForm()
             device_list = QADeviceInfo.objects.all()
@@ -253,9 +497,58 @@ def upload_image(request):
 @login_required
 def index_qa(request):
     device_list = QADeviceInfo.objects.all()
+    material_rows = (
+        QADeviceInfo.objects.exclude(material__exact="")
+        .values("material", "material_code")
+        .order_by("material", "material_code")
+    )
+    seen = set()
+    material_list = []
+    for row in material_rows:
+        key = (row.get("material") or "", row.get("material_code") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        material_list.append(
+            {
+                "material": key[0],
+                "material_code": key[1],
+            }
+        )
     return render(request, 'quet_anh/index_qa.html', {
         'device_list': device_list,
+        'material_list': material_list,
     })
+
+
+@login_required
+def stock_in_start(request):
+    material_name = (request.GET.get("material_name") or "").strip()
+    material_code = (request.GET.get("material_code") or "").strip()
+
+    material_rows = (
+        QADeviceInfo.objects.exclude(material__exact="")
+        .values("material", "material_code")
+        .order_by("material", "material_code")
+    )
+    seen = set()
+    material_list = []
+    for row in material_rows:
+        key = (row.get("material") or "", row.get("material_code") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        material_list.append({"material": key[0], "material_code": key[1]})
+
+    return render(
+        request,
+        "quet_anh/stock_in_start.html",
+        {
+            "material_name": material_name,
+            "material_code": material_code,
+            "material_list": material_list,
+        },
+    )
 
 @login_required
 def qa_history(request):
@@ -266,6 +559,7 @@ def qa_history(request):
     if keyword:
         results = results.filter(
             Q(device__name__icontains=keyword) |
+            Q(device__material_code__icontains=keyword) |
             Q(device__material__icontains=keyword) |
             Q(user__first_name__icontains=keyword) |
             Q(user__last_name__icontains=keyword) |
@@ -451,6 +745,301 @@ def dashboard_qa(request):
         'bar_colors': json.dumps(bar_colors),
     })
 
+
+def _sync_material_stock_rows(limit=300):
+    # Luồng hiện tại chỉ hỗ trợ 出庫 (xuat kho).
+    # Tạm khóa toàn bộ sync 入庫 (nhap kho) để không phát sinh dữ liệu sai.
+    return
+
+
+def _sync_material_out_stock_rows(limit=300):
+    deleted_job_ids = QADeletedJobMarker.objects.values_list("job_id", flat=True)
+    ledgers = (
+        QAAutoInputLedger.objects.select_related("qa_result__device")
+        .filter(job_status="done")
+        .exclude(job_id__in=deleted_job_ids)
+        .order_by("-created_at")[:limit]
+    )
+
+    for ledger in ledgers:
+        qa_result = ledger.qa_result
+        device = qa_result.device if qa_result and qa_result.device else None
+
+        material_name = (device.material if device else "") or ledger.qa_material or ""
+        material_code = (device.material_code if device else "") or ""
+        source_date = qa_result.created_at if qa_result else ledger.created_at
+        stock_out_date = timezone.localtime(source_date).date()
+        weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+        mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
+
+        row = None
+        if qa_result:
+            row = QAMaterialOutStockLedger.objects.filter(qa_result=qa_result).first()
+            if row and not row.auto_input_ledger_id:
+                duplicate = (
+                    QAMaterialOutStockLedger.objects
+                    .filter(auto_input_ledger=ledger)
+                    .exclude(pk=row.pk)
+                    .first()
+                )
+                if duplicate:
+                    if not row.workstation_management_no and duplicate.workstation_management_no:
+                        row.workstation_management_no = duplicate.workstation_management_no
+                    if (row.weight_kg is None or row.weight_kg == 0) and duplicate.weight_kg is not None:
+                        row.weight_kg = duplicate.weight_kg
+                    if not row.lot_number and duplicate.lot_number:
+                        row.lot_number = duplicate.lot_number
+                    if not row.material_name and duplicate.material_name:
+                        row.material_name = duplicate.material_name
+                    if not row.material_code and duplicate.material_code:
+                        row.material_code = duplicate.material_code
+                    duplicate.delete()
+                row.auto_input_ledger = ledger
+                row.save()
+
+        if not row:
+            row, _ = QAMaterialOutStockLedger.objects.get_or_create(
+                auto_input_ledger=ledger,
+                defaults={
+                    "qa_result": qa_result,
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "stock_out_date": stock_out_date,
+                    "lot_color": (qa_result.lot_color if qa_result and qa_result.lot_color else QAMaterialOutStockLedger.LOT_COLOR_GREEN),
+                    "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
+                    "bag_sequence_no": "",
+                    "lot_number": (qa_result.lot_number if qa_result else ""),
+                    "workstation_management_no": mgmt_no,
+                },
+            )
+
+        changed = False
+        if qa_result and row.qa_result_id != qa_result.id:
+            row.qa_result = qa_result
+            changed = True
+        if not row.material_name and material_name:
+            row.material_name = material_name
+            changed = True
+        if not row.material_code and material_code:
+            row.material_code = material_code
+            changed = True
+        if (row.weight_kg is None or row.weight_kg == 0) and weight_kg is not None:
+            row.weight_kg = weight_kg
+            changed = True
+        if not row.workstation_management_no and mgmt_no:
+            row.workstation_management_no = mgmt_no
+            changed = True
+        if not row.stock_out_date:
+            row.stock_out_date = stock_out_date
+            changed = True
+        if qa_result and qa_result.lot_color and row.lot_color != qa_result.lot_color:
+            row.lot_color = qa_result.lot_color
+            changed = True
+        if qa_result and qa_result.lot_number and row.lot_number != qa_result.lot_number:
+            row.lot_number = qa_result.lot_number
+            changed = True
+
+        if changed:
+            row.save()
+
+
+@login_required
+def material_stock_ledger(request):
+    qs = QAMaterialStockLedger.objects.filter(auto_input_ledger__job_status="done")
+    keyword = request.GET.get("keyword", "").strip()
+    date = request.GET.get("date", "").strip()
+    confirmed = request.GET.get("confirmed", "").strip()
+
+    if keyword:
+        qs = qs.filter(
+            Q(material_name__icontains=keyword)
+            | Q(material_code__icontains=keyword)
+            | Q(lot_number__icontains=keyword)
+            | Q(workstation_management_no__icontains=keyword)
+            | Q(supervisor_name__icontains=keyword)
+        )
+    if date:
+        parsed = parse_date(date)
+        if parsed:
+            qs = qs.filter(stock_in_date=parsed)
+    if confirmed == "yes":
+        qs = qs.filter(supervisor_confirmed=True)
+    elif confirmed == "no":
+        qs = qs.filter(supervisor_confirmed=False)
+
+    paginator = Paginator(qs.order_by("-stock_in_date", "-id"), 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "quet_anh/material_stock_ledger.html",
+        {
+            "rows": page_obj,
+            "page_obj": page_obj,
+            "keyword": keyword,
+            "date": date,
+            "confirmed": confirmed,
+        },
+    )
+
+
+@login_required
+def material_out_stock_ledger(request):
+    _sync_material_out_stock_rows(limit=500)
+
+    qs = QAMaterialOutStockLedger.objects.filter(auto_input_ledger__job_status="done")
+    keyword = request.GET.get("keyword", "").strip()
+    date = request.GET.get("date", "").strip()
+    confirmed = request.GET.get("confirmed", "").strip()
+
+    if keyword:
+        qs = qs.filter(
+            Q(material_name__icontains=keyword)
+            | Q(material_code__icontains=keyword)
+            | Q(lot_number__icontains=keyword)
+            | Q(workstation_management_no__icontains=keyword)
+            | Q(supervisor_name__icontains=keyword)
+        )
+    if date:
+        parsed = parse_date(date)
+        if parsed:
+            qs = qs.filter(stock_out_date=parsed)
+    if confirmed == "yes":
+        qs = qs.filter(supervisor_confirmed=True)
+    elif confirmed == "no":
+        qs = qs.filter(supervisor_confirmed=False)
+
+    paginator = Paginator(qs.order_by("-stock_out_date", "-id"), 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "quet_anh/material_out_stock_ledger.html",
+        {
+            "rows": page_obj,
+            "page_obj": page_obj,
+            "keyword": keyword,
+            "date": date,
+            "confirmed": confirmed,
+        },
+    )
+
+
+@login_required
+def material_stock_ledger_edit(request, pk):
+    row = get_object_or_404(QAMaterialStockLedger, pk=pk)
+
+    if request.method == "POST":
+        form = QAMaterialStockLedgerForm(request.POST, instance=row)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            if obj.supervisor_confirmed:
+                if not obj.supervisor_confirmed_at:
+                    obj.supervisor_confirmed_at = timezone.now()
+            else:
+                obj.supervisor_confirmed_at = None
+                obj.supervisor_name = ""
+            obj.save()
+            messages.success(request, "原材料入庫台帳を更新しました。")
+            return redirect("material_stock_ledger")
+        messages.error(request, "入力内容を確認してください。")
+    else:
+        form = QAMaterialStockLedgerForm(instance=row)
+
+    return render(
+        request,
+        "quet_anh/material_stock_ledger_edit.html",
+        {
+            "form": form,
+            "row": row,
+        },
+    )
+
+
+@login_required
+def material_out_stock_ledger_edit(request, pk):
+    row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
+
+    if request.method == "POST":
+        form = QAMaterialOutStockLedgerForm(request.POST, instance=row)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            if obj.supervisor_confirmed:
+                if not obj.supervisor_confirmed_at:
+                    obj.supervisor_confirmed_at = timezone.now()
+            else:
+                obj.supervisor_confirmed_at = None
+                obj.supervisor_name = ""
+            obj.save()
+            messages.success(request, "原材料出庫台帳を更新しました。")
+            return redirect("material_out_stock_ledger")
+        messages.error(request, "入力内容を確認してください。")
+    else:
+        form = QAMaterialOutStockLedgerForm(instance=row)
+
+    return render(
+        request,
+        "quet_anh/material_out_stock_ledger_edit.html",
+        {
+            "form": form,
+            "row": row,
+        },
+    )
+
+
+@login_required
+@require_POST
+def auto_input_ledger_delete(request, pk):
+    item = get_object_or_404(QAAutoInputLedger, pk=pk)
+    QADeletedJobMarker.objects.get_or_create(
+        job_id=item.job_id,
+        defaults={"note": "削除操作: 自動入力ジョブ台帳"},
+    )
+    QAMaterialStockLedger.objects.filter(auto_input_ledger=item).delete()
+    QAMaterialOutStockLedger.objects.filter(auto_input_ledger=item).delete()
+    item.delete()
+    messages.success(request, "ジョブ台帳データを削除しました。")
+    return redirect("auto_input_ledger_list")
+
+
+@login_required
+@require_POST
+def material_stock_ledger_delete(request, pk):
+    row = get_object_or_404(QAMaterialStockLedger, pk=pk)
+    if row.auto_input_ledger_id:
+        QADeletedJobMarker.objects.get_or_create(
+            job_id=row.auto_input_ledger.job_id,
+            defaults={"note": "削除操作: 原材料入庫台帳"},
+        )
+        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=row.auto_input_ledger).delete()
+        row.auto_input_ledger.delete()
+        messages.success(request, "入庫台帳データを削除しました。")
+        return redirect("material_stock_ledger")
+    row.delete()
+    messages.success(request, "入庫台帳データを削除しました。")
+    return redirect("material_stock_ledger")
+
+
+@login_required
+@require_POST
+def material_out_stock_ledger_delete(request, pk):
+    row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
+    if row.auto_input_ledger_id:
+        QADeletedJobMarker.objects.get_or_create(
+            job_id=row.auto_input_ledger.job_id,
+            defaults={"note": "削除操作: 原材料出庫台帳"},
+        )
+        QAMaterialStockLedger.objects.filter(auto_input_ledger=row.auto_input_ledger).delete()
+        row.auto_input_ledger.delete()
+        messages.success(request, "出庫台帳データを削除しました。")
+        return redirect("material_out_stock_ledger")
+    row.delete()
+    messages.success(request, "出庫台帳データを削除しました。")
+    return redirect("material_out_stock_ledger")
+
+
 @require_GET
 def latest_vision_events(request):
     today = timezone.localdate()
@@ -484,25 +1073,30 @@ def latest_vision_events(request):
 
 
 def _pick_related_qa_result(phien):
-    """Ghép job nhập liệu với bản ghi quét ảnh gần nhất theo thời gian."""
+    """Liên kết chặt: chỉ nhận qa_result gắn trực tiếp từ luồng quét ảnh."""
     if getattr(phien, "qa_result_id", None):
         return phien.qa_result
+    return None
 
-    ref_time = phien.ngay_tao
-    window_start = ref_time - timedelta(minutes=30)
-    window_end = ref_time + timedelta(minutes=30)
-    return (
-        QAResult.objects.filter(created_at__range=(window_start, window_end))
-        .select_related("device")
-        .order_by("-created_at")
-        .first()
-    )
+
+def _cleanup_unlinked_ledgers():
+    """Xóa dữ liệu ledger không có liên kết trực tiếp tới QAResult."""
+    QAMaterialStockLedger.objects.filter(auto_input_ledger__qa_result__isnull=True).delete()
+    QAMaterialOutStockLedger.objects.filter(auto_input_ledger__qa_result__isnull=True).delete()
+    QAAutoInputLedger.objects.filter(qa_result__isnull=True).delete()
 
 
 def sync_auto_input_ledger(limit=200):
-    """Đồng bộ sổ cái từ các phiên nhập liệu mới/cập nhật."""
+    """Đồng bộ sổ cái job: chỉ lưu job đã hoàn thành thành công."""
+    _cleanup_unlinked_ledgers()
+    # Dọn các job không thành công khỏi sổ cái quản lý job
+    QAAutoInputLedger.objects.exclude(job_status="done").delete()
+    deleted_job_ids = QADeletedJobMarker.objects.values_list("job_id", flat=True)
+
     phien_qs = (
         PhienNhapLieu.objects.select_related("chuong_trinh", "may_tinh")
+        .filter(trang_thai="done", qa_result__isnull=False)
+        .exclude(ma_job__in=deleted_job_ids)
         .order_by("-ngay_tao")[:limit]
     )
 
@@ -539,51 +1133,4 @@ def sync_auto_input_ledger(limit=200):
 
 @login_required
 def auto_input_ledger_list(request):
-    sync_auto_input_ledger(limit=300)
-
-    qs = QAAutoInputLedger.objects.select_related("qa_result", "phien_nhap_lieu").all()
-    keyword = request.GET.get("keyword", "").strip()
-    date = request.GET.get("date", "").strip()
-    status = request.GET.get("status", "").strip()
-
-    if keyword:
-        qs = qs.filter(
-            Q(job_id__icontains=keyword)
-            | Q(workstation_ip__icontains=keyword)
-            | Q(ma_nhap_lieu__icontains=keyword)
-            | Q(qa_machine_number__icontains=keyword)
-            | Q(qa_device_name__icontains=keyword)
-            | Q(qa_material__icontains=keyword)
-            | Q(qa_product__icontains=keyword)
-            | Q(qa_operator_name__icontains=keyword)
-            | Q(job_message__icontains=keyword)
-        )
-
-    if status:
-        qs = qs.filter(job_status=status)
-
-    if date:
-        parsed = parse_date(date)
-        if parsed:
-            qs = qs.filter(created_at__date=parsed)
-
-    qs = qs.order_by("-created_at")
-    paginator = Paginator(qs, 15)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        "page_obj": page_obj,
-        "ledgers": page_obj,
-        "keyword": keyword,
-        "date": date,
-        "status": status,
-        "status_choices": [
-            ("queued", "Đang chờ"),
-            ("sending", "Đang gửi"),
-            ("sent", "Đã gửi"),
-            ("done", "Hoàn thành"),
-            ("failed", "Lỗi"),
-        ],
-    }
-    return render(request, "quet_anh/auto_input_ledger.html", context)
+    return redirect("material_out_stock_ledger")

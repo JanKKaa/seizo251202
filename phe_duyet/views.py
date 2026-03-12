@@ -84,7 +84,7 @@ def create_document(request):
                 よろしくお願いいたします。
                 承認管理システム
                 """
-                send_mail(subject, message, 'pts@hayashi-p.co.jp', [recipient_email])
+                send_mail(subject, message, 'hayashitechno01@gmail.com', [recipient_email])
 
             messages.success(request, '承認リクエストが作成されました。')
             if recipient_email:
@@ -281,7 +281,7 @@ def send_reminder_email(request, document_id):
     if document.recipient:
         subject = f"【リマインダー】ドキュメント承認のお願い: {document.title}"
         message = f"""
-        {document.recipient.first_name} {document.recipient.last_name} 様,
+        {document.recipient.last_name} 様,
 
         ドキュメント「{document.title}」の承認がまだ完了していません。
         以下のリンクから承認をお願いいたします。
@@ -293,7 +293,7 @@ def send_reminder_email(request, document_id):
         recipient_email = document.recipient.email
 
         try:
-            send_mail(subject, message, 'pts@hayashi-p.co.jp', [recipient_email])
+            send_mail(subject, message, 'hayashitechno01@gmail.com', [recipient_email])
             messages.success(request, "リマインダーメールを送信しました。")
         except Exception as e:
             messages.error(request, f"メール送信中にエラーが発生しました: {str(e)}")

@@ -14,7 +14,7 @@
         <div class="row align-items-end">
             <div class="col-md-4 mb-2">
                 <label for="keyword" class="form-label mb-0"><strong>検索：</strong></label>
-                <input type="text" class="form-control" id="keyword" name="keyword" value="{{ keyword|default_if_none:'' }}" placeholder="デバイス名、材料名、作業者名..." onchange="this.form.submit()">
+                <input type="text" class="form-control" id="keyword" name="keyword" value="{{ keyword|default_if_none:'' }}" placeholder="機械番号、材料コード、材料名、作業者名..." onchange="this.form.submit()">
             </div>
             <div class="col-md-3 mb-2">
                 <label for="date" class="form-label mb-0"><strong>日付で絞り込み：</strong></label>
@@ -33,12 +33,15 @@
                     <th class="text-center">#</th>
                     <th class="text-center">アップロード画像</th>
                     <th class="text-center">機械番号</th>
+                    <th class="text-center">材料コード</th>
                     <th class="text-center">材料名</th>
                     <th class="text-center">製品名</th>
                     <th class="text-center">混合率</th>
                     <th class="text-center">スキャンデータ</th>
                     <th class="text-center">結果</th>
                     <th class="text-center">一致率</th>
+                    <th class="text-center">ロット識別色</th>
+                    <th class="text-center">ロット番号</th>
                     <th class="text-center">日時</th>
                     <th class="text-center">作業者</th>
                     <th class="text-center">材料重量(kg)</th> <!-- Đưa lên trước -->
@@ -55,6 +58,7 @@
                         {% endif %}
                     </td>
                     <td>{{ item.device.name }}</td>
+                    <td>{{ item.device.material_code }}</td>
                     <td>{{ item.device.material }}</td>
                     <td>{{ item.device.product }}</td>
                     <td class="text-center">{{ item.device.ratio }}</td>
@@ -82,6 +86,12 @@
                         {% endif %}
                     </td>
                     <td class="text-center">
+                        {{ item.get_lot_color_display }}
+                    </td>
+                    <td class="text-center">
+                        {{ item.lot_number }}
+                    </td>
+                    <td class="text-center">
                         <small class="text-muted">{{ item.created_at|date:"Y/m/d H:i" }}</small>
                     </td>
                     <td class="text-center">
@@ -99,7 +109,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="13" class="text-center text-muted">結果がありません。</td>
+                    <td colspan="16" class="text-center text-muted">結果がありません。</td>
                 </tr>
                 {% endfor %}
             </tbody>

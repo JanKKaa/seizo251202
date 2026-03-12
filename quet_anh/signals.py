@@ -1,27 +1,31 @@
-from datetime import timedelta
+from decimal import Decimal
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from nhap_lieu.models import KetQuaNhapLieu, PhienNhapLieu
 
-from .models import QAAutoInputLedger, QAResult
+from .models import QAAutoInputLedger, QAResult, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
 
 
 def _find_qa_result_for_phien(phien):
+    # Liên kết chặt: chỉ nhận qa_result được gắn trực tiếp.
     if getattr(phien, "qa_result_id", None):
         return phien.qa_result
-
-    ref_time = phien.ngay_tao
-    return (
-        QAResult.objects.filter(created_at__range=(ref_time - timedelta(minutes=30), ref_time + timedelta(minutes=30)))
-        .select_related("device")
-        .order_by("-created_at")
-        .first()
-    )
+    return None
 
 
 def _sync_ledger_from_phien(phien):
+    if QADeletedJobMarker.objects.filter(job_id=phien.ma_job).exists():
+        QAAutoInputLedger.objects.filter(phien_nhap_lieu=phien).delete()
+        return
+
+    # Chỉ lưu sổ cái job khi job đã hoàn thành thành công
+    if (phien.trang_thai or "") != "done":
+        QAAutoInputLedger.objects.filter(phien_nhap_lieu=phien).delete()
+        return
+
     ledger, _ = QAAutoInputLedger.objects.get_or_create(
         phien_nhap_lieu=phien,
         defaults={"job_id": phien.ma_job},
@@ -52,6 +56,154 @@ def _sync_ledger_from_phien(phien):
     ledger.save()
 
 
+def _sync_material_stock_from_ledger(ledger):
+    if QADeletedJobMarker.objects.filter(job_id=ledger.job_id).exists():
+        QAMaterialStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+        return
+
+    if (ledger.job_status or "") != "done":
+        QAMaterialStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+        return
+
+    qa_result = ledger.qa_result
+    device = qa_result.device if qa_result and qa_result.device else None
+    source_date = qa_result.created_at if qa_result else ledger.created_at
+    stock_in_date = timezone.localtime(source_date).date()
+
+    material_name = (device.material if device else "") or ledger.qa_material or ""
+    material_code = (device.material_code if device else "") or ""
+    weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+    mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
+
+    row, created = QAMaterialStockLedger.objects.get_or_create(
+        auto_input_ledger=ledger,
+        defaults={
+            "qa_result": qa_result,
+            "material_name": material_name,
+            "material_code": material_code,
+            "stock_in_date": stock_in_date,
+            "lot_color": QAMaterialStockLedger.LOT_COLOR_GREEN,
+            "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
+            "workstation_management_no": mgmt_no,
+        },
+    )
+
+    if created:
+        return
+
+    changed = False
+    if qa_result and row.qa_result_id != qa_result.id:
+        row.qa_result = qa_result
+        changed = True
+    if not row.material_name and material_name:
+        row.material_name = material_name
+        changed = True
+    if not row.material_code and material_code:
+        row.material_code = material_code
+        changed = True
+    if (row.weight_kg is None or row.weight_kg == 0) and weight_kg is not None:
+        row.weight_kg = weight_kg
+        changed = True
+    if not row.workstation_management_no and mgmt_no:
+        row.workstation_management_no = mgmt_no
+        changed = True
+    if not row.stock_in_date:
+        row.stock_in_date = stock_in_date
+        changed = True
+
+    if changed:
+        row.save()
+
+
+def _sync_material_out_stock_from_ledger(ledger):
+    if QADeletedJobMarker.objects.filter(job_id=ledger.job_id).exists():
+        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+        return
+
+    if (ledger.job_status or "") != "done":
+        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+        return
+
+    qa_result = ledger.qa_result
+    device = qa_result.device if qa_result and qa_result.device else None
+    source_date = qa_result.created_at if qa_result else ledger.created_at
+    stock_out_date = timezone.localtime(source_date).date()
+
+    material_name = (device.material if device else "") or ledger.qa_material or ""
+    material_code = (device.material_code if device else "") or ""
+    weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+    mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
+
+    row = None
+    if qa_result:
+        row = QAMaterialOutStockLedger.objects.filter(qa_result=qa_result).first()
+        if row and not row.auto_input_ledger_id:
+            duplicate = (
+                QAMaterialOutStockLedger.objects
+                .filter(auto_input_ledger=ledger)
+                .exclude(pk=row.pk)
+                .first()
+            )
+            if duplicate:
+                if not row.workstation_management_no and duplicate.workstation_management_no:
+                    row.workstation_management_no = duplicate.workstation_management_no
+                if (row.weight_kg is None or row.weight_kg == 0) and duplicate.weight_kg is not None:
+                    row.weight_kg = duplicate.weight_kg
+                if not row.lot_number and duplicate.lot_number:
+                    row.lot_number = duplicate.lot_number
+                if not row.material_name and duplicate.material_name:
+                    row.material_name = duplicate.material_name
+                if not row.material_code and duplicate.material_code:
+                    row.material_code = duplicate.material_code
+                duplicate.delete()
+            row.auto_input_ledger = ledger
+            row.save()
+
+    if not row:
+        row, _ = QAMaterialOutStockLedger.objects.get_or_create(
+            auto_input_ledger=ledger,
+            defaults={
+                "qa_result": qa_result,
+                "material_name": material_name,
+                "material_code": material_code,
+                "stock_out_date": stock_out_date,
+                "lot_color": (qa_result.lot_color if qa_result and qa_result.lot_color else QAMaterialOutStockLedger.LOT_COLOR_GREEN),
+                "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
+                "lot_number": (qa_result.lot_number if qa_result else ""),
+                "workstation_management_no": mgmt_no,
+            },
+        )
+
+    changed = False
+    if qa_result and row.qa_result_id != qa_result.id:
+        row.qa_result = qa_result
+        changed = True
+    if not row.material_name and material_name:
+        row.material_name = material_name
+        changed = True
+    if not row.material_code and material_code:
+        row.material_code = material_code
+        changed = True
+    if (row.weight_kg is None or row.weight_kg == 0) and weight_kg is not None:
+        row.weight_kg = weight_kg
+        changed = True
+    if not row.workstation_management_no and mgmt_no:
+        row.workstation_management_no = mgmt_no
+        changed = True
+    if not row.stock_out_date:
+        row.stock_out_date = stock_out_date
+        changed = True
+    if qa_result and qa_result.lot_color and row.lot_color != qa_result.lot_color:
+        row.lot_color = qa_result.lot_color
+        changed = True
+    if qa_result and qa_result.lot_number and row.lot_number != qa_result.lot_number:
+        row.lot_number = qa_result.lot_number
+        changed = True
+
+    if changed:
+        row.save()
+
+
 @receiver(post_save, sender=PhienNhapLieu)
 def on_phien_saved(sender, instance, **kwargs):
     _sync_ledger_from_phien(instance)
@@ -61,3 +213,9 @@ def on_phien_saved(sender, instance, **kwargs):
 def on_ket_qua_saved(sender, instance, **kwargs):
     if instance.phien_id:
         _sync_ledger_from_phien(instance.phien)
+
+
+@receiver(post_save, sender=QAAutoInputLedger)
+def on_auto_ledger_saved(sender, instance, **kwargs):
+    _sync_material_stock_from_ledger(instance)
+    _sync_material_out_stock_from_ledger(instance)

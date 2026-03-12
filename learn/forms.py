@@ -27,14 +27,23 @@ class MotivationalQuoteForm(forms.ModelForm):
         }
 
 class CourseForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['start_date'].required = True
+        self.fields['end_date'].required = True
+
     class Meta:
         model = Course
         fields = [
             'title', 'external_url', 'start_date', 'end_date', 'price', 'duration',
             'material', 'location', 'target', 'description', 'is_active'
         ]
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }
         labels = {
-            'title': 'コース名',
+            'title': '研修・講習名',
             'external_url': '外部リンク',
             'start_date': '開始日',
             'end_date': '終了日',
@@ -48,8 +57,8 @@ class CourseForm(forms.ModelForm):
         }
         error_messages = {
             'title': {
-                'required': 'コース名は必須項目です。',
-                'max_length': 'コース名が長すぎます。',
+                'required': '研修・講習名は必須項目です。',
+                'max_length': '研修・講習名が長すぎます。',
             },
             'external_url': {
                 'required': '外部リンクは必須項目です。',

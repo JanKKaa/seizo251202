@@ -26,6 +26,7 @@
                             <th class="text-center">No.</th>
                             <th class="text-center">機械番号</th>
                             <th class="text-center">材料名</th>
+                            <th class="text-center">材料コード</th>
                             <th class="text-center">製品名</th>
                             <th class="text-center">混合率</th>
                             <th class="text-center">画像とQR比較一致率(%)</th>
@@ -38,6 +39,7 @@
                             <td class="text-center">{{ forloop.counter }}</td>
                             <td>{{ item.name }}</td>
                             <td>{{ item.material }}</td>
+                            <td>{{ item.material_code }}</td>
                             <td>{{ item.product }}</td>
                             <td class="text-center">{{ item.ratio }}</td>
                             <td class="text-center">
@@ -53,7 +55,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">データがありません。</td>
+                            <td colspan="8" class="text-center text-muted">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -16,24 +16,29 @@
 
     <!-- ナビゲーションボタンエリア -->
     <div class="row justify-content-center mb-4">
-        <div class="col-md-3 text-center mb-2">
+        <div class="col-lg-2 col-md-4 text-center mb-2">
             <a href="{% url 'qa_history' %}" class="btn btn-info btn-lg btn-block shadow rounded-pill px-4 py-2">
                 <i class="fas fa-list"></i> 履歴
             </a>
         </div>
-        <div class="col-md-3 text-center mb-2">
+        <div class="col-lg-2 col-md-4 text-center mb-2">
             <a href="{% url 'qa_device_list' %}" class="btn btn-secondary btn-lg btn-block shadow rounded-pill px-4 py-2">
                 <i class="fas fa-database"></i> 機械番号管理
             </a>
         </div>
-        <div class="col-md-3 text-center mb-2">
+        <div class="col-lg-2 col-md-4 text-center mb-2">
             <a href="{% url 'dashboard_qa' %}" class="btn btn-primary btn-lg btn-block shadow rounded-pill px-4 py-2">
                 <i class="fas fa-tachometer-alt"></i> ダッシュボード
             </a>
         </div>
-        <div class="col-md-3 text-center mb-2">
-            <a href="{% url 'auto_input_ledger_list' %}" class="btn btn-dark btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-book"></i> 自動入力台帳
+        <div class="col-lg-2 col-md-4 text-center mb-2">
+            <a href="{% url 'material_stock_ledger' %}" class="btn btn-success btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-warehouse"></i> 原材料入庫台帳
+            </a>
+        </div>
+        <div class="col-lg-2 col-md-4 text-center mb-2">
+            <a href="{% url 'material_out_stock_ledger' %}" class="btn btn-danger btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-dolly-flatbed"></i> 原材料出庫台帳
             </a>
         </div>
     </div>
@@ -43,18 +48,18 @@
         <iframe scrolling="no" frameborder="no" clocktype="html5" style="overflow:hidden;border:0;margin:0;padding:0;width:227px;height:75px;" src="https://www.clocklink.com/html5embed.php?clock=008&timezone=Japan_Tokyo&color=white&size=227&Title=&Message=&Target=&From=2025,1,1,0,0,0&Color=white"></iframe>
     </div>
 
-    <!-- 検査するデバイス選択エリア -->
+    <!-- 出庫/入庫 フロー選択エリア -->
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-lg-6 mb-3">
             <div class="card shadow-lg border-0">
                 <div class="card-header bg-primary text-white py-3 rounded-top">
-                    <h5 class="m-0 font-weight-bold text-center">機械番号を選択</h5>
+                    <h5 class="m-0 font-weight-bold text-center">出庫フロー: 機械番号を選択</h5>
                 </div>
                 <div class="card-body bg-light">
                     <form method="get" action="{% url 'upload_image' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
-                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 200px; max-width:100%;">
+                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
                             {% for d in device_list %}
-                                <option value="{{ d.id }}">{{ d.name }}</option>
+                                <option value="{{ d.id }}" data-device-name="{{ d.name }}">{{ d.name }}{% if d.material_code %} | {{ d.material_code }}{% endif %}</option>
                             {% endfor %}
                         </select>
                         <button type="submit" class="btn btn-primary shadow rounded px-6 py-2">
@@ -86,6 +91,49 @@
                 </div>
             </div>
         </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-success text-white py-3 rounded-top">
+                    <h5 class="m-0 font-weight-bold text-center">入庫フロー: 原材料QRを選択</h5>
+                </div>
+                <div class="card-body bg-light">
+                    <form method="get" action="{% url 'stock_in_start' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
+                        <select id="material_name" name="material_name" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
+                            {% for m in material_list %}
+                                <option value="{{ m.material }}" data-material-code="{{ m.material_code }}">{{ m.material }}{% if m.material_code %} | {{ m.material_code }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="hidden" id="material_code" name="material_code" value="">
+                        <button type="submit" class="btn btn-success shadow rounded px-6 py-2">
+                            <i class="fas fa-sign-in-alt"></i> 選択
+                        </button>
+                    </form>
+                    <div id="material-selected-msg" class="mt-2 mb-2 text-center" style="font-weight:bold; color:#155724; display:none;">
+                        <i class="fas fa-check-circle"></i> 原材料「<span id="selected-material-name"></span>」が選択されました！
+                    </div>
+                    <div class="w-100 text-center mb-2">
+                        <button type="button" class="btn btn-outline-success" id="start-material-qr-btn" style="min-width:120px;">
+                            <i class="fas fa-qrcode"></i> QRで選択
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" id="refocus-material-qr-btn" style="min-width:120px; display:none;">
+                            <i class="fas fa-crosshairs"></i> 再フォーカス
+                        </button>
+                    </div>
+                    <div class="row align-items-center">
+                        <div class="col-7">
+                            <div id="material-qr-reader" style="width:260px; margin: 0 auto; display:none;"></div>
+                        </div>
+                        <div class="col-5 text-center">
+                            <img src="{% static 'img/thamkhaoQR.JPEG' %}" alt="原材料QR参考画像" style="max-width:200px; border:1px solid #ccc; border-radius:8px;">
+                            <div style="font-size:0.95rem; color:#888;">原材料QR参考画像</div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3 mb-0 py-2">
+                        この画面は入庫フローのUI先行版です。次段階で処理ロジックを接続します。
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -97,8 +145,17 @@ const qrReader = document.getElementById('qr-reader');
 const selectDevice = document.getElementById('device_id');
 const deviceMsg = document.getElementById('device-selected-msg');
 const selectedDeviceName = document.getElementById('selected-device-name');
+const startMaterialQrBtn = document.getElementById('start-material-qr-btn');
+const refocusMaterialQrBtn = document.getElementById('refocus-material-qr-btn');
+const materialQrReader = document.getElementById('material-qr-reader');
+const selectMaterial = document.getElementById('material_name');
+const hiddenMaterialCode = document.getElementById('material_code');
+const materialMsg = document.getElementById('material-selected-msg');
+const selectedMaterialName = document.getElementById('selected-material-name');
 let html5QrCode = null;
 let qrRunning = false;
+let materialQrCode = null;
+let materialQrRunning = false;
 
 function showDeviceSelectedMsg() {
     const selectedOption = selectDevice.options[selectDevice.selectedIndex];
@@ -111,6 +168,24 @@ function showDeviceSelectedMsg() {
     }
     selectedOption.style.color = '#006400';
     selectedOption.style.fontWeight = 'bold';
+}
+
+function syncMaterialCodeField() {
+    const selectedOption = selectMaterial.options[selectMaterial.selectedIndex];
+    hiddenMaterialCode.value = selectedOption ? (selectedOption.dataset.materialCode || '') : '';
+}
+
+function showMaterialSelectedMsg() {
+    const selectedOption = selectMaterial.options[selectMaterial.selectedIndex];
+    selectedMaterialName.textContent = selectedOption.text;
+    materialMsg.style.display = 'block';
+    for (let i = 0; i < selectMaterial.options.length; i++) {
+        selectMaterial.options[i].style.color = '';
+        selectMaterial.options[i].style.fontWeight = '';
+    }
+    selectedOption.style.color = '#0f5132';
+    selectedOption.style.fontWeight = 'bold';
+    syncMaterialCodeField();
 }
 
 startQrBtn.addEventListener('click', function() {
@@ -127,7 +202,11 @@ startQrBtn.addEventListener('click', function() {
             // Tìm thiết bị theo id hoặc tên
             let found = false;
             for (let i = 0; i < selectDevice.options.length; i++) {
-                if (selectDevice.options[i].value === qrCodeMessage || selectDevice.options[i].text === qrCodeMessage) {
+                if (
+                    selectDevice.options[i].value === qrCodeMessage ||
+                    selectDevice.options[i].dataset.deviceName === qrCodeMessage ||
+                    selectDevice.options[i].text === qrCodeMessage
+                ) {
                     selectDevice.selectedIndex = i;
                     found = true;
                     break;
@@ -159,7 +238,11 @@ refocusQrBtn.addEventListener('click', function() {
                 qrCodeMessage => {
                     let found = false;
                     for (let i = 0; i < selectDevice.options.length; i++) {
-                        if (selectDevice.options[i].value === qrCodeMessage || selectDevice.options[i].text === qrCodeMessage) {
+                        if (
+                            selectDevice.options[i].value === qrCodeMessage ||
+                            selectDevice.options[i].dataset.deviceName === qrCodeMessage ||
+                            selectDevice.options[i].text === qrCodeMessage
+                        ) {
                             selectDevice.selectedIndex = i;
                             found = true;
                             break;
@@ -173,6 +256,82 @@ refocusQrBtn.addEventListener('click', function() {
                         showDeviceSelectedMsg();
                     } else {
                         alert("QRコードがリストに一致しません: " + qrCodeMessage);
+                    }
+                },
+                errorMessage => {}
+            );
+        });
+    }
+});
+
+if (selectMaterial) {
+    syncMaterialCodeField();
+    selectMaterial.addEventListener('change', syncMaterialCodeField);
+}
+
+startMaterialQrBtn.addEventListener('click', function() {
+    materialQrReader.style.display = 'block';
+    startMaterialQrBtn.style.display = 'none';
+    refocusMaterialQrBtn.style.display = 'inline-block';
+    if (!materialQrCode) {
+        materialQrCode = new Html5Qrcode("material-qr-reader");
+    }
+    materialQrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 200 },
+        qrCodeMessage => {
+            let found = false;
+            for (let i = 0; i < selectMaterial.options.length; i++) {
+                const option = selectMaterial.options[i];
+                const label = option.text.split("|")[0].trim();
+                if (option.value === qrCodeMessage || label === qrCodeMessage || option.text === qrCodeMessage) {
+                    selectMaterial.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                materialQrCode.stop();
+                materialQrReader.style.display = 'none';
+                startMaterialQrBtn.style.display = 'inline-block';
+                refocusMaterialQrBtn.style.display = 'none';
+                showMaterialSelectedMsg();
+            } else {
+                alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
+            }
+        },
+        errorMessage => {}
+    );
+    materialQrRunning = true;
+});
+
+refocusMaterialQrBtn.addEventListener('click', function() {
+    if (materialQrCode && materialQrRunning) {
+        materialQrCode.stop().then(() => {
+            materialQrReader.innerHTML = "";
+            materialQrCode = new Html5Qrcode("material-qr-reader");
+            materialQrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 200 },
+                qrCodeMessage => {
+                    let found = false;
+                    for (let i = 0; i < selectMaterial.options.length; i++) {
+                        const option = selectMaterial.options[i];
+                        const label = option.text.split("|")[0].trim();
+                        if (option.value === qrCodeMessage || label === qrCodeMessage || option.text === qrCodeMessage) {
+                            selectMaterial.selectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        materialQrCode.stop();
+                        materialQrReader.style.display = 'none';
+                        startMaterialQrBtn.style.display = 'inline-block';
+                        refocusMaterialQrBtn.style.display = 'none';
+                        showMaterialSelectedMsg();
+                    } else {
+                        alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
                     }
                 },
                 errorMessage => {}

@@ -1,4 +1,4 @@
-﻿{% extends "learn/base_learn.html" %}
+{% extends "learn/base_learn.html" %}
 {% load static %}
 
 {% block title %}ダッシュボード{% endblock %}
@@ -570,7 +570,7 @@
 <div class="dashboard-overlay"></div>
 <div class="dashboard-content">
     <div class="glass-card">
-        <h1>講習・研修ダッシュボード</h1>
+        <h1>研修・講習ダッシュボード</h1>
         <div class="accordion" id="mainAccordion">
              
             <div class="accordion-item mb-2">
@@ -586,6 +586,17 @@
                         class="btn btn-light text-start shadow-sm custom-link">
                             <i class="fas fa-building me-2 text-primary"></i>
                             長野労働基準協会
+                        </a>
+                    </div>
+                </div>
+                <div id="collapseKentei" class="accordion-collapse collapse" aria-labelledby="headingKentei" data-bs-parent="#mainAccordion">
+                    <div class="accordion-body d-flex flex-column gap-2">
+                        <a href="https://www3.jeed.go.jp/nagano/poly/kyushoku/index.html#course"
+                        target="_blank"
+                        class="btn btn-light text-start shadow-sm custom-link">
+                            <i class="fas fa-draw-polygon me-2 text-primary"></i>
+                            ポリテクセンター長野
+                            
                         </a>
                     </div>
                 </div>
@@ -658,3 +669,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

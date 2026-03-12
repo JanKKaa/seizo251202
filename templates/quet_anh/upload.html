@@ -114,6 +114,7 @@
                             <div class="border rounded p-2 mb-2 bg-light">
                                 <div><strong>機械No.:</strong> {{ device.name }}</div>
                                 <div><strong>材料名：</strong> {{ device.material }}</div>
+                                <div><strong>材料コード：</strong> {{ device.material_code }}</div>
                                 <div><strong>製品名：</strong> {{ device.product }}</div>
                                 <div><strong>混合率：</strong> {{ device.ratio }}</div>
                             </div>
@@ -157,6 +158,20 @@
         <button type="button" class="btn btn-warning num-btn" data-num="clear">C</button>
     </div>
 </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="lot_color"><strong>ロット識別色（必須）：</strong></label>
+                            <select class="form-control" id="lot_color" name="lot_color" required>
+                                <option value="">選択してください</option>
+                                <option value="green">緑</option>
+                                <option value="black">黒</option>
+                                <option value="blue">青</option>
+                                <option value="red">赤</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="lot_number"><strong>ロット番号：</strong></label>
+                            <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力">
                         </div>
                         <input type="hidden" id="captured_image" name="captured_image">
                          <div class="card p-3">
@@ -306,6 +321,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
     const inputWeight = document.getElementById('input_weight');
     const capturedImage = document.getElementById('captured_image');
     const expectedTextInput = document.getElementById('expected_text');
+    const lotColor = document.getElementById('lot_color');
 
     // Kiểm tra số kg
     const val = inputWeight.value.trim();
@@ -323,6 +339,11 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
     // Kiểm tra QR code
     if (!expectedTextInput.value || expectedTextInput.value.trim() === "None"|| expectedTextInput.value.trim() === "") {
         alert("QRコードを読み取ってください。");
+        e.preventDefault();
+        return false;
+    }
+    if (!lotColor.value) {
+        alert("ロット識別色を選択してください。");
         e.preventDefault();
         return false;
     }

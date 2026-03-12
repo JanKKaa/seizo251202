@@ -14,6 +14,8 @@ import requests
 from bs4 import BeautifulSoup
 from django.contrib.auth import logout
 from django.urls import reverse
+from django.http import StreamingHttpResponse
+from urllib.parse import urljoin
 import os
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -28,12 +30,74 @@ from .forms import MotivationalQuoteForm
 
 def login_required_ma_nv(view_func):
     def wrapper(request, *args, **kwargs):
-        if request.user.is_authenticated and request.user.username == 'kanri':
-            return view_func(request, *args, **kwargs)
+        if request.user.is_authenticated:
+            if request.user.username == 'kanri':
+                # Kanri login: auto clear employee-session login if exists.
+                request.session.pop('ma_nv', None)
+                request.session.pop('ten', None)
+                return view_func(request, *args, **kwargs)
+            # Chỉ cho phép tài khoản kanri. Tài khoản khác phải logout.
+            logout(request)
+            return redirect('learn:dangnhap')
         if not request.session.get('ma_nv'):
             return redirect('learn:dangnhap')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+def fetch_external_thumbnail(url):
+    if not url:
+        return ""
+    try:
+        response = requests.get(
+            url,
+            timeout=3,
+            headers={"User-Agent": "Mozilla/5.0 (CourseThumbBot)"},
+        )
+        if response.status_code >= 400:
+            return ""
+        soup = BeautifulSoup(response.text, 'html.parser')
+        for meta in [
+            soup.find('meta', property='og:image'),
+            soup.find('meta', attrs={'name': 'og:image'}),
+            soup.find('meta', attrs={'name': 'twitter:image'}),
+            soup.find('meta', property='twitter:image'),
+            soup.find('meta', attrs={'itemprop': 'image'}),
+        ]:
+            if meta and meta.get('content'):
+                return urljoin(url, meta.get('content').strip())
+        link_img = soup.find('link', rel='image_src')
+        if link_img and link_img.get('href'):
+            return urljoin(url, link_img.get('href').strip())
+        first_img = soup.find('img', src=True)
+        if first_img and first_img.get('src'):
+            src = first_img.get('src').strip()
+            if src.startswith('data:'):
+                return ""
+            return urljoin(url, src)
+    except Exception:
+        return ""
+    return ""
+
+@login_required_ma_nv
+def external_thumb_proxy(request):
+    url = request.GET.get('url', '').strip()
+    if not url or not (url.startswith('http://') or url.startswith('https://')):
+        return HttpResponse(status=404)
+    try:
+        resp = requests.get(
+            url,
+            stream=True,
+            timeout=5,
+            headers={"User-Agent": "Mozilla/5.0 (CourseThumbProxy)"},
+        )
+    except Exception:
+        return HttpResponse(status=502)
+    if resp.status_code >= 400:
+        return HttpResponse(status=404)
+    content_type = resp.headers.get('Content-Type', 'image/jpeg')
+    response = StreamingHttpResponse(resp.iter_content(chunk_size=8192), content_type=content_type)
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
 
 class NhanVienForm(forms.ModelForm):
     CHUC_VU_CHOICES = [
@@ -64,6 +128,11 @@ class NhanVienForm(forms.ModelForm):
         }
 
 class CourseForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['start_date'].required = True
+        self.fields['end_date'].required = True
+
     class Meta:
         model = Course
         fields = [
@@ -158,13 +227,13 @@ def course_create(request):
                 messages.error(request, '社員コードが正しくありません。')
                 return redirect('learn:dangnhap')
             course.save()
-            messages.success(request, "新しいコースが作成されました。")
+            messages.success(request, "新しい研修・講習が作成されました。")
             return redirect('learn:course_list')
         else:
             messages.error(request, "入力内容に誤りがあります。下記のエラーを確認してください。")
     else:
         form = CourseForm()
-    return render(request, 'learn/course_create.html', {'form': form, 'title': 'コース作成'})
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習作成'})
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def course_update(request, pk):
@@ -182,21 +251,22 @@ def course_update(request, pk):
                     course.material.delete(save=False)
                 course.material = request.FILES['material']
             course.save()
-            messages.success(request, 'コース情報が更新されました。')
+            messages.success(request, '研修・講習情報が更新されました。')
             return redirect('learn:course_list')
     else:
         form = CourseForm(instance=course)
-    return render(request, 'learn/course_create.html', {'form': form, 'title': 'コース編集'})
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集'})
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def course_delete(request, pk):
     course = get_object_or_404(Course, pk=pk)
     if request.method == 'POST':
         course.delete()
-        messages.success(request, 'コースが削除されました。')
+        messages.success(request, '研修・講習が削除されました。')
         return redirect('learn:course_list')
     return render(request, 'learn/course_confirm_delete.html', {'course': course})
 
+@login_required_ma_nv
 def index(request):
     course_count = Course.objects.count()
     user_count = User.objects.count()
@@ -231,13 +301,18 @@ def course_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Gán tên người tạo cho từng course (chỉ xử lý backend)
+    # Gán tên người tạo + fetch thumbnail (chỉ xử lý backend)
     for course in page_obj:
         if course.creator:
             nv = NhanVien.objects.filter(ma_so=course.creator.username).first()
             course.creator_name = nv.ten if nv else "管理部"
         else:
             course.creator_name = "管理部"
+        if course.external_url and not course.external_thumb_url:
+            thumb_url = fetch_external_thumbnail(course.external_url)
+            if thumb_url:
+                course.external_thumb_url = thumb_url
+                course.save(update_fields=['external_thumb_url'])
 
     # Xác định enrollments cần phê duyệt (giữ nguyên)
     enrollments_to_approve = Enrollment.objects.none()
@@ -258,6 +333,12 @@ def course_list(request):
             enrollment.user.ten = nv.ten
         except NhanVien.DoesNotExist:
             enrollment.user.ten = '不明'
+        # Gán tên người tạo cho khóa học trong danh sách duyệt
+        if enrollment.course and enrollment.course.creator:
+            nv_creator = NhanVien.objects.filter(ma_so=enrollment.course.creator.username).first()
+            enrollment.course.creator_name = nv_creator.ten if nv_creator else "管理部"
+        else:
+            enrollment.course.creator_name = "管理部"
 
     # Xử lý phê duyệt (giữ nguyên)
     if request.method == 'POST' and enrollments_to_approve.exists():
@@ -334,14 +415,17 @@ def course_list(request):
 def enroll_course(request, course_id):
     # Nếu là kanri thì không cho phép đăng ký, thông báo và chuyển hướng
     if request.user.is_authenticated and request.user.username == 'kanri':
-        messages.error(request, '管理部アカウントでは研修に申請できません。ログアウトします。')
+        messages.error(request, '管理部アカウントでは研修・講習を申請できません。ログアウトします。')
         logout(request)
         return redirect('learn:dangnhap')
+    if request.method != 'POST':
+        messages.error(request, '申請フォームからご登録ください。')
+        return redirect('learn:course_list')
     course = get_object_or_404(Course, id=course_id)
     ma_nv = request.session.get('ma_nv')
     user = User.objects.filter(username=ma_nv).first()
     if not user:
-        messages.error(request, '社員コードに対応するユーザーが存在しません。管理者に連絡してください。')
+        messages.error(request, '社員コードに対応するユーザーが存在しません。管理者へ連絡してください。')
         return redirect('learn:dangnhap')
     nv = NhanVien.objects.filter(ma_so=user.username).first()
     # Xử lý đặc biệt cho 係長
@@ -371,16 +455,32 @@ def enroll_course(request, course_id):
         status = 'pending_kanri'
     else:
         status = 'pending_supervisor'
+    q1_use_case = (request.POST.get('q1_use_case') or '').strip()
+    q2_pre_issue = (request.POST.get('q2_pre_issue') or '').strip()
+    q3_post_state = (request.POST.get('q3_post_state') or '').strip()
+    q4_purpose_summary = (request.POST.get('q4_purpose_summary') or '').strip()
+    if not all([q1_use_case, q2_pre_issue, q3_post_state, q4_purpose_summary]):
+        messages.error(request, '申請には4つの質問すべての回答が必要です。')
+        return redirect('learn:course_list')
+
     enrollment, created = Enrollment.objects.get_or_create(
-        user=user, course=course, defaults={'status': status}
+        user=user,
+        course=course,
+        defaults={
+            'status': status,
+            'q1_use_case': q1_use_case,
+            'q2_pre_issue': q2_pre_issue,
+            'q3_post_state': q3_post_state,
+            'q4_purpose_summary': q4_purpose_summary,
+        }
     )
     if created and not (nv and nv.chuc_vu == '係長'):
         send_approval_notification(enrollment)
-        messages.success(request, '登録が成功しました。上司の承認をお待ちください。' if status == 'pending_supervisor' else '登録が成功しました。管理部の承認をお待ちください。')
+        messages.success(request, '申請を受け付けました。上司の承認をお待ちください。' if status == 'pending_supervisor' else '申請を受け付けました。管理部の承認をお待ちください。')
     elif created:
-        messages.success(request, '登録が成功しました。管理部の承認をお待ちください。')
+        messages.success(request, '申請を受け付けました。管理部の承認をお待ちください。')
     else:
-        messages.info(request, '既に登録されています。')
+        messages.info(request, '既に申請済みです。')
     return redirect('learn:course_list')
 
 
@@ -462,6 +562,16 @@ def my_courses(request):
             except NhanVien.DoesNotExist:
                 nhanvien_cache[username] = None
         enrollment.nhanvien = nhanvien_cache[username]
+        if enrollment.course and enrollment.course.creator:
+            creator = enrollment.course.creator.username
+            if creator not in nhanvien_cache:
+                try:
+                    nhanvien_cache[creator] = NhanVien.objects.get(ma_so=creator)
+                except NhanVien.DoesNotExist:
+                    nhanvien_cache[creator] = None
+            enrollment.course.creator_name = nhanvien_cache[creator].ten if nhanvien_cache[creator] else "管理部"
+        else:
+            enrollment.course.creator_name = "管理部"
 
     paginator = Paginator(user_enrollments, 10)
     page_number = request.GET.get('page')
@@ -484,6 +594,9 @@ def my_courses(request):
 def dangnhap_ma_nv(request):
     error = ''  # Khởi tạo error
     if request.method == 'POST':
+        # Nếu đang login bằng kanri (Django user), logout trước khi login ma_nv.
+        if request.user.is_authenticated:
+            logout(request)
         ma_nv = request.POST.get('ma_nv')
         try:
             nhanvien = NhanVien.objects.get(ma_so=ma_nv)
@@ -505,7 +618,7 @@ def issue_certificate(request, enrollment_id):
     else:
         enrollment = get_object_or_404(Enrollment, id=enrollment_id, user__username=request.session['ma_nv'])
     if not enrollment.completed:
-        messages.error(request, 'コースが完了していません。')
+        messages.error(request, '研修・講習が完了していません。')
         return redirect('learn:my_courses')
     Certificate.objects.get_or_create(enrollment=enrollment, defaults={'issued_date': timezone.now()})
     messages.success(request, '証明書が発行されました。')
@@ -517,7 +630,7 @@ def training_report(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="training_report.csv"'
     writer = csv.writer(response)
-    writer.writerow(['社員コード', '名前', 'コース', '完了', '完了日'])
+    writer.writerow(['社員コード', '名前', '研修・講習', '完了', '完了日'])
     for enrollment in Enrollment.objects.select_related('user', 'course'):
         nv = NhanVien.objects.filter(ma_so=enrollment.user.username).first()
         writer.writerow([
@@ -538,7 +651,7 @@ def mark_completed(request, enrollment_id):
     enrollment.completed = True
     enrollment.completed_date = timezone.now()
     enrollment.save()
-    messages.success(request, 'コースが完了としてマークされました。')
+    messages.success(request, '研修・講習が完了としてマークされました。')
     return redirect('learn:my_courses')
 
 def logout_admin(request):
@@ -807,7 +920,7 @@ def course_edit(request, pk):
             return redirect('learn:course_list')
     else:
         form = CourseForm(instance=course)
-    return render(request, 'learn/course_create.html', {'form': form, 'title': 'コース編集'})
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集'})
 
 @login_required_ma_nv
 def bangcap_list(request):
@@ -958,9 +1071,9 @@ def send_reject_notification(enrollment):
     if nv and nv.email:
         subject = "【申請通知】申請は今回は見送られました。"
         if enrollment.status == 'rejected_by_supervisor':
-            message = f"{nv.ten}さんの申請は今回は見送られました。。理由: {enrollment.supervisor_comment}"
+            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {enrollment.supervisor_comment}"
         elif enrollment.status == 'rejected_by_kanri':
-            message = f"{nv.ten}さんの申請は今回は見送られました。。理由: {enrollment.kanri_comment}"
+            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {enrollment.kanri_comment}"
         else:
             message = f"{nv.ten}さんの申請は今回は見送られました。"
         send_mail(
@@ -990,4 +1103,6 @@ def quote_delete(request, pk):
     quote.delete()
     messages.success(request, "名言が削除されました。")
     return redirect('learn:quote_list')
+
+
 

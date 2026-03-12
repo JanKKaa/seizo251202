@@ -1,12 +1,12 @@
 from django.contrib import admin
 
-from .models import QADeviceInfo, QAResult, QAAutoInputLedger
+from .models import QADeviceInfo, QAResult, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger
 
 
 @admin.register(QADeviceInfo)
 class QADeviceInfoAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "material", "product", "ratio", "compare_ratio")
-    search_fields = ("name", "material", "product")
+    list_display = ("id", "name", "material_code", "material", "product", "ratio", "compare_ratio")
+    search_fields = ("name", "material_code", "material", "product")
 
 
 @admin.register(QAResult)
@@ -21,3 +21,53 @@ class QAAutoInputLedgerAdmin(admin.ModelAdmin):
     list_display = ("id", "job_id", "job_status", "workstation_ip", "qa_machine_number", "ma_nhap_lieu", "created_at")
     search_fields = ("job_id", "workstation_ip", "qa_machine_number", "qa_material", "qa_product", "ma_nhap_lieu")
     list_filter = ("job_status", "created_at")
+
+
+@admin.register(QAMaterialStockLedger)
+class QAMaterialStockLedgerAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "auto_input_ledger",
+        "stock_in_date",
+        "material_name",
+        "material_code",
+        "lot_number",
+        "lot_color",
+        "weight_kg",
+        "workstation_management_no",
+        "supervisor_confirmed",
+    )
+    search_fields = (
+        "material_name",
+        "material_code",
+        "lot_number",
+        "workstation_management_no",
+        "supervisor_name",
+        "auto_input_ledger__job_id",
+    )
+    list_filter = ("stock_in_date", "lot_color", "supervisor_confirmed")
+
+
+@admin.register(QAMaterialOutStockLedger)
+class QAMaterialOutStockLedgerAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "auto_input_ledger",
+        "stock_out_date",
+        "material_name",
+        "material_code",
+        "lot_number",
+        "lot_color",
+        "weight_kg",
+        "workstation_management_no",
+        "supervisor_confirmed",
+    )
+    search_fields = (
+        "material_name",
+        "material_code",
+        "lot_number",
+        "workstation_management_no",
+        "supervisor_name",
+        "auto_input_ledger__job_id",
+    )
+    list_filter = ("stock_out_date", "lot_color", "supervisor_confirmed")

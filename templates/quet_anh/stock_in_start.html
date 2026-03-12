@@ -1,0 +1,67 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block title %}原材料入庫フロー{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="text-success fw-bold mb-0">原材料入庫フロー（UI）</h2>
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary rounded-pill">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+    </div>
+
+    <div class="alert alert-info">
+        この画面は入庫処理のUI先行版です。次段階で自動入力ロジックを接続します。
+    </div>
+
+    <div class="card shadow border-0 mb-3">
+        <div class="card-header bg-success text-white fw-bold">選択された原材料</div>
+        <div class="card-body bg-light">
+            <div class="row">
+                <div class="col-md-6 mb-2">
+                    <label class="form-label fw-bold">原材料名</label>
+                    <input type="text" class="form-control" value="{{ material_name }}" readonly>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <label class="form-label fw-bold">原材料コード</label>
+                    <input type="text" class="form-control" value="{{ material_code }}" readonly>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow border-0">
+        <div class="card-header bg-primary text-white fw-bold">入庫情報入力（画面先行）</div>
+        <div class="card-body">
+            <form>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">重量 (kg)</label>
+                        <input type="text" class="form-control" placeholder="例: 25.00">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">ロット識別色</label>
+                        <select class="form-control">
+                            <option>緑</option>
+                            <option>黒</option>
+                            <option>青</option>
+                            <option>赤</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">ロット番号</label>
+                        <input type="text" class="form-control" placeholder="ロット番号">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-success rounded-pill px-4" disabled>
+                        <i class="fas fa-play"></i> 入庫処理開始（準備中）
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

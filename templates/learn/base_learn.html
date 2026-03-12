@@ -1,4 +1,4 @@
-﻿{% load static %}
+{% load static %}
 
 <!DOCTYPE html>
 <html lang="ja">
@@ -237,19 +237,19 @@
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'learn:index' %}">
                     <i class="fas fa-fw fa-graduation-cap"></i>
-                    <span>講習・研修情報</span>
+                    <span>研修・講習情報</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'learn:course_create' %}">
                     <i class="fas fa-plus"></i>
-                    <span>新しいコースを作成</span>
+                    <span>新しい研修・講習を作成</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'learn:course_list' %}">
                     <i class="fas fa-fw fa-book"></i>
-                    <span>講習・研修参加状況一覧</span>
+                    <span>研修・講習一覧</span>
                     {% if pending_course_count > 0 %}
                         <span class="badge bg-danger ms-1">{{ pending_course_count }}</span>
                     {% endif %}
@@ -260,7 +260,7 @@
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'learn:my_courses' %}">
                     <i class="fas fa-fw fa-user"></i>
-                    <span>講習・研修進歩管理</span>
+                    <span>研修・講習の報告書</span>
                     {% if pending_report_count > 0 %}
                         <span class="badge bg-warning ms-1">{{ pending_report_count }}</span>
                     {% endif %}
@@ -335,11 +335,13 @@
                                 </div>
                             </li>
                             {% else %}
-                            <li class="nav-item d-flex align-items-center">
-                                <a class="nav-link btn btn-outline-primary text-dark d-inline-flex align-items-center" href="{% url 'learn:dangnhap' %}" style="padding: 0.45rem 0.95rem; font-size: 1rem; white-space: nowrap;">
-                                    <i class="fas fa-user me-2"></i> 社員ログイン
-                                </a>
-                            </li>
+                                {% if not user.is_authenticated %}
+                                <li class="nav-item d-flex align-items-center">
+                                    <a class="nav-link btn btn-outline-primary text-dark d-inline-flex align-items-center" href="{% url 'learn:dangnhap' %}" style="padding: 0.45rem 0.95rem; font-size: 1rem; white-space: nowrap;">
+                                        <i class="fas fa-user me-2"></i> 社員ログイン
+                                    </a>
+                                </li>
+                                {% endif %}
                             {% endif %}
 
                             {% if user.is_authenticated %}
@@ -360,11 +362,13 @@
                                 </div>
                             </li>
                             {% else %}
-                            <li class="nav-item d-flex align-items-center ms-1">
-                                <a class="nav-link btn btn-warning btn-sm text-dark d-inline-flex align-items-center" href="{% url 'learn:login_admin' %}" style="padding: 0.45rem 0.95rem; font-size: 1rem; white-space: nowrap;">
-                                    <i class="fas fa-cog me-2"></i> 管理者ログイン
-                                </a>
-                            </li>
+                                {% if not request.session.ma_nv %}
+                                <li class="nav-item d-flex align-items-center ms-1">
+                                    <a class="nav-link btn btn-warning btn-sm text-dark d-inline-flex align-items-center" href="{% url 'learn:login_admin' %}" style="padding: 0.45rem 0.95rem; font-size: 1rem; white-space: nowrap;">
+                                        <i class="fas fa-cog me-2"></i> 管理者ログイン
+                                    </a>
+                                </li>
+                                {% endif %}
                             {% endif %}
                         </ul>
                     </div>
@@ -385,7 +389,7 @@
                         <i class="fas fa-graduation-cap me-2 text-primary"></i>
                         <strong>&copy; 2025 HAYASHI TECHNO CO., LTD.</strong>
                         <span class="mx-2" style="color:#adb5bd;">|</span>
-                        <span>講習・研修管理システム</span>
+                        <span>研修・講習管理システム</span>
                     </span>
                 </div>
             </div>
@@ -475,3 +479,5 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+
+

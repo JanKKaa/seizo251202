@@ -1,5 +1,5 @@
-﻿{% extends "learn/base_learn.html" %}
-{% block title %}私のコース{% endblock %}
+{% extends "learn/base_learn.html" %}
+{% block title %}私の研修・講習{% endblock %}
 
 {% block content %}
 <style>
@@ -33,11 +33,53 @@
     line-height: 1.15;
     border-radius: 6px;
 }
+
+.learn-modal-body {
+    padding: 1.5rem 1.75rem;
+}
+.learn-qa-card {
+    border: 1px solid #e6ecf5;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    background: #f8fbff;
+}
+.learn-qa-title {
+    font-weight: 800;
+    color: #1f3f7a;
+    margin-bottom: 0.8rem;
+    letter-spacing: 0.02em;
+}
+.learn-qa-item {
+    padding: 0.6rem 0;
+    border-top: 1px dashed #d9e3f3;
+}
+.learn-qa-item:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+}
+.learn-qa-q {
+    font-weight: 700;
+    color: #2a3f5f;
+    margin-bottom: 0.25rem;
+}
+.learn-qa-a {
+    color: #4c5f7a;
+    background: #ffffff;
+    border: 1px solid #e7edf7;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    min-height: 2.4rem;
+}
+@media (max-width: 992px) {
+    .learn-modal-body {
+        padding: 1.2rem;
+    }
+}
 </style>
 <div class="learn-page my-courses-left">
     <section class="learn-hero">
-        <h1 class="learn-hero-title">講習・研修進歩管理</h1>
-        <p class="learn-hero-sub">受講進捗、レポート提出、承認状況をリアルタイムで確認します。</p>
+        <h1 class="learn-hero-title">研修・講習の報告書</h1>
+        <p class="learn-hero-sub">受講進捗、報告書提出、承認状況をリアルタイムで確認します。</p>
         <div class="learn-kpi-grid mt-3">
             <div class="learn-kpi">
                 <span class="learn-kpi-label">受講件数</span>
@@ -48,7 +90,7 @@
                 <span class="learn-kpi-value">{{ page_obj.number|default:1 }}</span>
             </div>
             <div class="learn-kpi">
-                <span class="learn-kpi-label">レポート承認待ち</span>
+                <span class="learn-kpi-label">承認待ち</span>
                 <span class="learn-kpi-value">{{ pending_reports|length }}</span>
             </div>
             <div class="learn-kpi">
@@ -61,7 +103,7 @@
     <section class="learn-panel">
         <div class="learn-panel-header">
             <h2 class="learn-panel-title mb-0">進捗検索</h2>
-            <span class="learn-note">社員番号、コース名などで絞り込み</span>
+            <span class="learn-note">社員番号、研修・講習名などで絞り込み</span>
         </div>
         <div class="learn-panel-body">
             <form method="get" class="learn-search">
@@ -76,7 +118,7 @@
 
     <section class="learn-panel">
         <div class="learn-panel-header">
-            <h2 class="learn-panel-title mb-0">受講進捗一覧</h2>
+            <h2 class="learn-panel-title mb-0">研修・講習の報告書一覧</h2>
             <span class="learn-note">表示 {{ user_enrollments|length }} 件</span>
         </div>
         <div class="learn-panel-body">
@@ -95,11 +137,11 @@
                         <tr>
                             <th class="text-nowrap">社員番号</th>
                             <th class="text-nowrap">氏名</th>
-                            <th class="text-nowrap">コース</th>
-                            <th class="text-nowrap">ステータス</th>
-                            <th class="text-nowrap">完了</th>
-                            <th class="text-nowrap">受講報告書提出</th>
-                            <th class="text-nowrap">承認ステータス</th>
+                            <th class="text-nowrap">研修・講習</th>
+                            <th class="text-nowrap">申請状況</th>
+                            <th class="text-nowrap">提出済</th>
+                            <th class="text-nowrap">報告書</th>
+                            <th class="text-nowrap">報告書承認</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -120,7 +162,7 @@
                                     {{ enrollment.course.title }}
                                 </button>
                             </td>
-                            <td class="text-center"><span class="learn-chip learn-chip-success">承認済み</span></td>
+                            <td class="text-center"><span class="learn-chip learn-chip-success">済み</span></td>
                             <td class="text-center">
                                 {% if enrollment.report_file and enrollment.report_approved_by_supervisor and enrollment.report_approved_by_kanri %}
                                     <span class="learn-chip learn-chip-success">完了</span>
@@ -240,7 +282,7 @@
                         <tr>
                             <th>社員番号</th>
                             <th>氏名</th>
-                            <th>コース</th>
+                            <th>研修・講習</th>
                             <th>レポート</th>
                             <th>承認状況</th>
                             <th>操作</th>
@@ -315,61 +357,89 @@
 
 {% for enrollment in user_enrollments %}
 <div class="modal fade" id="courseModal{{ enrollment.course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ enrollment.course.id }}" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="courseModalLabel{{ enrollment.course.id }}">コース詳細</h5>
+                <h5 class="modal-title" id="courseModalLabel{{ enrollment.course.id }}">研修・講習詳細</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p><strong>タイトル:</strong> {{ enrollment.course.title }}</p>
-                <p><strong>理由:</strong> {{ enrollment.course.description }}</p>
-                <p><strong>外部リンク:</strong>
-                    {% if enrollment.course.external_url %}
-                        <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>
-                    {% else %}
-                        なし
-                    {% endif %}
-                </p>
-                <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
-                <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
-                <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
-                <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
-                <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
-                <p><strong>場所:</strong> {{ enrollment.course.location }}</p>
-                <p><strong>対象:</strong> {{ enrollment.course.target }}</p>
-                <p><strong>アクティブ:</strong>
-                    {% if enrollment.course.is_active %}
-                        <span class="badge bg-success">有効</span>
-                    {% else %}
-                        <span class="badge bg-secondary">無効</span>
-                    {% endif %}
-                </p>
-                <p><strong>作成者:</strong>
-                    {% if enrollment.course.creator %}
-                        {{ enrollment.course.creator.ten|default:enrollment.course.creator.username }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </p>
-                <p><strong>資料:</strong>
-                    {% if enrollment.course.material %}
-                        {% with url=enrollment.course.material.url|lower %}
-                            <a href="{{ enrollment.course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
-                                {% if ".pdf" in url %}
-                                    <i class="fas fa-file-pdf"></i> PDFを表示
-                                {% elif ".xlsx" in url or ".xls" in url %}
-                                    <i class="fas fa-file-excel"></i> Excelを表示
+                <div class="modal-body learn-modal-body">
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}</p>
+                            <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
+                            <p><strong>説明:</strong> {{ enrollment.course.description }}</p>
+                            <p><strong>外部リンク:</strong>
+                                {% if enrollment.course.external_url %}
+                                    <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>
                                 {% else %}
-                                    <i class="fas fa-file-image"></i> 画像を表示
+                                    なし
                                 {% endif %}
-                            </a>
-                        {% endwith %}
-                    {% else %}
-                        なし
-                    {% endif %}
-                </p>
-            </div>
+                            </p>
+                            <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
+                            <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
+                            <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
+                            <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
+                            <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
+                            <p><strong>場所:</strong> {{ enrollment.course.location }}</p>
+                            <p><strong>対象:</strong> {{ enrollment.course.target }}</p>
+                            <p><strong>アクティブ:</strong>
+                                {% if enrollment.course.is_active %}
+                                    <span class="badge bg-success">有効</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">無効</span>
+                                {% endif %}
+                            </p>
+                           <p><strong>作成者:</strong>
+                                    {% if enrollment.course.creator_name %}
+                                        {{ enrollment.course.creator_name }}
+                                    {% elif enrollment.course.creator %}
+                                        {{ enrollment.course.creator.username }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            <p><strong>資料:</strong>
+                                {% if enrollment.course.material %}
+                                    {% with url=enrollment.course.material.url|lower %}
+                                        <a href="{{ enrollment.course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                            {% if ".pdf" in url %}
+                                                <i class="fas fa-file-pdf"></i> PDFを表示
+                                            {% elif ".xlsx" in url or ".xls" in url %}
+                                                <i class="fas fa-file-excel"></i> Excelを表示
+                                            {% else %}
+                                                <i class="fas fa-file-image"></i> 画像を表示
+                                            {% endif %}
+                                        </a>
+                                    {% endwith %}
+                                {% else %}
+                                    なし
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="learn-qa-card">
+                                <div class="learn-qa-title">受講申請回答（{{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}）</div>
+                                <div class="learn-qa-item">
+                                    <div class="learn-qa-q">1. 今回の研修を、どの業務で活かす予定ですか？</div>
+                                    <div class="learn-qa-a">{{ enrollment.q1_use_case }}</div>
+                                </div>
+                                <div class="learn-qa-item">
+                                    <div class="learn-qa-q">2. 受講前に感じている課題や困りごと</div>
+                                    <div class="learn-qa-a">{{ enrollment.q2_pre_issue }}</div>
+                                </div>
+                                <div class="learn-qa-item">
+                                    <div class="learn-qa-q">3. 受講後、どのような状態になっていたいですか？</div>
+                                    <div class="learn-qa-a">{{ enrollment.q3_post_state }}</div>
+                                </div>
+                                <div class="learn-qa-item">
+                                    <div class="learn-qa-q">4. 受講目的（上記を踏まえて一文でまとめてください）</div>
+                                    <div class="learn-qa-a">{{ enrollment.q4_purpose_summary }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
             </div>
@@ -389,3 +459,5 @@
 </div>
 {% endif %}
 {% endblock %}
+
+

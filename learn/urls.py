@@ -13,6 +13,7 @@ urlpatterns = [
     path('dangnhap/', views.dangnhap_ma_nv, name='dangnhap'),
     path('logout/', views.logout_nv, name='logout_nv'),
     path('logout_admin/', views.logout_admin, name='logout_admin'),
+    path('thumb/', views.external_thumb_proxy, name='external_thumb_proxy'),
 ]
 
 urlpatterns += [

@@ -6,23 +6,24 @@ from django.conf import settings
 from menu.models import NhanVien
 
 class Course(models.Model):
-    title = models.CharField(max_length=200, verbose_name='コースタイトル', help_text='コースのタイトルを入力してください。')
-    description = models.TextField(blank=True, verbose_name='説明', help_text='コースの詳細説明を入力してください。')
-    start_date = models.DateField(null=True, blank=True, verbose_name='開始日', help_text='コースの開始日を選択してください。')
-    end_date = models.DateField(null=True, blank=True, verbose_name='終了日', help_text='コースの終了日を選択してください。')
+    title = models.CharField(max_length=200, verbose_name='研修・講習タイトル', help_text='研修・講習のタイトルを入力してください。')
+    description = models.TextField(blank=True, verbose_name='説明', help_text='研修・講習の詳細説明を入力してください。')
+    start_date = models.DateField(null=True, blank=True, verbose_name='開始日', help_text='研修・講習の開始日を選択してください。')
+    end_date = models.DateField(null=True, blank=True, verbose_name='終了日', help_text='研修・講習の終了日を選択してください。')
     external_url = models.URLField(blank=True, verbose_name='外部URL', help_text='外部リンクがある場合は入力してください。')
-    is_active = models.BooleanField(default=True, verbose_name='アクティブ', help_text='コースがアクティブかどうかを選択してください。')
-    price = models.CharField(max_length=100, default='0', verbose_name='価格', help_text='コースの価格を入力してください。')
-    duration = models.CharField(max_length=100, blank=True, verbose_name='期間', help_text='コースの期間を入力してください。')
-    capacity = models.IntegerField(default=1, verbose_name='定員', help_text='コースの定員を入力してください。')
-    location = models.CharField(max_length=100, blank=True, verbose_name='場所', help_text='コースの場所を入力してください。')
-    target = models.TextField(blank=True, verbose_name='対象', help_text='コースの対象者を入力してください。')
+    is_active = models.BooleanField(default=True, verbose_name='アクティブ', help_text='研修・講習がアクティブかどうかを選択してください。')
+    price = models.CharField(max_length=100, default='0', verbose_name='価格', help_text='研修・講習の価格を入力してください。')
+    duration = models.CharField(max_length=100, blank=True, verbose_name='期間', help_text='研修・講習の期間を入力してください。')
+    capacity = models.IntegerField(default=1, verbose_name='定員', help_text='研修・講習の定員を入力してください。')
+    location = models.CharField(max_length=100, blank=True, verbose_name='場所', help_text='研修・講習の場所を入力してください。')
+    target = models.TextField(blank=True, verbose_name='対象', help_text='研修・講習の対象者を入力してください。')
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     material = models.FileField("資料", upload_to="materials/", blank=True, null=True)
+    external_thumb_url = models.URLField(blank=True, default="", verbose_name='外部サムネイルURL', help_text='外部URLから取得したサムネイルURLを保存します。')
 
     class Meta:
-        verbose_name = 'コース'
-        verbose_name_plural = 'コース'
+        verbose_name = '研修・講習'
+        verbose_name_plural = '研修・講習'
 
     def __str__(self):
         return self.title
@@ -31,6 +32,10 @@ class Enrollment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     enrolled_at = models.DateTimeField(auto_now_add=True)
+    q1_use_case = models.TextField("活用予定業務", blank=True, default="")
+    q2_pre_issue = models.TextField("受講前課題", blank=True, default="")
+    q3_post_state = models.TextField("受講後の状態", blank=True, default="")
+    q4_purpose_summary = models.TextField("受講目的まとめ", blank=True, default="")
     completed = models.BooleanField(default=False)
     score = models.FloatField(null=True, blank=True)
     completed_date = models.DateTimeField(null=True, blank=True)
@@ -131,3 +136,4 @@ class MotivationalQuote(models.Model):
 
     def __str__(self):
         return f"{self.text} — {self.author}"
+

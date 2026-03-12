@@ -1,14 +1,118 @@
-﻿{% extends "learn/base_learn.html" %}
-{% block title %}コース一覧{% endblock %}
+{% extends "learn/base_learn.html" %}
+{% load static %}
+{% block title %}研修・講習一覧{% endblock %}
 
 {% block content %}
 <div class="learn-page">
+    <style>
+        .learn-modal-body {
+            padding: 1.6rem 1.9rem;
+        }
+        .learn-modal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem 1.5rem;
+        }
+        .learn-info-card {
+            border: 1px solid #e6ecf5;
+            border-radius: 14px;
+            padding: 1.1rem 1.3rem;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(31, 63, 122, 0.06);
+        }
+        .learn-info-title {
+            font-weight: 800;
+            color: #1f3f7a;
+            margin-bottom: 0.9rem;
+            letter-spacing: 0.02em;
+        }
+        .learn-info-list {
+            margin: 0;
+        }
+        .learn-info-row {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 0.5rem 1rem;
+            padding: 0.55rem 0;
+            border-top: 1px dashed #d9e3f3;
+        }
+        .learn-info-row:first-of-type {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .learn-info-label {
+            font-weight: 700;
+            color: #2a3f5f;
+        }
+        .learn-info-value {
+            color: #455a76;
+            word-break: break-word;
+        }
+        .learn-thumb {
+            margin-top: 1rem;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid #e6ecf5;
+            box-shadow: 0 12px 26px rgba(31, 63, 122, 0.12);
+            background: #f4f7fb;
+        }
+        .learn-thumb img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            display: block;
+        }
+        .learn-qa-card {
+            border: 1px solid #e6ecf5;
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            background: #f8fbff;
+        }
+        .learn-qa-title {
+            font-weight: 800;
+            color: #1f3f7a;
+            margin-bottom: 0.8rem;
+            letter-spacing: 0.02em;
+        }
+        .learn-qa-item {
+            padding: 0.6rem 0;
+            border-top: 1px dashed #d9e3f3;
+        }
+        .learn-qa-item:first-of-type {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .learn-qa-q {
+            font-weight: 700;
+            color: #2a3f5f;
+            margin-bottom: 0.25rem;
+        }
+        .learn-qa-a {
+            color: #4c5f7a;
+            background: #ffffff;
+            border: 1px solid #e7edf7;
+            border-radius: 8px;
+            padding: 0.6rem 0.7rem;
+            min-height: 2.4rem;
+        }
+        @media (max-width: 992px) {
+            .learn-modal-body {
+                padding: 1.2rem;
+            }
+            .learn-modal-grid {
+                grid-template-columns: 1fr;
+            }
+            .learn-info-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
     <section class="learn-hero">
-        <h1 class="learn-hero-title">講習・研修参加状況一覧</h1>
-        <p class="learn-hero-sub">研修コース検索、申請、承認待ちの確認を一画面で管理します。</p>
+        <h1 class="learn-hero-title">研修・講習一覧</h1>
+        <p class="learn-hero-sub">研修・講習の検索、申請、承認待ちの確認を一画面で管理します。</p>
         <div class="learn-kpi-grid mt-3">
             <div class="learn-kpi">
-                <span class="learn-kpi-label">総コース数</span>
+                <span class="learn-kpi-label">総研修・講習数</span>
                 <span class="learn-kpi-value">{{ page_obj.paginator.count|default:0 }}</span>
             </div>
             <div class="learn-kpi">
@@ -28,8 +132,8 @@
 
     <section class="learn-panel">
         <div class="learn-panel-header">
-            <h2 class="learn-panel-title mb-0">コース検索</h2>
-            <span class="learn-note">キーワードでタイトル・内容を絞り込み</span>
+            <h2 class="learn-panel-title mb-0">研修・講習検索</h2>
+            <span class="learn-note">キーワードで研修・講習・内容を絞り込み</span>
         </div>
         <div class="learn-panel-body">
             <form method="get" class="learn-search">
@@ -44,7 +148,7 @@
 
     <section class="learn-panel">
         <div class="learn-panel-header">
-            <h2 class="learn-panel-title mb-0">コース一覧</h2>
+            <h2 class="learn-panel-title mb-0">研修・講習一覧</h2>
             <span class="learn-note">対象: {{ page_obj.paginator.count|default:0 }} 件</span>
         </div>
         <div class="learn-panel-body">
@@ -53,12 +157,12 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">#</th>
-                            <th style="width: 20%;">タイトル</th>
+                            <th style="width: 20%;">研修・講習</th>
                             <th style="width: 20%;">受講目的</th>
                             <th style="width: 9%;">開始日</th>
                             <th style="width: 9%;">終了日</th>
                             <th style="width: 8%;">申請者</th>
-                            <th style="width: 8%;">申込済資料</th>
+                            <th style="width: 8%;">申込資料</th>
                             <th style="width: 12%;">アクション</th>
                             <th style="width: 10%;">ステータス</th>
                         </tr>
@@ -100,7 +204,9 @@
                                     {% elif course.status == 'expired' %}
                                         <span class="learn-chip learn-chip-neutral">終了</span>
                                     {% else %}
-                                        <a href="{% url 'learn:enroll_course' course.id %}" class="btn btn-primary btn-sm">登録</a>
+                                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#enrollModal{{ course.id }}">
+                                            申請
+                                        </button>
                                     {% endif %}
 
                                     {% if user.is_authenticated and user.username == 'kanri' %}
@@ -184,7 +290,7 @@
     {% if show_approval_table %}
     <section class="learn-panel">
         <div class="learn-panel-header">
-            <h2 class="learn-panel-title mb-0">承認待ち登録</h2>
+            <h2 class="learn-panel-title mb-0">承認待ち</h2>
             <span class="learn-note">承認対象 {{ enrollments_to_approve|length }} 件</span>
         </div>
         <div class="learn-panel-body">
@@ -194,7 +300,7 @@
                         <tr>
                             <th>社員番号</th>
                             <th>氏名</th>
-                            <th>コース</th>
+                            <th>研修・講習</th>
                             <th>ステータス</th>
                             <th>アクション</th>
                         </tr>
@@ -205,7 +311,7 @@
                             <td>{{ enrollment.user.username }}</td>
                             <td>{{ enrollment.user.ten }}</td>
                             <td>
-                                <button type="button" class="btn btn-link p-0" data-bs-toggle="modal" data-bs-target="#courseModal{{ enrollment.course.id }}">
+                                <button type="button" class="btn btn-link p-0" data-bs-toggle="modal" data-bs-target="#approvalDetailModal{{ enrollment.id }}">
                                     {{ enrollment.course.title }}
                                 </button>
                             </td>
@@ -231,7 +337,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-center text-muted py-3">承認待ちの登録はありません。</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">承認待ちの申請はありません。</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -240,59 +346,271 @@
     </section>
     {% endif %}
 
+    {% if show_approval_table %}
+        {% for enrollment in enrollments_to_approve %}
+        <div class="modal fade" id="approvalDetailModal{{ enrollment.id }}" tabindex="-1" aria-labelledby="approvalDetailModalLabel{{ enrollment.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="approvalDetailModalLabel{{ enrollment.id }}">申請詳細</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body learn-modal-body">
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.user.ten %} - {{ enrollment.user.ten }}{% endif %}</p>
+                                <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
+                                <p><strong>説明:</strong> {{ enrollment.course.description }}</p>
+                                <p><strong>外部リンク:</strong>
+                                    {% if enrollment.course.external_url %}
+                                        <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>
+                                    {% else %}
+                                        なし
+                                    {% endif %}
+                                </p>
+                                <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
+                                <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
+                                <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
+                                <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
+                                <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
+                                <p><strong>場所:</strong> {{ enrollment.course.location }}</p>
+                                <p><strong>対象:</strong> {{ enrollment.course.target }}</p>
+                                <p><strong>作成者:</strong>
+                                    {% if enrollment.course.creator_name %}
+                                        {{ enrollment.course.creator_name }}
+                                    {% elif enrollment.course.creator %}
+                                        {{ enrollment.course.creator.username }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                                <p><strong>資料:</strong>
+                                    {% if enrollment.course.material %}
+                                        {% with url=enrollment.course.material.url|lower %}
+                                            <a href="{{ enrollment.course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                {% if ".pdf" in url %}
+                                                    <i class="fas fa-file-pdf"></i> PDFを表示
+                                                {% elif ".xlsx" in url or ".xls" in url %}
+                                                    <i class="fas fa-file-excel"></i> Excelを表示
+                                                {% else %}
+                                                    <i class="fas fa-file-image"></i> 画像を表示
+                                                {% endif %}
+                                            </a>
+                                        {% endwith %}
+                                    {% else %}
+                                        なし
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="learn-qa-card">
+                                    <div class="learn-qa-title">受講申請回答</div>
+                                    <div class="learn-qa-item">
+                                        <div class="learn-qa-q">1. 今回の研修を、どの業務で活かす予定ですか？</div>
+                                        <div class="learn-qa-a">{{ enrollment.q1_use_case }}</div>
+                                    </div>
+                                    <div class="learn-qa-item">
+                                        <div class="learn-qa-q">2. 受講前に感じている課題や困りごと</div>
+                                        <div class="learn-qa-a">{{ enrollment.q2_pre_issue }}</div>
+                                    </div>
+                                    <div class="learn-qa-item">
+                                        <div class="learn-qa-q">3. 受講後、どのような状態になっていたいですか？</div>
+                                        <div class="learn-qa-a">{{ enrollment.q3_post_state }}</div>
+                                    </div>
+                                    <div class="learn-qa-item">
+                                        <div class="learn-qa-q">4. 受講目的（上記を踏まえて一文でまとめてください）</div>
+                                        <div class="learn-qa-a">{{ enrollment.q4_purpose_summary }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+
     {% for course in courses %}
     <div class="modal fade" id="courseModal{{ course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ course.id }}" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="courseModalLabel{{ course.id }}">コース詳細</h5>
+                    <h5 class="modal-title" id="courseModalLabel{{ course.id }}">研修・講習詳細</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <p><strong>タイトル:</strong> {{ course.title }}</p>
-                    <p><strong>理由:</strong> {{ course.description }}</p>
-                    <p><strong>外部リンク:</strong>
-                        {% if course.external_url %}
-                            <a href="{{ course.external_url }}" target="_blank">{{ course.external_url }}</a>
-                        {% else %}
-                            なし
-                        {% endif %}
-                    </p>
-                    <p><strong>開始日:</strong> {{ course.start_date|date:"Y-m-d" }}</p>
-                    <p><strong>終了日:</strong> {{ course.end_date|date:"Y-m-d" }}</p>
-                    <p><strong>受講料:</strong> {{ course.price }}</p>
-                    <p><strong>研修期間（時間）:</strong> {{ course.duration }}</p>
-                    <p><strong>定員:</strong> {{ course.capacity }}</p>
-                    <p><strong>場所:</strong> {{ course.location }}</p>
-                    <p><strong>対象:</strong> {{ course.target }}</p>
-                    <p><strong>アクティブ:</strong>
-                        {% if course.is_active %}
-                            <span class="badge bg-success">有効</span>
-                        {% else %}
-                            <span class="badge bg-secondary">無効</span>
-                        {% endif %}
-                    </p>
-                    <p><strong>作成者:</strong> {{ course.creator_name }}</p>
-                    <p><strong>資料:</strong>
-                        {% if course.material %}
-                            {% with url=course.material.url|lower %}
-                                <a href="{{ course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
-                                    {% if ".pdf" in url %}
-                                        <i class="fas fa-file-pdf"></i> PDFを表示
-                                    {% elif ".xlsx" in url or ".xls" in url %}
-                                        <i class="fas fa-file-excel"></i> Excelを表示
+                <div class="modal-body learn-modal-body">
+                    <div class="learn-modal-grid">
+                        <div class="learn-info-card">
+                            <div class="learn-info-title">研修・講習情報</div>
+                            <dl class="learn-info-list">
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">研修・講習</dt>
+                                    <dd class="learn-info-value">{{ course.title }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">説明</dt>
+                                    <dd class="learn-info-value">{{ course.description }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">外部リンク</dt>
+                                    <dd class="learn-info-value">
+                                        {% if course.external_url %}
+                                            <a href="{{ course.external_url }}" target="_blank">{{ course.external_url }}</a>
+                                        {% else %}
+                                            なし
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">作成者</dt>
+                                    <dd class="learn-info-value">
+                                        {% if course.creator_name %}
+                                            {{ course.creator_name }}
+                                        {% elif course.creator %}
+                                            {{ course.creator.username }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div class="learn-thumb">
+                                {% if course.external_thumb_url %}
+                                    {% if course.external_thumb_url|slice:":7" == "http://" %}
+                                        <img src="{% url 'learn:external_thumb_proxy' %}?url={{ course.external_thumb_url|urlencode }}" alt="研修・講習イメージ">
                                     {% else %}
-                                        <i class="fas fa-file-image"></i> 画像を表示
+                                        <img src="{{ course.external_thumb_url }}" alt="研修・講習イメージ">
                                     {% endif %}
-                                </a>
-                            {% endwith %}
-                        {% else %}
-                            なし
-                        {% endif %}
-                    </p>
+                                {% elif course.material %}
+                                    {% with url=course.material.url|lower %}
+                                        {% if ".jpg" in url or ".jpeg" in url or ".png" in url or ".gif" in url or ".webp" in url %}
+                                            <img src="{{ course.material.url }}" alt="研修・講習イメージ">
+                                        {% else %}
+                                            <img src="{% static 'img/logo.png' %}" alt="研修・講習イメージ">
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    <img src="{% static 'img/logo.png' %}" alt="研修・講習イメージ">
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="learn-info-card">
+                            <div class="learn-info-title">運用情報</div>
+                            <dl class="learn-info-list">
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">開始日</dt>
+                                    <dd class="learn-info-value">{{ course.start_date|date:"Y-m-d" }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">終了日</dt>
+                                    <dd class="learn-info-value">{{ course.end_date|date:"Y-m-d" }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">受講料</dt>
+                                    <dd class="learn-info-value">{{ course.price }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">研修期間（時間）</dt>
+                                    <dd class="learn-info-value">{{ course.duration }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">定員</dt>
+                                    <dd class="learn-info-value">{{ course.capacity }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">場所</dt>
+                                    <dd class="learn-info-value">{{ course.location }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">対象</dt>
+                                    <dd class="learn-info-value">{{ course.target }}</dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">アクティブ</dt>
+                                    <dd class="learn-info-value">
+                                        {% if course.is_active %}
+                                            <span class="badge bg-success">有効</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">無効</span>
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                                <div class="learn-info-row">
+                                    <dt class="learn-info-label">資料</dt>
+                                    <dd class="learn-info-value">
+                                        {% if course.material %}
+                                            {% with url=course.material.url|lower %}
+                                                <a href="{{ course.material.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                    {% if ".pdf" in url %}
+                                                        <i class="fas fa-file-pdf"></i> PDFを表示
+                                                    {% elif ".xlsx" in url or ".xls" in url %}
+                                                        <i class="fas fa-file-excel"></i> Excelを表示
+                                                    {% else %}
+                                                        <i class="fas fa-file-image"></i> 画像を表示
+                                                    {% endif %}
+                                                </a>
+                                            {% endwith %}
+                                        {% else %}
+                                            なし
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% for course in courses %}
+    <div class="modal fade" id="enrollModal{{ course.id }}" tabindex="-1" aria-labelledby="enrollModalLabel{{ course.id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="enrollModalLabel{{ course.id }}">受講申請フォーム</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="fw-bold">対象研修・講習: {{ course.title }}</div>
+                        <div class="text-muted small">※ 4項目の回答が必須です。</div>
+                    </div>
+                    <form method="post" action="{% url 'learn:enroll_course' course.id %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">1. 今回の研修を、どの業務で活かす予定ですか？</label>
+                            <div class="text-muted small mb-1">例: 会議運営、経理処理、顧客対応、資料作成、チームマネジメント など</div>
+                            <textarea class="form-control" name="q1_use_case" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">2. 受講前に感じている課題や困りごと</label>
+                            <textarea class="form-control" name="q2_pre_issue" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">3. 受講後、どのような状態になっていたいですか？</label>
+                            <div class="text-muted small mb-1">例: 会議で要点を整理して話せるようになりたい</div>
+                            <textarea class="form-control" name="q3_post_state" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">4. 受講目的（上記を踏まえて一文でまとめてください）</label>
+                            <div class="text-muted small mb-1">★報告書の「目的達成度」とつながる</div>
+                            <div class="text-muted small mb-1">例: 私は（課題）を改善し、（業務）で（どうなりたいか）ために受講します</div>
+                            <textarea class="form-control" name="q4_purpose_summary" rows="2" required></textarea>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+                            <button type="submit" class="btn btn-primary">申請</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -325,3 +643,5 @@ document.querySelectorAll('.reject-btn').forEach(btn => {
 </div>
 {% endif %}
 {% endblock %}
+
+
