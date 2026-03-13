@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 class MonAn(models.Model):
     ten = models.CharField(max_length=100)
@@ -18,6 +19,7 @@ class NhanVien(models.Model):
     supervisor = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates', verbose_name='上司')
     email = models.EmailField(max_length=255, null=True, blank=True, verbose_name="Email")
     chuc_vu = models.CharField("役職", max_length=100, blank=True, null=True)  # Thêm trường chức vụ
+    created_at = models.DateTimeField("作成日時", default=timezone.now)
 
     class Meta:
         verbose_name = '社員'

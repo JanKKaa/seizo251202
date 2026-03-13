@@ -37,6 +37,8 @@ urlpatterns += [
     # Phê duyệt
     path('approval-history/', views.approval_history_list, name='approval_history_list'),
     path('approval-history/<int:enrollment_id>/', views.approval_history, name='approval_history'),
+    path('access-logs/', views.access_log_list, name='access_log_list'),
+    path('access-logs/ping/', views.access_log_ping, name='access_log_ping'),
     # Phê duyệt báo cáo
     path('approve_report_supervisor/<int:enrollment_id>/', views.approve_report_supervisor, name='approve_report_supervisor'),
     path('approve_report_kanri/<int:enrollment_id>/', views.approve_report_kanri, name='approve_report_kanri'),

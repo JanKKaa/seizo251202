@@ -127,17 +127,19 @@
                     <colgroup>
                         <col style="width: 8%;">
                         <col style="width: 11%;">
-                        <col style="width: 30%;">
+                        <col style="width: 26%;">
+                        <col style="width: 10%;">
                         <col style="width: 10%;">
                         <col style="width: 8%;">
-                        <col style="width: 15%;">
-                        <col style="width: 15%;">
+                        <col style="width: 13%;">
+                        <col style="width: 14%;">
                     </colgroup>
                     <thead>
                         <tr>
                             <th class="text-nowrap">社員番号</th>
                             <th class="text-nowrap">氏名</th>
                             <th class="text-nowrap">研修・講習</th>
+                            <th class="text-nowrap">申請日時</th>
                             <th class="text-nowrap">申請状況</th>
                             <th class="text-nowrap">提出済</th>
                             <th class="text-nowrap">報告書</th>
@@ -162,6 +164,7 @@
                                     {{ enrollment.course.title }}
                                 </button>
                             </td>
+                            <td class="text-center">{{ enrollment.enrolled_at|date:"Y-m-d H:i" }}</td>
                             <td class="text-center"><span class="learn-chip learn-chip-success">済み</span></td>
                             <td class="text-center">
                                 {% if enrollment.report_file and enrollment.report_approved_by_supervisor and enrollment.report_approved_by_kanri %}
@@ -226,7 +229,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">データがありません。</td>
+                            <td colspan="8" class="text-center text-muted py-4">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -279,14 +282,15 @@
             <div class="learn-table-wrap table-responsive">
                 <table class="table learn-table" width="100%" cellspacing="0">
                     <thead>
-                        <tr>
-                            <th>社員番号</th>
-                            <th>氏名</th>
-                            <th>研修・講習</th>
-                            <th>レポート</th>
-                            <th>承認状況</th>
-                            <th>操作</th>
-                        </tr>
+                          <tr>
+                              <th>社員番号</th>
+                              <th>氏名</th>
+                              <th>研修・講習</th>
+                              <th>申請日時</th>
+                              <th>レポート</th>
+                              <th>承認状況</th>
+                              <th>操作</th>
+                          </tr>
                     </thead>
                     <tbody>
                         {% for enrollment in pending_reports %}
@@ -299,7 +303,8 @@
                                     {{ enrollment.user.get_full_name|default:enrollment.user.username }}
                                 {% endif %}
                             </td>
-                            <td>{{ enrollment.course.title }}</td>
+                              <td>{{ enrollment.course.title }}</td>
+                              <td>{{ enrollment.enrolled_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 {% if enrollment.report_file %}
                                     <a href="{{ enrollment.report_file.url }}" target="_blank" class="btn btn-info btn-sm">
@@ -344,7 +349,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-3">承認待ちのレポートはありません。</td>
+                            <td colspan="7" class="text-center text-muted py-3">承認待ちのレポートはありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -368,7 +373,7 @@
                         <div class="col-lg-6">
                             <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}</p>
                             <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
-                            <p><strong>説明:</strong> {{ enrollment.course.description }}</p>
+                           
                             <p><strong>外部リンク:</strong>
                                 {% if enrollment.course.external_url %}
                                     <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>

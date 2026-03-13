@@ -581,23 +581,70 @@
                 </h2>
                 <div id="collapseKentei" class="accordion-collapse collapse" aria-labelledby="headingKentei" data-bs-parent="#mainAccordion">
                     <div class="accordion-body d-flex flex-column gap-2">
-                        <a href="http://www.nagano-roudoukijyunkyoukai.or.jp/training/"
-                        target="_blank"
-                        class="btn btn-light text-start shadow-sm custom-link">
-                            <i class="fas fa-building me-2 text-primary"></i>
-                            長野労働基準協会
-                        </a>
-                    </div>
-                </div>
-                <div id="collapseKentei" class="accordion-collapse collapse" aria-labelledby="headingKentei" data-bs-parent="#mainAccordion">
-                    <div class="accordion-body d-flex flex-column gap-2">
-                        <a href="https://www3.jeed.go.jp/nagano/poly/kyushoku/index.html#course"
-                        target="_blank"
-                        class="btn btn-light text-start shadow-sm custom-link">
-                            <i class="fas fa-draw-polygon me-2 text-primary"></i>
-                            ポリテクセンター長野
-                            
-                        </a>
+                        {% for link in koshukai_links %}
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <a href="{{ link.url }}" target="_blank" class="btn btn-light text-start shadow-sm custom-link flex-grow-1">
+                                    <i class="{{ link.icon_class|default:'fas fa-building' }} me-2 text-primary"></i>
+                                    {{ link.name }}
+                                </a>
+                                {% if request.user.is_authenticated and request.user.username == 'kanri' %}
+                                    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editLinkModal{{ link.id }}">編集</button>
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="link_id" value="{{ link.id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('削除しますか？');">削除</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% empty %}
+                            <div class="text-muted small">リンクがありません。</div>
+                        {% endfor %}
+                        {% if request.user.is_authenticated and request.user.username == 'kanri' %}
+                        <form method="post" class="d-flex flex-column gap-2 mt-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create">
+                            <input type="hidden" name="category" value="koshukai">
+                            <input type="text" name="name" class="form-control" placeholder="会社・団体名" required>
+                            <input type="url" name="url" class="form-control" placeholder="https://..." required>
+                            <input type="text" name="icon_class" class="form-control" placeholder="アイコン（任意: fas fa-building）" list="iconList">
+                            <div class="d-flex flex-wrap gap-2 mt-2 icon-picker">
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-building"><i class="fas fa-building"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-school"><i class="fas fa-school"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-university"><i class="fas fa-university"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-chalkboard-teacher"><i class="fas fa-chalkboard-teacher"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-laptop"><i class="fas fa-laptop"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-video"><i class="fas fa-video"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-certificate"><i class="fas fa-certificate"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-book"><i class="fas fa-book"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-users"><i class="fas fa-users"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-tools"><i class="fas fa-tools"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-industry"><i class="fas fa-industry"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-lightbulb"><i class="fas fa-lightbulb"></i></button>
+                            </div>
+                            <datalist id="iconList">
+                                <option value="fas fa-building">
+                                <option value="fas fa-school">
+                                <option value="fas fa-university">
+                                <option value="fas fa-chalkboard-teacher">
+                                <option value="fas fa-laptop">
+                                <option value="fas fa-video">
+                                <option value="fas fa-certificate">
+                                <option value="fas fa-book">
+                                <option value="fas fa-users">
+                                <option value="fas fa-tools">
+                                <option value="fas fa-industry">
+                                <option value="fas fa-lightbulb">
+                            </datalist>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="koshukaiActive" checked>
+                                <label class="form-check-label" for="koshukaiActive">表示</label>
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary btn-sm">追加</button>
+                            </div>
+                        </form>
+                        {% endif %}
                     </div>
                 </div>
             </div> 
@@ -610,20 +657,56 @@
                 </h2>
                <div id="collapseKenshu" class="accordion-collapse collapse" aria-labelledby="headingKenshu" data-bs-parent="#mainAccordion">
                     <div class="accordion-body d-flex flex-column gap-2">
-
-                        <a href="https://www.opmia.jp/seminar/seminar_type/online"
-                        target="_blank"
-                        class="btn btn-light text-start shadow-sm custom-link">
-                            <i class="fas fa-school me-2 text-primary"></i>
-                            大阪府工業協会オンラインセミナー
-                        </a>
-
-                        <a href="https://www.insource.co.jp/bup/online-seminar.html"
-                        target="_blank"
-                        class="btn btn-light text-start shadow-sm custom-link">
-                            <i class="fas fa-video me-2 text-danger"></i>
-                            インソースオンラインセミナー
-                        </a>
+                        {% for link in online_links %}
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <a href="{{ link.url }}" target="_blank" class="btn btn-light text-start shadow-sm custom-link flex-grow-1">
+                                    <i class="{{ link.icon_class|default:'fas fa-video' }} me-2 text-danger"></i>
+                                    {{ link.name }}
+                                </a>
+                                {% if request.user.is_authenticated and request.user.username == 'kanri' %}
+                                    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editLinkModal{{ link.id }}">編集</button>
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="link_id" value="{{ link.id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('削除しますか？');">削除</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% empty %}
+                            <div class="text-muted small">リンクがありません。</div>
+                        {% endfor %}
+                        {% if request.user.is_authenticated and request.user.username == 'kanri' %}
+                        <form method="post" class="d-flex flex-column gap-2 mt-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create">
+                            <input type="hidden" name="category" value="online">
+                            <input type="text" name="name" class="form-control" placeholder="会社・団体名" required>
+                            <input type="url" name="url" class="form-control" placeholder="https://..." required>
+                            <input type="text" name="icon_class" class="form-control" placeholder="アイコン（任意: fas fa-video）" list="iconList">
+                            <div class="d-flex flex-wrap gap-2 mt-2 icon-picker">
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-building"><i class="fas fa-building"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-school"><i class="fas fa-school"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-university"><i class="fas fa-university"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-chalkboard-teacher"><i class="fas fa-chalkboard-teacher"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-laptop"><i class="fas fa-laptop"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-video"><i class="fas fa-video"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-certificate"><i class="fas fa-certificate"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-book"><i class="fas fa-book"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-users"><i class="fas fa-users"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-tools"><i class="fas fa-tools"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-industry"><i class="fas fa-industry"></i></button>
+                                <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-lightbulb"><i class="fas fa-lightbulb"></i></button>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="onlineActive" checked>
+                                <label class="form-check-label" for="onlineActive">表示</label>
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary btn-sm">追加</button>
+                            </div>
+                        </form>
+                        {% endif %}
 
                     </div>
                 </div>
@@ -635,6 +718,68 @@
     </div>
    
 </div>
+{% if request.user.is_authenticated and request.user.username == 'kanri' %}
+{% for link in all_links %}
+<div class="modal fade" id="editLinkModal{{ link.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">リンク編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="link_id" value="{{ link.id }}">
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">会社・団体名</label>
+                        <input type="text" name="name" class="form-control" value="{{ link.name }}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">URL</label>
+                        <input type="url" name="url" class="form-control" value="{{ link.url }}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">カテゴリ</label>
+                        <select name="category" class="form-select" required>
+                            <option value="koshukai" {% if link.category == 'koshukai' %}selected{% endif %}>講習会</option>
+                            <option value="online" {% if link.category == 'online' %}selected{% endif %}>オンラインセミナー</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">アイコン（任意）</label>
+                        <input type="text" name="icon_class" class="form-control" value="{{ link.icon_class }}" list="iconList">
+                        <div class="d-flex flex-wrap gap-2 mt-2 icon-picker">
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-building"><i class="fas fa-building"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-school"><i class="fas fa-school"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-university"><i class="fas fa-university"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-chalkboard-teacher"><i class="fas fa-chalkboard-teacher"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-laptop"><i class="fas fa-laptop"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-video"><i class="fas fa-video"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-certificate"><i class="fas fa-certificate"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-book"><i class="fas fa-book"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-users"><i class="fas fa-users"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-tools"><i class="fas fa-tools"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-industry"><i class="fas fa-industry"></i></button>
+                            <button type="button" class="btn btn-light btn-sm icon-btn" data-icon="fas fa-lightbulb"><i class="fas fa-lightbulb"></i></button>
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="editActive{{ link.id }}" {% if link.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="editActive{{ link.id }}">表示</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
  <!-- Thêm lịch và đồng hồ ở dưới cùng -->
     <div class="dashboard-footer mt-4">
         <div class="clock-box" id="clock-box">
@@ -666,6 +811,17 @@ function updateClockAndCalendar() {
 document.addEventListener('DOMContentLoaded', function() {
     updateClockAndCalendar();
     setInterval(updateClockAndCalendar, 1000);
+    document.querySelectorAll('.icon-picker .icon-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const icon = this.getAttribute('data-icon') || '';
+            const form = this.closest('form');
+            if (!form) return;
+            const input = form.querySelector('input[name="icon_class"]');
+            if (input) {
+                input.value = icon;
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

@@ -1,0 +1,117 @@
+{% extends "learn/base_learn.html" %}
+{% block title %}アクセス分析{% endblock %}
+
+{% block content %}
+<div class="learn-page">
+    <section class="learn-hero">
+        <h1 class="learn-hero-title">アクセス分析</h1>
+        <p class="learn-hero-sub">社員ごとのアクセス回数・滞在時間を確認できます。</p>
+    </section>
+
+    <section class="learn-panel">
+        <div class="learn-panel-header">
+            <h2 class="learn-panel-title mb-0">社員別サマリー</h2>
+            <span class="learn-note">アクセス回数順</span>
+        </div>
+        <div class="learn-panel-body">
+            <form method="get" class="learn-search mb-3">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="社員番号・氏名で検索" value="{{ search_query|default:'' }}">
+                    <input type="month" name="month" class="form-control" value="{{ month_filter|default:'' }}">
+                    <button class="btn btn-primary" type="submit">検索</button>
+                    <a href="{% url 'learn:access_log_list' %}" class="btn btn-outline-secondary">クリア</a>
+                </div>
+            </form>
+            <div class="card shadow-sm mb-3 border-0">
+                <div class="card-header fw-bold bg-white border-0 d-flex align-items-center justify-content-between">
+                    <span>アクセス回数・滞在時間 上位10名</span>
+                    <span class="badge bg-dark text-white">Top 10</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for row in chart_employees %}
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="fw-semibold">
+                                            {{ row.ma_so }}
+                                            {% if row.ten %} - {{ row.ten }}{% endif %}
+                                        </div>
+                                        {% if forloop.counter == 1 %}
+                                            <span class="badge bg-warning text-dark">TOP1</span>
+                                        {% elif forloop.counter == 2 %}
+                                            <span class="badge bg-secondary">TOP2</span>
+                                        {% elif forloop.counter == 3 %}
+                                            <span class="badge bg-danger">TOP3</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="small text-muted">ログイン回数</div>
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar" style="width: {% widthratio row.access_count chart_employees.0.access_count 100 %}%; background: #1f4db8;"></div>
+                                        </div>
+                                        <div class="fw-bold">{{ row.access_count }}</div>
+                                    </div>
+                                    <div class="small text-muted">滞在時間(分)</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar" style="width: {% widthratio row.total_ms|default:0 chart_employees.0.total_ms|default:1 100 %}%; background: #0f7b63;"></div>
+                                        </div>
+                                        <div class="fw-bold">{% if row.total_ms %}{% widthratio row.total_ms 60000 1 %}{% else %}0{% endif %}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12">
+                            <div class="text-center text-muted">データがありません。</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="learn-table-wrap table-responsive">
+                <table class="table table-sm table-hover align-middle learn-table">
+                    <thead>
+                        <tr>
+                            <th>社員番号</th>
+                            <th>氏名</th>
+                            <th>アクセス回数</th>
+                            <th>滞在時間（分）</th>
+                            <th>最終アクセス</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in by_employee %}
+                        <tr>
+                            <td>{{ row.ma_so }}</td>
+                            <td>
+                                {{ row.ten|default:"-" }}
+                                {% if forloop.counter == 1 %}
+                                    <span class="badge bg-warning text-dark ms-1">TOP1</span>
+                                {% elif forloop.counter == 2 %}
+                                    <span class="badge bg-secondary ms-1">TOP2</span>
+                                {% elif forloop.counter == 3 %}
+                                    <span class="badge bg-danger ms-1">TOP3</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.access_count }}</td>
+                            <td>{% if row.total_ms %}{% widthratio row.total_ms 60000 1 %}{% else %}0{% endif %}</td>
+                            <td>{{ row.last_access|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}{% endblock %}

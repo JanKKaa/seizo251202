@@ -19,6 +19,7 @@
                             <th>メール</th>
                             <th>役職</th>
                             <th>上司</th>
+                            <th>作成日</th>
                             <th>アクション</th>
                         </tr>
                     </thead>
@@ -30,6 +31,7 @@
                             <td>{{ nv.email }}</td>
                             <td>{{ nv.chuc_vu|default:"" }}</td>
                             <td>{% if nv.supervisor %}{{ nv.supervisor.ten }}{% else %}なし{% endif %}</td>
+                            <td>{{ nv.created_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 <a href="{% url 'learn:nhanvien_update' nv.pk %}" class="btn btn-primary btn-sm">編集</a>
                                 <a href="{% url 'learn:nhanvien_delete' nv.pk %}" class="btn btn-danger btn-sm">削除</a>

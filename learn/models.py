@@ -20,6 +20,7 @@ class Course(models.Model):
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     material = models.FileField("資料", upload_to="materials/", blank=True, null=True)
     external_thumb_url = models.URLField(blank=True, default="", verbose_name='外部サムネイルURL', help_text='外部URLから取得したサムネイルURLを保存します。')
+    created_at = models.DateTimeField(default=timezone.now, verbose_name='作成日時')
 
     class Meta:
         verbose_name = '研修・講習'
@@ -136,4 +137,41 @@ class MotivationalQuote(models.Model):
 
     def __str__(self):
         return f"{self.text} — {self.author}"
+
+class TrainingProviderLink(models.Model):
+    CATEGORY_CHOICES = [
+        ('koshukai', '講習会'),
+        ('online', 'オンラインセミナー'),
+    ]
+    name = models.CharField("会社・団体名", max_length=200)
+    url = models.URLField("URL")
+    category = models.CharField("カテゴリ", max_length=20, choices=CATEGORY_CHOICES)
+    icon_class = models.CharField("アイコン", max_length=100, blank=True, default="")
+    is_active = models.BooleanField("表示", default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = '研修・講習リンク'
+        verbose_name_plural = '研修・講習リンク'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+
+class AccessLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    ma_so = models.CharField("社員番号", max_length=20, blank=True, default="")
+    ten = models.CharField("氏名", max_length=100, blank=True, default="")
+    event_type = models.CharField("種別", max_length=20, default="pageview")
+    path = models.CharField("パス", max_length=255)
+    method = models.CharField("メソッド", max_length=10, default="GET")
+    ip = models.CharField("IP", max_length=45, blank=True, default="")
+    user_agent = models.CharField("User-Agent", max_length=255, blank=True, default="")
+    duration_ms = models.IntegerField("滞在時間(ms)", default=0)
+    created_at = models.DateTimeField("アクセス日時", default=timezone.now)
+
+    class Meta:
+        verbose_name = 'アクセスログ'
+        verbose_name_plural = 'アクセスログ'
+        ordering = ['-created_at']
 

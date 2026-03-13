@@ -70,7 +70,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
+    'learn.middleware.LearnAccessLogMiddleware',
+
 ]
 
 ROOT_URLCONF = 'trang_chu.urls'

@@ -1,5 +1,5 @@
 from django import forms
-from .models import BangCap, MotivationalQuote, Course
+from .models import BangCap, MotivationalQuote, Course, TrainingProviderLink
 
 class BangCapForm(forms.ModelForm):
     class Meta:
@@ -41,6 +41,18 @@ class CourseForm(forms.ModelForm):
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
             'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class TrainingProviderLinkForm(forms.ModelForm):
+    class Meta:
+        model = TrainingProviderLink
+        fields = ['name', 'url', 'category', 'icon_class', 'is_active']
+        labels = {
+            'name': '会社・団体名',
+            'url': 'URL',
+            'category': 'カテゴリ',
+            'icon_class': 'アイコン（任意）',
+            'is_active': '表示',
         }
         labels = {
             'title': '研修・講習名',

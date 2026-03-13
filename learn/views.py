@@ -24,9 +24,11 @@ from django.core.paginator import Paginator
 from .models import BangCap
 from .forms import BangCapForm
 from django.db import models
+from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
 from django.core.mail import send_mail
 from .models import MotivationalQuote
-from .forms import MotivationalQuoteForm
+from .forms import MotivationalQuoteForm, TrainingProviderLinkForm
+from .models import TrainingProviderLink, AccessLog
 
 def login_required_ma_nv(view_func):
     def wrapper(request, *args, **kwargs):
@@ -204,7 +206,7 @@ def nhanvien_delete(request, pk):
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def nhanvien_list(request):
-    nhanvien_list = sorted(NhanVien.objects.all(), key=lambda x: int(x.ma_so))
+    nhanvien_list = NhanVien.objects.all().order_by('-id')
     return render(request, 'learn/nhanvien_list.html', {'nhanvien_list': nhanvien_list})
 
 @login_required_ma_nv
@@ -271,15 +273,45 @@ def index(request):
     course_count = Course.objects.count()
     user_count = User.objects.count()
     completed_count = Enrollment.objects.filter(completed=True).count()
+
+    if request.method == 'POST' and request.user.is_authenticated and request.user.username == 'kanri':
+        action = request.POST.get('action', '')
+        if action in {'create', 'update'}:
+            link_id = request.POST.get('link_id')
+            instance = None
+            if action == 'update' and link_id:
+                instance = TrainingProviderLink.objects.filter(id=link_id).first()
+            form = TrainingProviderLinkForm(request.POST, instance=instance)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'リンクを保存しました。')
+                return redirect('learn:index')
+            messages.error(request, '入力内容に誤りがあります。')
+        elif action == 'delete':
+            link_id = request.POST.get('link_id')
+            if link_id:
+                TrainingProviderLink.objects.filter(id=link_id).delete()
+                messages.success(request, 'リンクを削除しました。')
+                return redirect('learn:index')
+
+    link_form = TrainingProviderLinkForm()
+    links = TrainingProviderLink.objects.filter(is_active=True).order_by('-created_at')
+    koshukai_links = [l for l in links if l.category == 'koshukai']
+    online_links = [l for l in links if l.category == 'online']
+
     return render(request, 'learn/index.html', {
         'course_count': course_count,
         'user_count': user_count,
         'completed_count': completed_count,
+        'koshukai_links': koshukai_links,
+        'online_links': online_links,
+        'link_form': link_form,
+        'all_links': TrainingProviderLink.objects.all().order_by('-created_at'),
     })
 @login_required_ma_nv
 def course_list(request):
     query = request.GET.get('q', '')
-    courses = Course.objects.all()
+    courses = Course.objects.all().order_by('-id')
     if query:
         courses = courses.filter(
             Q(title__icontains=query) |
@@ -317,12 +349,12 @@ def course_list(request):
     # Xác định enrollments cần phê duyệt (giữ nguyên)
     enrollments_to_approve = Enrollment.objects.none()
     if request.user.is_authenticated and request.user.username == 'kanri':
-        enrollments_to_approve = Enrollment.objects.filter(status='pending_kanri').select_related('user', 'course')
+        enrollments_to_approve = Enrollment.objects.filter(status='pending_kanri').select_related('user', 'course').order_by('-enrolled_at')
     elif request.session.get('ma_nv'):
         try:
             supervisor_ma_so = request.session['ma_nv']
             subordinates = NhanVien.objects.filter(supervisor__ma_so=supervisor_ma_so).values_list('ma_so', flat=True)
-            enrollments_to_approve = Enrollment.objects.filter(status='pending_supervisor', user__username__in=subordinates).select_related('user', 'course')
+            enrollments_to_approve = Enrollment.objects.filter(status='pending_supervisor', user__username__in=subordinates).select_related('user', 'course').order_by('-enrolled_at')
         except:
             pass
 
@@ -393,7 +425,7 @@ def course_list(request):
         return redirect('learn:course_list')
 
     # Enrollments của user hiện tại (giữ nguyên)
-    user_enrollments = Enrollment.objects.filter(user__username=request.session.get('ma_nv', request.user.username)).select_related('course')
+    user_enrollments = Enrollment.objects.filter(user__username=request.session.get('ma_nv', request.user.username)).select_related('course').order_by('-enrolled_at')
 
     # Kiểm tra xem có hiển thị bảng phê duyệt hay không
     show_approval_table = (
@@ -518,12 +550,12 @@ def my_courses(request):
 
     # HIỂN THỊ ENROLLMENT
     if is_kanri:
-        user_enrollments = Enrollment.objects.all().select_related('course', 'user')
+        user_enrollments = Enrollment.objects.all().select_related('course', 'user').order_by('-enrolled_at')
     else:
         user_enrollments = Enrollment.objects.filter(
             user__username=ma_so,
             status='approved'
-        ).select_related('course', 'user')
+        ).select_related('course', 'user').order_by('-enrolled_at')
     
     if query:
         nv_ma_so_list = list(NhanVien.objects.filter(ten__icontains=query).values_list('ma_so', flat=True))
@@ -544,13 +576,13 @@ def my_courses(request):
         if is_kanri:
             pending_reports = Enrollment.objects.filter(
                 report_status='pending_kanri'
-            ).select_related('user', 'course')
+            ).select_related('user', 'course').order_by('-enrolled_at')
         elif has_subordinates:
             sub_ma_so_list = list(nhanvien.subordinates.values_list('ma_so', flat=True))
             pending_reports = Enrollment.objects.filter(
                 report_status='pending_supervisor',
                 user__username__in=sub_ma_so_list
-            ).exclude(report_file='').select_related('user', 'course')
+            ).exclude(report_file='').select_related('user', 'course').order_by('-enrolled_at')
 
     # Attach NhanVien to each enrollment for template access
     nhanvien_cache = {}
@@ -602,6 +634,19 @@ def dangnhap_ma_nv(request):
             nhanvien = NhanVien.objects.get(ma_so=ma_nv)
             request.session['ma_nv'] = nhanvien.ma_so
             request.session['ten'] = nhanvien.ten
+            ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', '')
+            user_agent = request.META.get('HTTP_USER_AGENT', '')[:255]
+            AccessLog.objects.create(
+                user=None,
+                ma_so=nhanvien.ma_so,
+                ten=nhanvien.ten,
+                event_type="login",
+                path=request.path,
+                method=request.method,
+                ip=ip,
+                user_agent=user_agent,
+                duration_ms=0,
+            )
             return redirect('learn:index')
         except NhanVien.DoesNotExist:
             error = '社員コードが正しくありません。'
@@ -829,6 +874,70 @@ def approval_history_list(request):
         'nhanviens': nhanviens,  # Thêm dòng này
     })
 
+@login_required_ma_nv
+def access_log_list(request):
+    if not (request.user.is_authenticated and request.user.username == 'kanri'):
+        messages.error(request, '管理部のみ閲覧可能です。')
+        return redirect('learn:index')
+
+    q = request.GET.get('q', '').strip()
+    month = request.GET.get('month', '').strip()
+    by_employee = AccessLog.objects.exclude(ma_so='') \
+        .values('ma_so', 'ten') \
+        .annotate(
+            access_count=models.Count('id', filter=Q(event_type='login')),
+            total_ms=models.Sum('duration_ms', filter=Q(event_type='ping')),
+            last_access=models.Max('created_at')
+        )
+    if q:
+        by_employee = by_employee.filter(
+            Q(ma_so__icontains=q) |
+            Q(ten__icontains=q)
+        )
+    if month:
+        try:
+            year, mon = month.split('-')
+            by_employee = by_employee.filter(created_at__year=int(year), created_at__month=int(mon))
+        except Exception:
+            pass
+    by_employee = by_employee.order_by('-access_count')
+
+    return render(request, 'learn/access_log_list.html', {
+        'search_query': q,
+        'month_filter': month,
+        'by_employee': by_employee,
+        'chart_employees': list(by_employee[:10]),
+    })
+
+@login_required_ma_nv
+def access_log_ping(request):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    user = request.user if request.user.is_authenticated else None
+    ma_so = request.session.get('ma_nv', '') or (user.username if user and user.username != 'kanri' else '')
+    ten = ''
+    if ma_so:
+        nv = NhanVien.objects.filter(ma_so=ma_so).first()
+        if nv:
+            ten = nv.ten
+
+    ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', '')
+    user_agent = request.META.get('HTTP_USER_AGENT', '')[:255]
+
+    AccessLog.objects.create(
+        user=user,
+        ma_so=ma_so,
+        ten=ten,
+        event_type="ping",
+        path=request.path,
+        method=request.method,
+        ip=ip,
+        user_agent=user_agent,
+        duration_ms=30000,
+    )
+    return HttpResponse(status=204)
+
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 
@@ -925,11 +1034,11 @@ def course_edit(request, pk):
 @login_required_ma_nv
 def bangcap_list(request):
     if request.user.is_authenticated and request.user.username == 'kanri':
-        bangcaps = BangCap.objects.select_related('nhan_vien').all()
+        bangcaps = BangCap.objects.select_related('nhan_vien').all().order_by('-id')
     else:
         ma_nv = request.session.get('ma_nv')
         nhanvien = NhanVien.objects.get(ma_so=ma_nv)
-        bangcaps = BangCap.objects.filter(nhan_vien=nhanvien)
+        bangcaps = BangCap.objects.filter(nhan_vien=nhanvien).order_by('-id')
     query = request.GET.get('q', '')
     radar_data = None
     radar_labels = []

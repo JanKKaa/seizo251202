@@ -288,6 +288,12 @@
                     <span>社員リスト</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'learn:access_log_list' %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>アクセス分析</span>
+                </a>
+            </li>
             {% endif %}
 
             <hr class="sidebar-divider d-none d-md-block">
@@ -477,6 +483,45 @@
     </script>
 
     {% block extra_js %}{% endblock %}
+    <script>
+    (function() {
+        var isLoggedIn = {{ request.user.is_authenticated|yesno:"true,false" }} || {{ request.session.ma_nv|yesno:"true,false" }};
+        if (!isLoggedIn) return;
+
+        var pingTimer = null;
+        var pingInterval = 30000;
+
+        function sendPing() {
+            fetch("{% url 'learn:access_log_ping' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}" }
+            }).catch(function() {});
+        }
+
+        function startPing() {
+            if (pingTimer) return;
+            sendPing();
+            pingTimer = setInterval(sendPing, pingInterval);
+        }
+
+        function stopPing() {
+            if (pingTimer) {
+                clearInterval(pingTimer);
+                pingTimer = null;
+            }
+        }
+
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") {
+                startPing();
+            } else {
+                stopPing();
+            }
+        });
+
+        startPing();
+    })();
+    </script>
 </body>
 </html>
 

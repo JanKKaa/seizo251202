@@ -157,13 +157,13 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">#</th>
-                            <th style="width: 20%;">研修・講習</th>
-                            <th style="width: 20%;">受講目的</th>
+                            <th style="width: 26%;">研修・講習</th>
+                            <th style="width: 10%;">作成日</th>
                             <th style="width: 9%;">開始日</th>
                             <th style="width: 9%;">終了日</th>
-                            <th style="width: 8%;">申請者</th>
-                            <th style="width: 8%;">申込資料</th>
-                            <th style="width: 12%;">アクション</th>
+                            <th style="width: 10%;">申請者</th>
+                            <th style="width: 10%;">申込資料</th>
+                            <th style="width: 10%;">アクション</th>
                             <th style="width: 10%;">ステータス</th>
                         </tr>
                     </thead>
@@ -176,7 +176,8 @@
                                     {{ course.title }}
                                 </a>
                             </td>
-                            <td>{{ course.description|truncatechars:50 }}</td>
+                            
+                            <td>{{ course.created_at|date:"Y-m-d" }}</td>
                             <td>{{ course.start_date|date:"Y-m-d" }}</td>
                             <td>{{ course.end_date|date:"Y-m-d" }}</td>
                             <td>{{ course.creator_name }}</td>
@@ -244,7 +245,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">データがありません。</td>
+                            <td colspan="10" class="text-center py-4 text-muted">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -301,6 +302,7 @@
                             <th>社員番号</th>
                             <th>氏名</th>
                             <th>研修・講習</th>
+                            <th>申請日時</th>
                             <th>ステータス</th>
                             <th>アクション</th>
                         </tr>
@@ -315,6 +317,7 @@
                                     {{ enrollment.course.title }}
                                 </button>
                             </td>
+                            <td>{{ enrollment.enrolled_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 {% if enrollment.status == 'pending_supervisor' %}上司承認待ち{% endif %}
                                 {% if enrollment.status == 'pending_kanri' %}管理課承認待ち{% endif %}
@@ -337,7 +340,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-center text-muted py-3">承認待ちの申請はありません。</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-3">承認待ちの申請はありません。</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -360,7 +363,6 @@
                             <div class="col-lg-6">
                                 <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.user.ten %} - {{ enrollment.user.ten }}{% endif %}</p>
                                 <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
-                                <p><strong>説明:</strong> {{ enrollment.course.description }}</p>
                                 <p><strong>外部リンク:</strong>
                                     {% if enrollment.course.external_url %}
                                         <a href="{{ enrollment.course.external_url }}" target="_blank">{{ enrollment.course.external_url }}</a>
@@ -451,10 +453,7 @@
                                     <dt class="learn-info-label">研修・講習</dt>
                                     <dd class="learn-info-value">{{ course.title }}</dd>
                                 </div>
-                                <div class="learn-info-row">
-                                    <dt class="learn-info-label">説明</dt>
-                                    <dd class="learn-info-value">{{ course.description }}</dd>
-                                </div>
+                                
                                 <div class="learn-info-row">
                                     <dt class="learn-info-label">外部リンク</dt>
                                     <dd class="learn-info-value">
