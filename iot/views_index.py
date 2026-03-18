@@ -17,6 +17,7 @@ from baotri.models import TaskCode
 from django.db.models.functions import Coalesce
 from .services import get_latest_esp32_status
 from iot.models import DashboardNotification, DemAlarm, Esp32AlarmCount, Esp32Device
+from menu.models import Holiday
 # thêm import ProductionPlan
 from .models import ProductionPlan
 import logging
@@ -386,6 +387,10 @@ def get_shotplan_list():
 
 def dashboard(request):
     t0 = time.time()
+    now = timezone.localtime()
+    is_weekend = now.weekday() in (5, 6)
+    is_holiday = Holiday.objects.filter(date=now.date()).exists() or is_weekend
+    sleep_mode = is_holiday and now.hour >= 7
     from .views_csv import update_net100_current_product_by_plan
     update_net100_current_product_by_plan()
     logger.info("update_net100_current_product_by_plan: %.2f", time.time() - t0)
@@ -674,6 +679,8 @@ def dashboard(request):
         'month_label': timezone.localdate().strftime("%Y年%m月"),
         'total_material_today': total_material_today,
     }
+    context['sleep_mode'] = sleep_mode
+    context['sleep_mode_reason'] = '休日' if is_holiday else ''
     return render(request, 'iot/dashboard.html', context)
 
 # === NEW: theo dõi thay đổi trạng thái để frontend chớp 5s ===

@@ -5,9 +5,15 @@ from datetime import timedelta
 from .models import Esp32CycleShot, ProductShotMaster, ProductionPlan
 from calendar import monthrange
 from datetime import date
+import re
 
 MATERIAL_MACHINES = [str(code) for code in range(200, 216)]
 
+def _strip_material_code(name: str) -> str:
+    if not name:
+        return ""
+    cleaned = re.sub(r'^\s*8[0-9A-Za-z\-]*\s+', '', str(name))
+    return cleaned.strip() or str(name).strip()
 
 
 def get_plan_for_day(target_date):
@@ -84,7 +90,7 @@ def center_panel2_partial(request):
 
 
 def get_material_plan_for_day(target_date):
-    return list(
+    plans = list(
         ProductionPlan.objects.filter(
             machine__in=MATERIAL_MACHINES,
             plan_date=target_date
@@ -93,6 +99,9 @@ def get_material_plan_for_day(target_date):
         .annotate(total_plan=Sum('plan_shot'))
         .order_by('machine', 'product_name')
     )
+    for plan in plans:
+        plan['product_name'] = _strip_material_code(plan.get('product_name'))
+    return plans
 
 
 def kpi_panel2_partial(request):

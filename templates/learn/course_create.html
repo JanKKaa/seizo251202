@@ -109,7 +109,7 @@
                             <label for="{{ form.title.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-book"></i> 研修・講習名
                             </label>
-                            <input type="text" class="form-control {% if form.title.errors %}is-invalid{% endif %}" id="{{ form.title.id_for_label }}" name="title" value="{{ form.title.value|default_if_none:'' }}" placeholder="研修・講習名を入力してください">
+                            <input type="text" required class="form-control {% if form.title.errors %}is-invalid{% endif %}" id="{{ form.title.id_for_label }}" name="title" value="{{ form.title.value|default_if_none:'' }}" placeholder="研修・講習名を入力してください">
                             {% for error in form.title.errors %}
                                 <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
@@ -119,7 +119,7 @@
                             <label for="{{ form.external_url.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-external-link-alt"></i> 外部リンク
                             </label>
-                            <input type="text" class="form-control {% if form.external_url.errors %}is-invalid{% endif %}" id="{{ form.external_url.id_for_label }}" name="external_url" value="{{ form.external_url.value|default_if_none:'' }}" placeholder="外部リンクを入力してください">
+                            <input type="text" required class="form-control {% if form.external_url.errors %}is-invalid{% endif %}" id="{{ form.external_url.id_for_label }}" name="external_url" value="{{ form.external_url.value|default_if_none:'' }}" placeholder="外部リンクを入力してください">
                             {% for error in form.external_url.errors %}
                                 <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
@@ -149,7 +149,7 @@
                             <label for="{{ form.price.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-yen-sign"></i> 受講料
                             </label>
-                            <input type="text" class="form-control {% if form.price.errors %}is-invalid{% endif %}" id="{{ form.price.id_for_label }}" name="price" value="{{ form.price.value|default_if_none:'' }}" placeholder="受講料を入力してください">
+                            <input type="text" required class="form-control {% if form.price.errors %}is-invalid{% endif %}" id="{{ form.price.id_for_label }}" name="price" value="{{ form.price.value|default_if_none:'' }}" placeholder="受講料を入力してください">
                             {% for error in form.price.errors %}
                                 <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
@@ -159,7 +159,7 @@
                             <label for="{{ form.duration.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-clock"></i> 研修期間（時間）
                             </label>
-                            <input type="text" class="form-control {% if form.duration.errors %}is-invalid{% endif %}" id="{{ form.duration.id_for_label }}" name="duration" value="{{ form.duration.value|default_if_none:'' }}" placeholder="研修期間を入力してください">
+                            <input type="text" required class="form-control {% if form.duration.errors %}is-invalid{% endif %}" id="{{ form.duration.id_for_label }}" name="duration" value="{{ form.duration.value|default_if_none:'' }}" placeholder="研修期間を入力してください">
                             {% for error in form.duration.errors %}
                                 <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
@@ -184,7 +184,7 @@
                             <label for="{{ form.location.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-map-marker-alt"></i> 場所
                             </label>
-                            <input type="text" class="form-control {% if form.location.errors %}is-invalid{% endif %}" id="{{ form.location.id_for_label }}" name="location" value="{{ form.location.value|default_if_none:'' }}" placeholder="場所を入力してください">
+                            <input type="text" required class="form-control {% if form.location.errors %}is-invalid{% endif %}" id="{{ form.location.id_for_label }}" name="location" value="{{ form.location.value|default_if_none:'' }}" placeholder="場所を入力してください">
                             {% for error in form.location.errors %}
                                 <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
@@ -194,17 +194,21 @@
                             <label for="{{ form.target.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-user-check"></i> 対象
                             </label>
-                            <textarea class="form-control {% if form.target.errors %}is-invalid{% endif %}" id="{{ form.target.id_for_label }}" name="target" rows="2" placeholder="対象を入力してください">{{ form.target.value|default_if_none:'' }}</textarea>
+                            <textarea required class="form-control {% if form.target.errors %}is-invalid{% endif %}" id="{{ form.target.id_for_label }}" name="target" rows="2" placeholder="対象を入力してください">{{ form.target.value|default_if_none:'' }}</textarea>
                             {% for error in form.target.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                         </div>
 
-                        <div class="form-check mt-2">
-                            {{ form.is_active }}
-                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                        <div class="mb-1">
+                            <label for="{{ form.is_active.id_for_label }}" class="learn-field-label">
                                 <i class="fas fa-toggle-on"></i> アクティブ
                             </label>
+                            <select class="form-select {% if form.is_active.errors %}is-invalid{% endif %}" id="{{ form.is_active.id_for_label }}" name="is_active" required>
+                                <option value="" disabled {% if form.is_active.value|stringformat:'s' == '' %}selected{% endif %}>選択してください</option>
+                                <option value="True" {% if form.is_active.value %}selected{% endif %}>有効</option>
+                                <option value="False" {% if form.is_active.value|stringformat:'s' == 'False' %}selected{% endif %}>無効</option>
+                            </select>
                             {% for error in form.is_active.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
@@ -236,4 +240,3 @@
     {% endif %}
 </div>
 {% endblock %}
-

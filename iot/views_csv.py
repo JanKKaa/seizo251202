@@ -30,6 +30,12 @@ def _parse_month_header(header_text):
     today = datetime.today()
     return today.year, today.month, f"{today.year}-{today.month:02d}", f"{today.year}年{today.month}月"
 
+def _strip_material_code(name: str) -> str:
+    if not name:
+        return ""
+    cleaned = re.sub(r'^\s*8[0-9A-Za-z\-]*\s+', '', str(name))
+    return cleaned.strip() or str(name).strip()
+
 
 def get_latest_plan_created_date(machine_filter=None):
     qs = ProductionPlan.objects.all()
@@ -123,7 +129,7 @@ def upload_material_plan(request):
                 messages.error(request, "CSVにデータがありません。")
                 return redirect('upload_material_plan')
             plan_month_year = rows[0][0].strip() if len(rows[0]) > 0 else ""
-            plan_created_date = rows[0][3].strip() if len(rows[0]) > 3 else datetime.now().strftime("%Y-%m-%d")
+            plan_created_date = rows[0][4].strip() if len(rows[0]) > 4 else datetime.now().strftime("%Y-%m-%d")
             _, _, month_year, plan_month_year = _parse_month_header(plan_month_year)
             plan_objs = []
             material_rows = []
@@ -131,22 +137,31 @@ def upload_material_plan(request):
                 if len(row) < 7:
                     debug_logs.append(f"{idx}行目: 列数不足")
                     continue
-                product_name = row[3].strip()
-                plan_flag = row[4].strip()
-                if plan_flag != '入庫予定':
-                    debug_logs.append(f"{idx}行目: 入庫予定 以外のためスキップ")
+                material_code = row[0].strip()
+                product_name = row[1].strip()
+                plan_flag = row[3].strip()
+                if not material_code.startswith("8"):
+                    debug_logs.append(f"{idx}行目: 部番が8で始まらないためスキップ")
+                    continue
+                if '納入' not in plan_flag:
+                    debug_logs.append(f"{idx}行目: 納入がないためスキップ")
                     continue
                 daily_entries = []
-                for i in range(6, len(row)):
+                # データ開始列: F (index 5)
+                for i in range(5, len(row)):
                     shot = row[i].strip()
-                    if not shot.isdigit():
-                        if shot:
-                            debug_logs.append(f"{idx}行目 列{chr(65+i)}: 数値ではないのでスキップ")
+                    if not shot:
                         continue
-                    qty = int(shot)
-                    if qty == 0:
+                    normalized = shot.replace(",", "")
+                    try:
+                        qty_val = float(normalized)
+                    except ValueError:
+                        debug_logs.append(f"{idx}行目 列{chr(65+i)}: 数値ではないのでスキップ")
                         continue
-                    day = i - 5
+                    qty = int(qty_val)
+                    if qty <= 0:
+                        continue
+                    day = i - 4
                     try:
                         plan_date = datetime.strptime(f"{month_year}-{day:02d}", "%Y-%m-%d").date()
                     except ValueError:
@@ -154,7 +169,7 @@ def upload_material_plan(request):
                     daily_entries.append((plan_date, qty))
                 if daily_entries:
                     material_rows.append({
-                        'product_name': product_name or f"Material-{idx}",
+                        'product_name': (f"{material_code} {product_name}").strip() or f"Material-{idx}",
                         'entries': daily_entries,
                     })
             for m_idx, material_row in enumerate(material_rows):
@@ -194,8 +209,11 @@ def production_plan_status(request):
         machine_key = plan.machine
         if machine_key not in table:
             table[machine_key] = {'machine': plan.machine, 'days': {day: [] for day in range(1, 32)}}
+        display_name = plan.product_name
+        if plan.machine in MATERIAL_MACHINES:
+            display_name = _strip_material_code(plan.product_name)
         table[machine_key]['days'][plan.plan_date.day].append({
-            'product_name': plan.product_name,
+            'product_name': display_name,
             'plan_shot': plan.plan_shot,
             'cell_note': plan.cell_note,
             'id': plan.id,

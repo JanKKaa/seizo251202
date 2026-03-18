@@ -183,25 +183,7 @@
     </div>
   {% endif %}
 
-  {% if notifications %}
-    <div class="card-section mb-3">
-      <h4 class="mb-2"><i class="fa-solid fa-bell me-2"></i>通知一覧</h4>
-      {% for n in notifications %}
-        <div class="alert alert-info d-flex justify-content-between align-items-center mb-2">
-          <div>
-            <strong>{{ n.message }}</strong>
-            <span class="ms-2">({{ n.appear_at|date:"H:i" }} - {{ n.expire_at|date:"H:i" }})</span>
-          </div>
-          <a href="{% url 'delete_notification' n.pk %}" class="btn btn-danger btn-sm ms-3">削除</a>
-        </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="card-section mb-3">
-      <h4 class="mb-2"><i class="fa-solid fa-bell-slash me-2"></i>通知</h4>
-      <p class="text-muted">通知はありません。</p>
-    </div>
-  {% endif %}
+  
   <div class="card-section mb-3">
     <h4 class="mb-2"><i class="fa-solid fa-list-check me-2"></i>機能メニュー</h4>
     <div class="btn-group-custom d-flex flex-wrap gap-2">

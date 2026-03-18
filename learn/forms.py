@@ -17,6 +17,7 @@ class BangCapForm(forms.ModelForm):
             'ngay_cap': forms.DateInput(attrs={'type': 'date'}),
         }
 
+
 class MotivationalQuoteForm(forms.ModelForm):
     class Meta:
         model = MotivationalQuote
@@ -26,22 +27,35 @@ class MotivationalQuoteForm(forms.ModelForm):
             'author': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['start_date'].required = True
-        self.fields['end_date'].required = True
+        # description đã ẩn khỏi UI nên không bắt buộc để tránh lỗi submit
+        required_fields = {
+            'title',
+            'external_url',
+            'start_date',
+            'end_date',
+            'price',
+            'duration',
+            'location',
+            'target',
+        }
+        for name, field in self.fields.items():
+            field.required = name in required_fields
 
     class Meta:
         model = Course
         fields = [
             'title', 'external_url', 'start_date', 'end_date', 'price', 'duration',
-            'material', 'location', 'target', 'description', 'is_active'
+            'material', 'location', 'target', 'is_active'
         ]
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
             'end_date': forms.DateInput(attrs={'type': 'date'}),
         }
+
 
 class TrainingProviderLinkForm(forms.ModelForm):
     class Meta:
@@ -53,8 +67,6 @@ class TrainingProviderLinkForm(forms.ModelForm):
             'category': 'カテゴリ',
             'icon_class': 'アイコン（任意）',
             'is_active': '表示',
-        }
-        labels = {
             'title': '研修・講習名',
             'external_url': '外部リンク',
             'start_date': '開始日',
@@ -65,7 +77,7 @@ class TrainingProviderLinkForm(forms.ModelForm):
             'location': '場所',
             'target': '対象',
             'description': '参加の理由',
-            'is_active': 'アクティブ',
+            
         }
         error_messages = {
             'title': {

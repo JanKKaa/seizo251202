@@ -18,6 +18,132 @@
             top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(30,30,30,0.7); /* overlay tối hơn */
             z-index: 0;
+            pointer-events: none;
+        }
+        .game-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 10, 18, 0.72);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 1.2rem;
+        }
+        .game-modal-overlay.is-open {
+            display: flex;
+        }
+        .game-modal {
+            width: min(820px, 92vw);
+            max-height: 80vh;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 1rem;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+            position: relative;
+            padding: 0.8rem;
+            overflow: hidden;
+        }
+        .game-modal[data-game="tap"] { max-width: 760px; }
+        .game-modal[data-game="memory"] { max-width: 900px; max-height: 86vh; }
+        .game-modal[data-game="memory"] .game-board-wrap {
+            min-height: 360px;
+        }
+        .game-modal[data-game="quiz"] { max-width: 720px; }
+        .game-modal[data-game="tap"] .game-board-wrap {
+            height: 220px;
+            min-height: 220px;
+        }
+        .game-board-wrap {
+            aspect-ratio: 3 / 2;
+            width: 100%;
+            min-height: clamp(220px, 40vh, 320px);
+        }
+        .mini-game-panels {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .mini-game-board {
+            height: 100%;
+        }
+        .game-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            margin-bottom: 0.6rem;
+        }
+        .difficulty-picker {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .difficulty-btn {
+            font-weight: 800;
+            font-size: 0.82rem;
+            letter-spacing: 0.2px;
+            border-radius: 999px;
+            padding: 0.3rem 0.9rem;
+            box-shadow: 0 6px 14px rgba(31,42,68,0.12);
+        }
+        .difficulty-btn.active {
+            box-shadow: 0 10px 18px rgba(31,42,68,0.3);
+        }
+        .difficulty-btn.active.btn-primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .difficulty-btn.active.btn-warning {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: #fff;
+        }
+        .difficulty-btn.active.btn-danger {
+            background: #ef4444;
+            border-color: #ef4444;
+        }
+        .game-rule-text {
+            font-size: 0.86rem;
+            color: #4a5878;
+            background: #f2f5ff;
+            border-radius: 0.8rem;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid rgba(31,42,68,0.08);
+            margin-bottom: 0.6rem;
+            line-height: 1.5;
+        }
+        .game-panel-rule {
+            font-size: 0.82rem;
+            color: #4a5878;
+            background: #f7f9ff;
+            border: 1px solid rgba(34,46,80,0.12);
+            border-radius: 0.65rem;
+            padding: 0.42rem 0.6rem;
+            margin-bottom: 0.5rem;
+            line-height: 1.45;
+        }
+        .game-modal-title {
+            font-weight: 800;
+            color: #1f2a44;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.05rem;
+        }
+        .game-modal-close {
+            border: none;
+            background: #f1f3f8;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            color: #23304f;
+            cursor: pointer;
+        }
+        .page-wrap {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         .container, .card {
             position: relative;
@@ -51,19 +177,392 @@
             background: #1cc88a;
             color: #fff;
         }
+        .mini-game-launcher {
+            background: rgba(255,255,255,0.92);
+            border-radius: 1rem;
+            border: 1px solid rgba(34,46,80,0.12);
+            padding: 0.9rem 0.9rem 0.8rem;
+            box-shadow: 0 8px 24px rgba(20,30,60,0.12);
+        }
+        .mini-game-launcher-title {
+            font-weight: 800;
+            color: #222e50;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .mini-game-picker {
+            display: flex;
+            justify-content: space-between;
+            gap: 1.1rem;
+            margin-bottom: 0.9rem;
+        }
+        .mini-game-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.2rem;
+            border: none;
+            background: transparent;
+            color: #223052;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .mini-game-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(20,30,60,0.2);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .game-tap { background: linear-gradient(135deg, #21d4a2, #1cc88a); }
+        .game-memory { background: linear-gradient(135deg, #4f8df7, #6fb1ff); }
+        .game-quiz { background: linear-gradient(135deg, #ffb347, #ffcc33); }
+        .mini-game-btn.active .mini-game-icon {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 10px 26px rgba(20,30,60,0.28);
+        }
+        .mini-game-panels > div {
+            display: none;
+        }
+        .mini-game-panels > div.active {
+            display: block;
+        }
+        .mini-game-header {
+            font-weight: 700;
+            color: #222e50;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.5rem;
+        }
+        .mini-game-modal {
+            background: rgba(255,255,255,0.98);
+            border-radius: 1rem;
+        }
+        .mini-game-board {
+            position: relative;
+            width: 100%;
+            height: 180px;
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, rgba(28,200,138,0.12), rgba(34,46,80,0.08));
+            border: 1px dashed rgba(34,46,80,0.2);
+            overflow: hidden;
+        }
+        .mini-target {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #1cc88a;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(28,200,138,0.35);
+            transition: transform 0.08s ease-out;
+        }
+        .mini-target:active {
+            transform: scale(0.92);
+        }
+        .mini-game-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.6rem;
+            font-size: 0.95rem;
+            color: #222e50;
+            font-weight: 600;
+        }
+        .mini-game-hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            margin-top: 0.5rem;
+        }
+        .hud-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 999px;
+            background: #f3f7ff;
+            color: #223052;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .mini-game-actions {
+            display: flex;
+            gap: 0.4rem;
+        }
+        .mini-game-actions .btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+        .mini-game-name {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .mini-game-name input {
+            width: 160px;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(34,46,80,0.2);
+            padding: 0.35rem 0.5rem;
+            font-size: 0.85rem;
+        }
+        .mini-game-name select {
+            border-radius: 0.5rem;
+            border: 1px solid rgba(34,46,80,0.2);
+            padding: 0.35rem 0.5rem;
+            font-size: 0.85rem;
+            background: #fff;
+            width: 140px;
+        }
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+        .memory-card {
+            position: relative;
+            height: clamp(58px, 8vh, 82px);
+            border-radius: 0.6rem;
+            background: #f5f7ff;
+            border: 1px solid rgba(34,46,80,0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #223052;
+            text-align: center;
+            padding: 0.35rem;
+            font-size: 0.85rem;
+        }
+        .memory-card.revealed {
+            background: #e7f7ef;
+            border-color: rgba(28,200,138,0.5);
+        }
+        .quiz-box {
+            background: #f7f9ff;
+            border: 1px solid rgba(34,46,80,0.12);
+            border-radius: 0.8rem;
+            padding: 0.6rem;
+        }
+        .tap-box {
+            background: #f7f9ff;
+            border: 1px solid rgba(34,46,80,0.12);
+            border-radius: 0.8rem;
+            padding: 0.2rem;
+        }
+        .game-modal[data-game="tap"] .mini-game-hud {
+            margin-top: 0.4rem;
+        }
+        .learn-prompt-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 10, 18, 0.65);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100000;
+            padding: 1.2rem;
+        }
+        .learn-prompt-overlay.is-open {
+            display: flex;
+        }
+        .learn-prompt {
+            background: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.3);
+            padding: 1.4rem;
+            width: min(520px, 92vw);
+            text-align: center;
+        }
+        .learn-prompt-title {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #1f2a44;
+            margin-bottom: 0.4rem;
+        }
+        .learn-prompt-text {
+            color: #4a5878;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+        .learn-prompt-actions {
+            display: flex;
+            gap: 0.6rem;
+            justify-content: center;
+        }
+        .game-score-note {
+            margin-top: 0.35rem;
+            font-size: 0.8rem;
+            color: #52638a;
+            text-align: center;
+        }
+        .mini-save-toast {
+            position: fixed;
+            right: 20px;
+            bottom: 24px;
+            background: rgba(28, 200, 138, 0.95);
+            color: #fff;
+            font-weight: 700;
+            padding: 0.5rem 0.9rem;
+            border-radius: 999px;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.25);
+            z-index: 100001;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+        }
+        .mini-save-toast.is-show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .quiz-question {
+            font-weight: 800;
+            color: #1f2a44;
+            margin-bottom: 0.6rem;
+        }
+        .quiz-options {
+            display: grid;
+            gap: 0.5rem;
+        }
+        .quiz-options button {
+            text-align: left;
+            font-weight: 700;
+            border-radius: 0.6rem;
+        }
+        .avatar-circle {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4f8df7, #6fb1ff);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 800;
+            font-size: 1rem;
+            box-shadow: 0 6px 16px rgba(79,141,247,0.35);
+            text-transform: uppercase;
+        }
+        .mini-game-save {
+            border-radius: 999px;
+            padding: 0.45rem 0.9rem;
+            font-weight: 800;
+        }
+        .mini-game-top {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 1.6rem;
+            align-items: center;
+        }
+        .mini-rank {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            padding: 0.6rem 0.4rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #f7f9ff;
+            text-align: center;
+        }
+        .mini-medal {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #f8fbff;
+            text-shadow: 0 6px 18px rgba(0,0,0,0.45);
+        }
+        .mini-medal i {
+            font-size: 1.35rem;
+        }
+        .rank-1 .mini-medal { color: #9ee6ff; text-shadow: 0 0 20px rgba(158,230,255,0.9); }
+        .rank-2 .mini-medal { color: #d6e4f7; text-shadow: 0 0 18px rgba(214,228,247,0.9); }
+        .rank-3 .mini-medal { color: #ffd98a; text-shadow: 0 0 18px rgba(255,217,138,0.9); }
+        .rank-4 .mini-medal { color: #e8e8e8; text-shadow: 0 0 16px rgba(232,232,232,0.9); }
+        .rank-5 .mini-medal { color: #f3b277; text-shadow: 0 0 16px rgba(243,178,119,0.9); }
+        .mini-rank-name {
+            font-size: 0.88rem;
+            font-weight: 800;
+            line-height: 1.25;
+            min-height: 2.2em;
+        }
+        .mini-rank-score {
+            font-size: 0.82rem;
+            font-weight: 700;
+            opacity: 0.9;
+        }
+        @media (max-width: 992px) {
+            .mini-game-top {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 576px) {
+            .mini-game-top {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="bg-overlay"></div>
+<div class="page-wrap">
+<div class="flex-grow-1 d-flex flex-column">
 <div class="container mt-5">
     <div class="row justify-content-center">
         <!-- Hướng dẫn sử dụng bên phải -->
         <div class="col-md-5 d-flex align-items-center">
-            <div class="alert alert-info w-100" style="font-size:1.2rem;">
-                <i class="fas fa-info-circle"></i>
-                <strong>ご利用案内:</strong><br>
-                ご自身の社員番号を入力して<br>「次へ」を押してください。<br>
-                社員番号でお弁当の注文管理・確認ができます。
+            <div class="w-100">
+                <div class="alert alert-info w-100 mb-3" style="font-size:1.2rem;">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>ご利用案内:</strong><br>
+                    ご自身の社員番号を入力して<br>「次へ」を押してください。<br>
+                    社員番号でお弁当の注文管理・確認ができます。
+                </div>
+                <div class="mini-game-launcher">
+                    <div class="mini-game-launcher-title">
+                        <i class="fas fa-gamepad"></i> ミニゲーム
+                    </div>
+                    <div class="mini-game-picker" id="miniGamePicker">
+                        <button type="button" class="mini-game-btn" data-game="tap">
+                            <div class="mini-game-icon game-tap"><i class="fas fa-bolt"></i></div>
+                            <div>ボルト</div>
+                        </button>
+                        <button type="button" class="mini-game-btn" data-game="memory">
+                            <div class="mini-game-icon game-memory"><i class="fas fa-clone"></i></div>
+                            <div>メモリー</div>
+                        </button>
+                        <button type="button" class="mini-game-btn" data-game="quiz">
+                            <div class="mini-game-icon game-quiz"><i class="fas fa-question-circle"></i></div>
+                            <div>クイズ</div>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="col-md-5">
@@ -101,7 +600,159 @@
         </div>
     </div>
 </div>
+</div>
+<div class="container pb-4 mt-3" style="margin-top:auto; padding-bottom:1rem;">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card border-0" style="background: transparent;">
+                <div class="text-center text-white mb-3" style="font-weight: 800; letter-spacing: 0.08em;">
+                    <i class="fas fa-trophy"></i> MINI GAME TOP 5
+                </div>
+                <div class="card-body pt-0">
+                    <div class="mini-game-top" id="miniTopList">
+                        <div class="mini-rank rank-1">
+                            <div class="mini-medal"><i class="fas fa-gem"></i> DIAMOND</div>
+                            <div class="mini-rank-name">1位 なし</div>
+                            <div class="mini-rank-score">-</div>
+                        </div>
+                        <div class="mini-rank rank-2">
+                            <div class="mini-medal"><i class="fas fa-award"></i> PLATINUM</div>
+                            <div class="mini-rank-name">2位 なし</div>
+                            <div class="mini-rank-score">-</div>
+                        </div>
+                        <div class="mini-rank rank-3">
+                            <div class="mini-medal"><i class="fas fa-medal"></i> GOLD</div>
+                            <div class="mini-rank-name">3位 なし</div>
+                            <div class="mini-rank-score">-</div>
+                        </div>
+                        <div class="mini-rank rank-4">
+                            <div class="mini-medal"><i class="fas fa-medal"></i> SILVER</div>
+                            <div class="mini-rank-name">4位 なし</div>
+                            <div class="mini-rank-score">-</div>
+                        </div>
+                        <div class="mini-rank rank-5">
+                            <div class="mini-medal"><i class="fas fa-medal"></i> BRONZE</div>
+                            <div class="mini-rank-name">5位 なし</div>
+                            <div class="mini-rank-score">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<div class="game-modal-overlay" id="miniGameOverlay" aria-hidden="true">
+        <div class="game-modal" id="miniGameModal" data-game="tap" role="dialog" aria-modal="true" aria-labelledby="miniGameModalLabel">
+        <div class="game-modal-header">
+            <div class="game-modal-title" id="miniGameModalLabel">
+                <i class="fas fa-bolt"></i> ミニゲーム: ボルトをタップ
+            </div>
+            <button type="button" class="game-modal-close" id="miniModalCloseBtn">×</button>
+        </div>
+        <div class="difficulty-picker" id="miniDifficultyPicker">
+            <button type="button" class="btn btn-outline-primary difficulty-btn active" data-difficulty="easy">EASY</button>
+            <button type="button" class="btn btn-outline-warning difficulty-btn" data-difficulty="hard">HARD</button>
+            <button type="button" class="btn btn-outline-danger difficulty-btn" data-difficulty="extreme">EXTREME</button>
+        </div>
+        <div class="mini-game-panels" id="miniGamePanels">
+            <div class="active" data-game-panel="tap">
+                <div class="game-panel-rule">ルール（ボルト）：制限時間内にボルトをできるだけ多くタップしてください。</div>
+                <div class="game-board-wrap tap-box">
+                    <div class="mini-game-board" id="miniGameBoard">
+                        <div class="mini-target" id="miniTarget" aria-label="tap target">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="mini-game-hud">
+                    <div class="hud-pill"><i class="fas fa-star"></i> <span id="miniScore">0</span></div>
+                    <div class="mini-game-actions">
+                        <button type="button" class="btn btn-outline-info" data-game-action="start" title="スタート">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-game-action="reset" title="リセット">
+                            <i class="fas fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div class="hud-pill"><i class="fas fa-clock"></i> <span id="miniTime">60</span>秒</div>
+                </div>
+                <div class="game-score-note">ボルト: EASY 1点 / HARD 2点 / EXTREME 3点</div>
+            </div>
+            <div data-game-panel="memory">
+                <div class="game-panel-rule">ルール（メモリー）：同じカードを2枚そろえると得点。そろわない場合はカードが閉じます。</div>
+                <div class="mini-game-hud">
+                    <div class="hud-pill"><i class="fas fa-star"></i> <span id="memoryScore">0</span></div>
+                    <div class="mini-game-actions">
+                        <button type="button" class="btn btn-outline-info" data-game-action="start" title="スタート">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-game-action="reset" title="リセット">
+                            <i class="fas fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div class="hud-pill"><i class="fas fa-clock"></i> <span id="memoryTime">60</span>秒</div>
+                    <div class="hud-pill"><i class="fas fa-th"></i> <span id="memoryMatched">0</span>/10</div>
+                </div>
+                <div class="game-score-note">メモリー: EASY 2点 / HARD 4点 / EXTREME 8点</div>
+                <div class="memory-grid mt-2" id="memoryGrid"></div>
+            </div>
+            <div data-game-panel="quiz">
+                <div class="game-panel-rule">ルール（クイズ）：問題ごとに正しい選択肢を1つ選びます。自動で次の問題へ進みます。</div>
+                <div class="mini-game-hud">
+                    <div class="hud-pill"><i class="fas fa-star"></i> <span id="quizScore">0</span></div>
+                    <div class="mini-game-actions">
+                        <button type="button" class="btn btn-outline-info" data-game-action="start" title="スタート">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-game-action="reset" title="リセット">
+                            <i class="fas fa-rotate"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-info" id="quizNextBtn" title="次へ">
+                            <i class="fas fa-forward"></i>
+                        </button>
+                    </div>
+                    <div class="hud-pill"><i class="fas fa-clock"></i> <span id="quizTime">60</span>秒</div>
+                    <div class="hud-pill"><i class="fas fa-list-ol"></i> <span id="quizIndex">1</span></div>
+                </div>
+                <div class="game-score-note">クイズ: EASY 1点 / HARD 2点 / EXTREME 3点</div>
+                <div class="quiz-box mt-2">
+                    <div class="quiz-question" id="quizQuestion">---</div>
+                    <div class="quiz-options" id="quizOptions"></div>
+                </div>
+            </div>
+        </div>
+        <div class="mini-game-name">
+            <div class="avatar-circle" id="miniAvatar">A</div>
+            <select id="miniPlayerSelect" class="form-select form-select-sm" style="max-width: 160px;">
+                <option value="">名前を選択</option>
+            </select>
+            <input type="text" id="miniPlayerName" maxlength="12" placeholder="名前を入力">
+            <button type="button" class="btn btn-outline-primary mini-game-save" id="miniSaveBtn">
+                <i class="fas fa-save"></i> 保存
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="learn-prompt-overlay" id="learnPromptOverlay" aria-hidden="true">
+    <div class="learn-prompt" role="dialog" aria-modal="true" aria-labelledby="learnPromptTitle">
+        <div class="learn-prompt-title" id="learnPromptTitle">研修・講習システムへ移動しますか？</div>
+        <div class="learn-prompt-text">
+            学びの場に行って、次のステップを一緒に進めましょう。
+        </div>
+        <div class="learn-prompt-actions">
+            <button type="button" class="btn btn-primary" id="learnPromptGo">行く</button>
+            <button type="button" class="btn btn-outline-secondary" id="learnPromptStay">このまま</button>
+        </div>
+    </div>
+</div>
+
+<div class="mini-save-toast" id="miniSaveToast">保存完了</div>
 <script>
+window.__MINI_TOP__ = {{ mini_game_top_json|default:"[]"|safe }};
 function addNumber(num) {
     let input = document.getElementById('ma_nv');
     if (input.value.length < 10) {
@@ -112,6 +763,714 @@ function deleteNumber() {
     let input = document.getElementById('ma_nv');
     input.value = input.value.slice(0, -1);
 }
+
+(() => {
+    const board = document.getElementById('miniGameBoard');
+    const target = document.getElementById('miniTarget');
+    const scoreEl = document.getElementById('miniScore');
+    const timeEl = document.getElementById('miniTime');
+    const saveBtn = document.getElementById('miniSaveBtn');
+    const nameInput = document.getElementById('miniPlayerName');
+    const nameSelect = document.getElementById('miniPlayerSelect');
+    const topListEl = document.getElementById('miniTopList');
+    const gamePicker = document.getElementById('miniGamePicker');
+    const headerEl = document.getElementById('miniGameModalLabel');
+    const gamePanels = document.getElementById('miniGamePanels');
+    const overlay = document.getElementById('miniGameOverlay');
+    const modalEl = document.getElementById('miniGameModal');
+    const learnPromptOverlay = document.getElementById('learnPromptOverlay');
+    const learnPromptGo = document.getElementById('learnPromptGo');
+    const learnPromptStay = document.getElementById('learnPromptStay');
+    const saveToast = document.getElementById('miniSaveToast');
+    const avatarEl = document.getElementById('miniAvatar');
+    const memoryGrid = document.getElementById('memoryGrid');
+    const memoryScoreEl = document.getElementById('memoryScore');
+    const memoryMatchedEl = document.getElementById('memoryMatched');
+    const quizQuestionEl = document.getElementById('quizQuestion');
+    const quizOptionsEl = document.getElementById('quizOptions');
+    const quizScoreEl = document.getElementById('quizScore');
+    const quizIndexEl = document.getElementById('quizIndex');
+    const quizNextBtn = document.getElementById('quizNextBtn');
+    const difficultyPicker = document.getElementById('miniDifficultyPicker');
+    const memoryTimeEl = document.getElementById('memoryTime');
+    const quizTimeEl = document.getElementById('quizTime');
+
+    let score = 0;
+    let timeLeft = 60;
+    let timerId = null;
+    let moveId = null;
+    let running = false;
+    const recordKey = 'menuMiniGameTop5';
+
+    const memoryTerms = [
+        '成形条件のはじき出し', '特殊素材は温度幅が狭い', '24時間稼働', '3交代制',
+        '研削中心', '流動解析ソフト', '2次元CAD', '3次元CAD',
+        '約1カ月で量産', '4〜5回修正'
+    ];
+
+    const quizData = [
+        { q: '成形技術で最重要とされるポイントは？', options: ['成形条件のはじき出し', '塗装工程の自動化', '組立ラインの増設', '物流最適化'], a: '成形条件のはじき出し' },
+        { q: '特殊素材の成形で特徴的なのは？', options: ['温度や金型温度の幅が狭い', '温度管理が不要', '常温で成形できる', '冷却不要'], a: '温度や金型温度の幅が狭い' },
+        { q: '成形技術で言及される工場の稼働体制は？', options: ['24時間稼働', '日勤のみ', '週末のみ', '月次稼働'], a: '24時間稼働' },
+        { q: '成形現場の体制として記載されているのは？', options: ['3交代制', '2交代制', '固定日勤', 'フレックス制'], a: '3交代制' },
+        { q: '金型技術で重視される加工の中心は？', options: ['研削中心', '鍛造中心', '鋳造中心', '切断中心'], a: '研削中心' },
+        { q: '金型設計で活用しているCADは？', options: ['2次元CADと3次元CAD', '3次元CADのみ', '2次元CADのみ', 'CADは使わない'], a: '2次元CADと3次元CAD' },
+        { q: '金型設計で導入している解析は？', options: ['流動解析ソフト', '振動解析のみ', '熱伝導のみ', '応力解析のみ'], a: '流動解析ソフト' },
+        { q: '金型が量産ベースに乗るまでの期間は？', options: ['約1カ月', '約1週間', '約3カ月', '約半年'], a: '約1カ月' },
+        { q: '金型の細部修正は通常どの程度？', options: ['4〜5回', '1回のみ', '10回以上', '修正しない'], a: '4〜5回' },
+        { q: '自動化技術の目的は？', options: ['省人化・生産性向上', '手作業の増加', '単発生産化', '検査の省略'], a: '省人化・生産性向上' },
+        { q: '自動化機械の導入数は？', options: ['7種類ほど', '2種類', '15種類', '導入なし'], a: '7種類ほど' },
+        { q: '自動化機械の例として挙げられるのは？', options: ['メタル整列機', '旋盤加工機', '焼結炉', 'レーザー溶接機'], a: 'メタル整列機' },
+        { q: '自動化機械の例として正しいのは？', options: ['パレタイジング機', '溶鉱炉', '織機', 'ベルト炉'], a: 'パレタイジング機' },
+        { q: '品質保証部が「部」として独立したのは？', options: ['2022年1月', '2019年4月', '2020年10月', '2024年1月'], a: '2022年1月' },
+        { q: '品質保証・品質管理の流れに含まれるのは？', options: ['金型設計→金型製造→射出成形→検証', '販売→広告→展示会→回収', '設計→組立→出荷→運搬', '営業→採用→広報→制作'], a: '金型設計→金型製造→射出成形→検証' },
+        { q: '設備紹介の油圧横型射出成形機は？', options: ['JSW 50t 4台', 'TOYO130 1台', 'JSW 40t 2台', 'JSW 100t 1台'], a: 'JSW 50t 4台' },
+        { q: '電動横型射出成形機の台数は？', options: ['JSW 20t～100t 19台', 'JSW 20t～100t 4台', 'JSW 20t～100t 2台', 'JSW 20t～100t 1台'], a: 'JSW 20t～100t 19台' },
+        { q: '2材種成形機（電動）の型式は？', options: ['TOYO130 1台', 'JSW 50t 4台', 'JSW 40t 2台', 'JSW 100t 1台'], a: 'TOYO130 1台' },
+        { q: '工作機の例として正しいのは？', options: ['CNCワイヤー放電（マキノ）', '大型鍛造プレス', '旋盤ライン', '3Dプリンタ'], a: 'CNCワイヤー放電（マキノ）' },
+        { q: '測定機の例として正しいのは？', options: ['CRYSTA-Apex', 'LM-X100TL', 'ロンコム40C', '上記すべて'], a: '上記すべて' },
+        { q: '成形技術のキーワードとして適切なのは？', options: ['成形条件のはじき出し', '塗装最適化', '鋳造改善', '鍛造高速化'], a: '成形条件のはじき出し' },
+        { q: '成形技術ページで示される運用体制は？', options: ['24時間稼働', '平日日勤のみ', '土日休止', '月次運転'], a: '24時間稼働' },
+        { q: '成形現場の勤務体制として記載があるのは？', options: ['3交代制', '2交代制', '固定日勤', '完全裁量制'], a: '3交代制' },
+        { q: '特殊素材対応で重要視される管理は？', options: ['温度管理', '色管理のみ', '包装管理のみ', '運搬管理のみ'], a: '温度管理' },
+        { q: '金型技術で中心となる加工は？', options: ['研削中心', '鋳造中心', '鍛造中心', 'プレス中心'], a: '研削中心' },
+        { q: '金型設計で使用している設計手法は？', options: ['2次元CADと3次元CAD', '紙図面のみ', '3次元CADのみ', '外注のみ'], a: '2次元CADと3次元CAD' },
+        { q: '金型設計で導入されている解析は？', options: ['流動解析', '音響解析', '振動解析のみ', '解析なし'], a: '流動解析' },
+        { q: '金型量産立ち上げの目安期間は？', options: ['約1カ月', '約1日', '約3カ月', '約6カ月'], a: '約1カ月' },
+        { q: '金型修正の回数目安は？', options: ['4〜5回', '0回', '1回', '20回'], a: '4〜5回' },
+        { q: '自動化技術の目的として正しいのは？', options: ['省人化・生産性向上', '人員増加', '工程削減なし', '検査廃止'], a: '省人化・生産性向上' },
+        { q: '自動化設備のカテゴリとして紹介されるのは？', options: ['整列機', '鍛造炉', '溶鉱炉', '織機'], a: '整列機' },
+        { q: '自動化設備の例として適切なのは？', options: ['着磁自動機', '船舶エンジン', '高炉', '大型旋盤'], a: '着磁自動機' },
+        { q: '自動化設備の例として適切なのは？', options: ['ストッカー機', '溶鉱設備', '高圧ボイラー', '圧延機'], a: 'ストッカー機' },
+        { q: '自動化設備の例として適切なのは？', options: ['カメラ検査', '手作業検査のみ', '検査なし', '外部委託のみ'], a: 'カメラ検査' },
+        { q: '品質保証部が独立した時期は？', options: ['2022年1月', '2022年12月', '2021年1月', '2023年1月'], a: '2022年1月' },
+        { q: '品質保証で準備している規格は？', options: ['IATF16949', 'ISO9000のみ', 'JISのみ', 'DINのみ'], a: 'IATF16949' },
+        { q: '品質保証の取り組みとして適切なのは？', options: ['品質パトロール', '検査省略', '抜取廃止', '記録不要'], a: '品質パトロール' },
+        { q: '品質工程フローに含まれるのは？', options: ['射出成形', '圧延加工', '鍛造加工', '溶鉱工程'], a: '射出成形' },
+        { q: '品質工程フローの起点は？', options: ['金型設計', '営業会議', '出荷', '請求処理'], a: '金型設計' },
+        { q: '設備紹介で油圧横型として記載のある機種は？', options: ['JSW 50t', 'TOYO130', 'JSW 40tロータリー', 'JSW 100tロータリー'], a: 'JSW 50t' },
+        { q: 'JSW 50t（油圧横型）の台数は？', options: ['4台', '1台', '2台', '10台'], a: '4台' },
+        { q: '電動横型（JSW 20t〜100t）の台数は？', options: ['19台', '9台', '3台', '30台'], a: '19台' },
+        { q: '2材種成形機（電動）として記載される機種は？', options: ['TOYO130', 'JSW 50t', 'JSW 55t', 'JSW 85t'], a: 'TOYO130' },
+        { q: '磁場成形機（横型）として記載されるレンジは？', options: ['JSW 55t〜85t', 'JSW 20t〜40t', 'JSW 100t〜130t', 'TOYO 30t〜50t'], a: 'JSW 55t〜85t' },
+        { q: '磁場成形機（横型）の台数は？', options: ['3台', '1台', '5台', '8台'], a: '3台' },
+        { q: '縦型成形機として記載される機種は？', options: ['JSW 40t', 'TOYO130', 'JSW 100t', 'JSW 85t'], a: 'JSW 40t' },
+        { q: '縦型成形機（JSW 40t）の台数は？', options: ['1台', '2台', '3台', '4台'], a: '1台' },
+        { q: 'ロータリー成形機として記載される機種は？', options: ['JSW 40t', 'JSW 50t', 'TOYO130', 'JSW 20t'], a: 'JSW 40t' },
+        { q: 'ロータリー成形機（JSW 40t）の台数は？', options: ['2台', '1台', '4台', '6台'], a: '2台' },
+        { q: 'ロータリー成形機（JSW 100t）の台数は？', options: ['1台', '2台', '3台', '5台'], a: '1台' },
+        { q: '工作機として紹介される設備は？', options: ['CNCワイヤー放電', '鍛造プレス', '圧延ロール', '溶鉱炉'], a: 'CNCワイヤー放電' },
+        { q: '測定機として紹介される設備は？', options: ['CRYSTA-Apex', '溶接ロボット', '高炉', '旋盤'], a: 'CRYSTA-Apex' },
+        { q: '測定機として紹介される設備は？', options: ['ロンコム40C', '高圧ボイラー', '鋳造機', '圧延機'], a: 'ロンコム40C' },
+        { q: '磁化設備として紹介される設備は？', options: ['PC-1510DS', 'CNC旋盤', 'ボール盤', 'フライス盤'], a: 'PC-1510DS' },
+        { q: '選ばれる理由ページで強調される要素は？', options: ['短納期対応', '納期不定', '少量のみ', '海外不可'], a: '短納期対応' },
+        { q: '選ばれる理由ページで強調される要素は？', options: ['低コスト化', '高コスト化', '価格非公開', '価格固定なし'], a: '低コスト化' },
+        { q: '選ばれる理由ページで強調される要素は？', options: ['高品質', '品質無保証', '検査省略', '記録不要'], a: '高品質' },
+        { q: '会社情報カテゴリに含まれるページは？', options: ['会社概要', '鋳造設備', '農業機械', '医療機器'], a: '会社概要' },
+        { q: '会社情報カテゴリに含まれるページは？', options: ['沿革', '製品保証書', '販売価格表', '発注書一覧'], a: '沿革' },
+        { q: '会社情報カテゴリに含まれるページは？', options: ['拠点', '成形条件表', '検査手順書', '購買規程'], a: '拠点' },
+        { q: '技術カテゴリに含まれるページは？', options: ['成形技術', '給与規程', '休暇申請', '福利厚生'], a: '成形技術' },
+        { q: '技術カテゴリに含まれるページは？', options: ['金型技術', '購買依頼', '請求管理', '勤怠管理'], a: '金型技術' },
+        { q: '技術カテゴリに含まれるページは？', options: ['自動化技術', '人事評価', '経費精算', '文書管理'], a: '自動化技術' },
+        { q: '技術カテゴリに含まれるページは？', options: ['品質保証', '備品申請', '会議議事録', '勤怠実績'], a: '品質保証' },
+        { q: '設備カテゴリの名称として正しいのは？', options: ['設備紹介', '設備削除', '設備停止', '設備未定'], a: '設備紹介' },
+        { q: 'お知らせカテゴリに含まれるのは？', options: ['展示会情報', '購買一覧', '日報一覧', '監査表'], a: '展示会情報' },
+        { q: '採用カテゴリとして正しいのは？', options: ['採用情報', '採用停止', '採用なし', '採用外'], a: '採用情報' },
+        { q: 'FAQの日本語表記は？', options: ['よくある質問', '一般情報', '標準仕様', '公開資料'], a: 'よくある質問' },
+        { q: '研修・講習システムで学ぶ技術領域に近いのは？', options: ['成形・金型・自動化・品質', '農業・畜産・漁業', '観光・宿泊・飲食', '芸術・音楽・演劇'], a: '成形・金型・自動化・品質' },
+        { q: '技術理解を深めるうえで最も重要なのは？', options: ['工程ごとの役割理解', '暗記のみ', '操作省略', '記録省略'], a: '工程ごとの役割理解' },
+        { q: '品質保証の目的として最も適切なのは？', options: ['安定品質の維持', '検査コストのみ削減', '検査回避', '記録不要化'], a: '安定品質の維持' }
+    ];
+
+    let memoryCards = [];
+    let memoryFirst = null;
+    let memoryLock = false;
+    let memoryStarted = false;
+    let memoryScore = 0;
+    let memoryMatched = 0;
+    let quizIndex = 0;
+    let quizScore = 0;
+    let quizPool = [];
+    let difficulty = 'easy';
+    let tapDuration = 60;
+    let tapPoint = 1;
+    let memoryPoint = 1;
+    let quizPoint = 1;
+    let memoryTimeLeft = 0;
+    let memoryTimerId = null;
+    let quizTimeLeft = 0;
+    let quizTimerId = null;
+    let quizLocked = false;
+
+    const difficultyMap = {
+        easy: { time: 60, point: 1, memoryPoint: 2 },
+        hard: { time: 45, point: 2, memoryPoint: 4 },
+        extreme: { time: 20, point: 3, memoryPoint: 8 },
+    };
+
+    const shuffleArray = (arr) => {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    };
+
+    const moveTarget = () => {
+        const boardRect = board.getBoundingClientRect();
+        const size = 48;
+        const maxX = Math.max(0, boardRect.width - size);
+        const maxY = Math.max(0, boardRect.height - size);
+        const x = Math.floor(Math.random() * maxX);
+        const y = Math.floor(Math.random() * maxY);
+        target.style.left = `${x}px`;
+        target.style.top = `${y}px`;
+    };
+
+    const updateUI = () => {
+        scoreEl.textContent = score;
+        timeEl.textContent = timeLeft;
+    };
+
+    const stopGame = () => {
+        running = false;
+        clearInterval(timerId);
+        clearInterval(moveId);
+        timerId = null;
+        moveId = null;
+    };
+
+    const startGame = () => {
+        if (running) return;
+        running = true;
+        moveTarget();
+        timerId = setInterval(() => {
+            timeLeft -= 1;
+            updateUI();
+            if (timeLeft <= 0) {
+                stopGame();
+            }
+        }, 1000);
+        moveId = setInterval(moveTarget, 1200);
+    };
+
+    const resetGame = () => {
+        stopGame();
+        score = 0;
+        timeLeft = tapDuration;
+        updateUI();
+        moveTarget();
+    };
+
+    const stopMemoryTimer = () => {
+        if (memoryTimerId) clearInterval(memoryTimerId);
+        memoryTimerId = null;
+    };
+
+    const stopQuizTimer = () => {
+        if (quizTimerId) clearInterval(quizTimerId);
+        quizTimerId = null;
+    };
+
+    const startMemoryTimer = () => {
+        stopMemoryTimer();
+        memoryStarted = true;
+        memoryTimeLeft = difficultyMap[difficulty].time;
+        if (memoryTimeEl) memoryTimeEl.textContent = memoryTimeLeft;
+        memoryTimerId = setInterval(() => {
+            memoryTimeLeft -= 1;
+            if (memoryTimeEl) memoryTimeEl.textContent = Math.max(memoryTimeLeft, 0);
+            if (memoryTimeLeft <= 0) {
+                stopMemoryTimer();
+                memoryStarted = false;
+                memoryLock = true;
+            }
+        }, 1000);
+    };
+
+    const startQuizTimer = () => {
+        stopQuizTimer();
+        quizTimeLeft = difficultyMap[difficulty].time;
+        quizLocked = false;
+        if (quizTimeEl) quizTimeEl.textContent = quizTimeLeft;
+        quizTimerId = setInterval(() => {
+            quizTimeLeft -= 1;
+            if (quizTimeEl) quizTimeEl.textContent = Math.max(quizTimeLeft, 0);
+            if (quizTimeLeft <= 0) {
+                stopQuizTimer();
+                quizLocked = true;
+                const buttons = quizOptionsEl ? quizOptionsEl.querySelectorAll('button') : [];
+                buttons.forEach((btn) => { btn.disabled = true; });
+            }
+        }, 1000);
+    };
+
+    const applyDifficulty = () => {
+        const config = difficultyMap[difficulty];
+        tapDuration = config.time;
+        tapPoint = config.point;
+        memoryPoint = config.memoryPoint || config.point;
+        quizPoint = config.point;
+        if (difficultyPicker) {
+            difficultyPicker.querySelectorAll('.difficulty-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.difficulty === difficulty);
+            });
+        }
+        timeLeft = tapDuration;
+        updateUI();
+        if (memoryTimeEl) memoryTimeEl.textContent = difficultyMap[difficulty].time;
+        if (quizTimeEl) quizTimeEl.textContent = difficultyMap[difficulty].time;
+    };
+
+    const getActiveGame = () => {
+        if (!gamePanels) return 'tap';
+        const active = gamePanels.querySelector('[data-game-panel].active');
+        return active ? active.dataset.gamePanel : 'tap';
+    };
+
+    const resetAllGameScores = () => {
+        stopGame();
+        stopMemoryTimer();
+        stopQuizTimer();
+
+        score = 0;
+        timeLeft = tapDuration;
+        updateUI();
+
+        memoryScore = 0;
+        memoryMatched = 0;
+        memoryLock = false;
+        memoryStarted = false;
+        if (memoryScoreEl) memoryScoreEl.textContent = memoryScore;
+        if (memoryMatchedEl) memoryMatchedEl.textContent = memoryMatched;
+        if (memoryTimeEl) memoryTimeEl.textContent = difficultyMap[difficulty].time;
+
+        quizScore = 0;
+        quizIndex = 0;
+        quizPool = [];
+        quizLocked = false;
+        if (quizScoreEl) quizScoreEl.textContent = quizScore;
+        if (quizIndexEl) quizIndexEl.textContent = '1';
+        if (quizTimeEl) quizTimeEl.textContent = difficultyMap[difficulty].time;
+    };
+
+    const setupMemory = () => {
+        if (!memoryGrid) return;
+        memoryLock = false;
+        memoryStarted = false;
+        const pool = shuffleArray([...memoryTerms])
+            .concat(shuffleArray([...memoryTerms]))
+            .map((text, idx) => ({ id: idx, text }))
+            .sort(() => Math.random() - 0.5);
+        memoryCards = pool;
+        memoryFirst = null;
+        memoryLock = false;
+        memoryScore = 0;
+        memoryMatched = 0;
+        if (memoryScoreEl) memoryScoreEl.textContent = memoryScore;
+        if (memoryMatchedEl) memoryMatchedEl.textContent = memoryMatched;
+        memoryGrid.innerHTML = '';
+        if (memoryTimeEl) memoryTimeEl.textContent = difficultyMap[difficulty].time;
+        pool.forEach((card) => {
+            const el = document.createElement('button');
+            el.type = 'button';
+            el.className = 'memory-card';
+            el.textContent = '？';
+            el.addEventListener('click', () => {
+                if (!memoryStarted) return;
+                if (memoryLock || el.classList.contains('revealed')) return;
+                el.classList.add('revealed');
+                el.textContent = card.text;
+                if (!memoryFirst) {
+                    memoryFirst = { card, el };
+                    return;
+                }
+                if (memoryFirst.card.text === card.text) {
+                    memoryScore += memoryPoint;
+                    memoryMatched += 1;
+                    memoryFirst = null;
+                    if (memoryScoreEl) memoryScoreEl.textContent = memoryScore;
+                    if (memoryMatchedEl) memoryMatchedEl.textContent = memoryMatched;
+                    return;
+                }
+                memoryLock = true;
+                setTimeout(() => {
+                    el.classList.remove('revealed');
+                    el.textContent = '？';
+                    memoryFirst.el.classList.remove('revealed');
+                    memoryFirst.el.textContent = '？';
+                    memoryFirst = null;
+                    memoryLock = false;
+                }, 700);
+            });
+            memoryGrid.appendChild(el);
+        });
+    };
+
+    const renderQuiz = () => {
+        if (!quizQuestionEl || !quizOptionsEl) return;
+        if (!quizPool.length) {
+            quizPool = shuffleArray(quizData).map((item) => ({
+                ...item,
+                options: shuffleArray(item.options),
+            }));
+        }
+        const data = quizPool[quizIndex % quizPool.length];
+        quizQuestionEl.textContent = data.q;
+        quizOptionsEl.innerHTML = '';
+        data.options.forEach((opt) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-outline-primary';
+            btn.textContent = opt;
+            btn.addEventListener('click', () => {
+                if (quizLocked) return;
+                if (opt === data.a) {
+                    quizScore += quizPoint;
+                    btn.classList.remove('btn-outline-primary');
+                    btn.classList.add('btn-success');
+                    setTimeout(() => {
+                        const total = quizPool.length || quizData.length;
+                        quizIndex = (quizIndex + 1) % total;
+                        renderQuiz();
+                    }, 250);
+                    return;
+                } else {
+                    btn.classList.remove('btn-outline-primary');
+                    btn.classList.add('btn-danger');
+                    setTimeout(() => {
+                        const total = quizPool.length || quizData.length;
+                        quizIndex = (quizIndex + 1) % total;
+                        renderQuiz();
+                    }, 250);
+                    return;
+                }
+                if (quizScoreEl) quizScoreEl.textContent = quizScore;
+            });
+            if (quizLocked || quizTimeLeft <= 0) btn.disabled = true;
+            quizOptionsEl.appendChild(btn);
+        });
+        if (quizIndexEl) quizIndexEl.textContent = `${quizIndex + 1}/${quizPool.length}`;
+        if (quizScoreEl) quizScoreEl.textContent = quizScore;
+    };
+
+    const loadRecord = () => {
+        if (window.__MINI_TOP__ && Array.isArray(window.__MINI_TOP__) && window.__MINI_TOP__.length) {
+            renderTop5(window.__MINI_TOP__);
+            populateNameSelect(window.__MINI_TOP__);
+        }
+        fetch('/menu/api/mini-game/top/', { cache: 'no-store' })
+            .then(res => res.json())
+            .then((res) => {
+                if (res && Array.isArray(res.data)) {
+                    renderTop5(res.data);
+                    populateNameSelect(res.data);
+                } else {
+                    renderTop5([]);
+                    populateNameSelect([]);
+                }
+            })
+            .catch(() => {
+                if (!(window.__MINI_TOP__ && Array.isArray(window.__MINI_TOP__) && window.__MINI_TOP__.length)) {
+                    renderTop5([]);
+                    populateNameSelect([]);
+                }
+            });
+    };
+
+    const renderTop5 = (list) => {
+        const medals = [
+            '<i class="fas fa-gem"></i> DAIMOND',
+            '<i class="fas fa-award"></i> PLATINUM',
+            '<i class="fas fa-medal"></i> GOLD',
+            '<i class="fas fa-medal"></i> SILVER',
+            '<i class="fas fa-medal"></i> BRONZE'
+        ];
+        const classes = ['rank-1', 'rank-2', 'rank-3', 'rank-4', 'rank-5'];
+        topListEl.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const row = list[i];
+            const name = row ? row.name : 'なし';
+            const scoreText = row ? `${row.score} 点` : '-';
+            const rankDiv = document.createElement('div');
+            rankDiv.className = `mini-rank ${classes[i]}`;
+            rankDiv.innerHTML = `
+                <div class="mini-medal">${medals[i]}</div>
+                <div class="mini-rank-name">${i + 1}位 ${name}</div>
+                <div class="mini-rank-score">${scoreText}</div>
+            `;
+            topListEl.appendChild(rankDiv);
+        }
+    };
+
+    const populateNameSelect = (list) => {
+        if (!nameSelect) return;
+        nameSelect.innerHTML = '<option value="">名前を選択</option>';
+        (list || []).forEach((item) => {
+            if (!item || !item.name) return;
+            const opt = document.createElement('option');
+            opt.value = item.name;
+            opt.textContent = item.name;
+            nameSelect.appendChild(opt);
+        });
+    };
+
+    const getCurrentScore = () => {
+        const active = getActiveGame();
+        if (active === 'memory') return memoryScore;
+        if (active === 'quiz') return quizScore;
+        return score;
+    };
+
+    const saveRecord = () => {
+        const name = (nameInput.value || '').trim();
+        if (!name) {
+            alert('名前を入力してください。');
+            nameInput.focus();
+            return;
+        }
+        const newRecord = { name, score: getCurrentScore() };
+        fetch('/menu/api/mini-game/score/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newRecord),
+        })
+            .then(res => res.json())
+            .then((res) => {
+                if (res && res.status === 'ok' && Array.isArray(res.data)) {
+                    renderTop5(res.data);
+                    populateNameSelect(res.data);
+                } else {
+                    alert('保存に失敗しました。しばらくしてから再度お試しください。');
+                    return;
+                }
+                resetAllGameScores();
+                if (saveToast) {
+                    saveToast.classList.add('is-show');
+                    setTimeout(() => {
+                        saveToast.classList.remove('is-show');
+                    }, 1200);
+                }
+                if (learnPromptOverlay) {
+                    setTimeout(() => {
+                        learnPromptOverlay.classList.add('is-open');
+                        learnPromptOverlay.setAttribute('aria-hidden', 'false');
+                    }, 250);
+                }
+            })
+            .catch(() => {
+                try {
+                    const raw = localStorage.getItem(recordKey);
+                    const list = raw ? JSON.parse(raw) : [];
+                    const cleaned = Array.isArray(list) ? list : [];
+                    const merged = cleaned
+                        .filter(item => item && item.name && typeof item.score === 'number');
+                    const existing = merged.find(item => item.name === name);
+                    if (existing) {
+                        existing.score = Math.max(existing.score, newRecord.score);
+                    } else {
+                        merged.push(newRecord);
+                    }
+                    const next = merged.sort((a, b) => b.score - a.score).slice(0, 5);
+                    localStorage.setItem(recordKey, JSON.stringify(next));
+                    renderTop5(next);
+                    populateNameSelect(next);
+                    resetAllGameScores();
+                    if (saveToast) {
+                        saveToast.classList.add('is-show');
+                        setTimeout(() => {
+                            saveToast.classList.remove('is-show');
+                        }, 1200);
+                    }
+                    if (learnPromptOverlay) {
+                        setTimeout(() => {
+                            learnPromptOverlay.classList.add('is-open');
+                            learnPromptOverlay.setAttribute('aria-hidden', 'false');
+                        }, 250);
+                    }
+                } catch (e) {}
+            });
+    };
+
+    if (nameInput && avatarEl) {
+        nameInput.addEventListener('input', () => {
+            const val = (nameInput.value || '').trim();
+            avatarEl.textContent = val ? val[0] : 'A';
+        });
+    }
+    if (nameSelect && nameInput) {
+        nameSelect.addEventListener('change', () => {
+            const val = nameSelect.value || '';
+            nameInput.value = val;
+            if (avatarEl) avatarEl.textContent = val ? val[0] : 'A';
+        });
+    }
+
+    target.addEventListener('click', () => {
+        if (!running) return;
+        score += tapPoint;
+        updateUI();
+        moveTarget();
+    });
+
+    if (saveBtn) saveBtn.addEventListener('click', saveRecord);
+
+    if (gamePicker) {
+        gamePicker.addEventListener('click', (e) => {
+            const btn = e.target.closest('.mini-game-btn');
+            if (!btn) return;
+            const game = btn.dataset.game;
+            resetAllGameScores();
+            if (overlay) {
+                overlay.classList.add('is-open');
+                overlay.setAttribute('aria-hidden', 'false');
+            }
+            if (modalEl) modalEl.dataset.game = game;
+            if (gamePanels) {
+                gamePanels.querySelectorAll('[data-game-panel]').forEach(p => p.classList.remove('active'));
+                const panel = gamePanels.querySelector(`[data-game-panel="${game}"]`);
+                if (panel) panel.classList.add('active');
+            }
+            if (game === 'tap') {
+                headerEl.innerHTML = '<i class="fas fa-bolt"></i> ミニゲーム: ボルトをタップ';
+                timeLeft = tapDuration;
+                updateUI();
+            } else if (game === 'memory') {
+                headerEl.innerHTML = '<i class="fas fa-clone"></i> ミニゲーム: メモリー';
+                setupMemory();
+            } else if (game === 'quiz') {
+                headerEl.innerHTML = '<i class="fas fa-question-circle"></i> ミニゲーム: クイズ';
+                quizIndex = 0;
+                quizScore = 0;
+                quizPool = [];
+                quizLocked = false;
+                renderQuiz();
+            }
+        });
+    }
+
+    const closeBtn = document.getElementById('miniModalCloseBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            if (overlay) {
+                overlay.classList.remove('is-open');
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+            resetAllGameScores();
+        });
+    }
+
+    if (quizNextBtn) {
+        quizNextBtn.addEventListener('click', () => {
+            const total = quizPool.length || quizData.length;
+            quizIndex = (quizIndex + 1) % total;
+            renderQuiz();
+        });
+    }
+    if (difficultyPicker) {
+        difficultyPicker.addEventListener('click', (e) => {
+            const btn = e.target.closest('.difficulty-btn');
+            if (!btn) return;
+            difficulty = btn.dataset.difficulty || 'easy';
+            applyDifficulty();
+            const active = getActiveGame();
+            if (active === 'memory') {
+                setupMemory();
+            } else if (active === 'quiz') {
+                quizIndex = 0;
+                quizScore = 0;
+                quizPool = [];
+                quizLocked = false;
+                startQuizTimer();
+                renderQuiz();
+            }
+        });
+    }
+
+    applyDifficulty();
+
+    if (gamePanels) {
+        gamePanels.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-game-action]');
+            if (!btn) return;
+            const action = btn.dataset.gameAction;
+            const active = getActiveGame();
+            if (action === 'start') {
+                if (active === 'tap') startGame();
+                if (active === 'memory') {
+                    setupMemory();
+                    startMemoryTimer();
+                }
+                if (active === 'quiz') {
+                    quizIndex = 0;
+                    quizScore = 0;
+                    quizPool = [];
+                    quizLocked = false;
+                    startQuizTimer();
+                    renderQuiz();
+                }
+            }
+            if (action === 'reset') {
+                if (active === 'tap') resetGame();
+                if (active === 'memory') {
+                    stopMemoryTimer();
+                    setupMemory();
+                }
+                if (active === 'quiz') {
+                    stopQuizTimer();
+                    quizIndex = 0;
+                    quizScore = 0;
+                    quizPool = [];
+                    quizLocked = false;
+                    if (quizTimeEl) quizTimeEl.textContent = difficultyMap[difficulty].time;
+                    renderQuiz();
+                }
+            }
+            if (action === 'save') {
+                saveRecord();
+            }
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.classList.remove('is-open');
+                overlay.setAttribute('aria-hidden', 'true');
+                resetAllGameScores();
+            }
+        });
+    }
+
+    if (learnPromptGo) {
+        learnPromptGo.addEventListener('click', () => {
+            window.location.href = '/learn/';
+        });
+    }
+    if (learnPromptStay) {
+        learnPromptStay.addEventListener('click', () => {
+            if (learnPromptOverlay) {
+                learnPromptOverlay.classList.remove('is-open');
+                learnPromptOverlay.setAttribute('aria-hidden', 'true');
+            }
+        });
+    }
+    if (learnPromptOverlay) {
+        learnPromptOverlay.addEventListener('click', (e) => {
+            if (e.target === learnPromptOverlay) {
+                learnPromptOverlay.classList.remove('is-open');
+                learnPromptOverlay.setAttribute('aria-hidden', 'true');
+            }
+        });
+    }
+
+    resetGame();
+    try {
+        localStorage.removeItem(recordKey);
+    } catch (e) {}
+    loadRecord();
+})();
 </script>
 </body>
 </html>

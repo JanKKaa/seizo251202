@@ -34,4 +34,6 @@ urlpatterns = [
     path('order_menu_year/<int:pk>/', views.order_menu_year, name='order_menu_year'),
     path('order/change_calamviec_multi/', views.change_calamviec_multi, name='change_calamviec_multi'),
     path('copy_order/', views.copy_order, name='copy_order'),
+    path('api/mini-game/top/', views.api_mini_game_top, name='api_mini_game_top'),
+    path('api/mini-game/score/', views.api_mini_game_save, name='api_mini_game_save'),
 ]

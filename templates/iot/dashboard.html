@@ -13,7 +13,43 @@
 <link rel="stylesheet" href="{% static 'iot/css/center2.css' %}">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 
+<style>
+  .sleep-screen {
+    position: fixed;
+    inset: 0;
+    background: #1f2023;
+    color: #cfd2d6;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    font-size: 2.2rem;
+    letter-spacing: 0.08em;
+  }
+  .sleep-screen.active {
+    display: flex;
+  }
+  .sleep-screen small {
+    display: block;
+    font-size: 1rem;
+    color: #8f949b;
+    margin-top: 0.6rem;
+  }
+  .sleep-screen .badge {
+    font-size: 0.95rem;
+    margin-left: 0.5rem;
+  }
+</style>
 
+<div class="sleep-screen {% if sleep_mode %}active{% endif %}" id="sleep-screen">
+  <div class="text-center">
+    省電力モード
+    {% if sleep_mode_reason %}
+      <span class="badge bg-secondary">{{ sleep_mode_reason }}</span>
+    {% endif %}
+    <small>07:00以降は表示を停止しています</small>
+  </div>
+</div>
 
 
 <div class="dashboard-header">
@@ -150,6 +186,33 @@ document.addEventListener('DOMContentLoaded', function() {
 setTimeout(function() {
     window.location.reload();
 }, 3600000);
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('sleepTestBtn');
+    const screen = document.getElementById('sleep-screen');
+    if (!btn || !screen) return;
+    btn.addEventListener('click', function() {
+      screen.classList.toggle('active');
+    });
+  });
+</script>
+
+<script>
+  // 毎日07:00に必ず再読み込みして営業日の通常表示へ戻す
+  (function scheduleMorningReload() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(7, 0, 0, 0);
+    if (now >= next) {
+      next.setDate(next.getDate() + 1);
+    }
+    const ms = next - now;
+    setTimeout(function() {
+      window.location.reload();
+    }, ms);
+  })();
 </script>
 
 {% endblock %}

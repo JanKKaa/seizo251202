@@ -24,7 +24,8 @@ from django.core.paginator import Paginator
 from .models import BangCap
 from .forms import BangCapForm
 from django.db import models
-from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
+from django.db.models.functions import TruncWeek, TruncMonth, TruncYear, Length, Cast
+from django.db.models import IntegerField
 from django.core.mail import send_mail
 from .models import MotivationalQuote
 from .forms import MotivationalQuoteForm, TrainingProviderLinkForm
@@ -132,13 +133,25 @@ class NhanVienForm(forms.ModelForm):
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['start_date'].required = True
-        self.fields['end_date'].required = True
+        # UI hiện tại không nhập description, chỉ material là tùy chọn.
+        required_fields = {
+            'title',
+            'start_date',
+            'end_date',
+            'external_url',
+            'is_active',
+            'price',
+            'duration',
+            'location',
+            'target',
+        }
+        for name, field in self.fields.items():
+            field.required = name in required_fields
 
     class Meta:
         model = Course
         fields = [
-            'title', 'description', 'start_date', 'end_date', 'external_url', 'is_active',
+            'title', 'start_date', 'end_date', 'external_url', 'is_active',
             'price', 'duration', 'location', 'target', 'material'
         ]
         widgets = {
@@ -206,7 +219,11 @@ def nhanvien_delete(request, pk):
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def nhanvien_list(request):
-    nhanvien_list = NhanVien.objects.all().order_by('-id')
+    nhanvien_list = (
+        NhanVien.objects.all()
+        .annotate(ma_so_len=Length('ma_so'), ma_so_num=Cast('ma_so', IntegerField()))
+        .order_by('ma_so_len', 'ma_so_num', 'ma_so')
+    )
     return render(request, 'learn/nhanvien_list.html', {'nhanvien_list': nhanvien_list})
 
 @login_required_ma_nv
@@ -232,6 +249,7 @@ def course_create(request):
             messages.success(request, "新しい研修・講習が作成されました。")
             return redirect('learn:course_list')
         else:
+            print("FORM ERRORS:", form.errors)
             messages.error(request, "入力内容に誤りがあります。下記のエラーを確認してください。")
     else:
         form = CourseForm()

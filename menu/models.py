@@ -64,3 +64,17 @@ class FaxStatus(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     def __str__(self):
         return f"{self.ngay} - {'SENT' if self.sent else 'PENDING'}"
+
+class MiniGameScore(models.Model):
+    name = models.CharField("名前", max_length=50, unique=True)
+    best_score = models.PositiveIntegerField("最高スコア", default=0)
+    created_at = models.DateTimeField("作成日時", auto_now_add=True)
+    updated_at = models.DateTimeField("更新日時", auto_now=True)
+
+    class Meta:
+        ordering = ['-best_score', '-updated_at']
+        verbose_name = "ミニゲームスコア"
+        verbose_name_plural = "ミニゲームスコア"
+
+    def __str__(self):
+        return f"{self.name} - {self.best_score}"

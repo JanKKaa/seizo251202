@@ -13,7 +13,7 @@ from django.conf import settings
 from .models import FaxStatus
 from django.utils import timezone
 
-from .models import MonAn, NhanVien, Holiday, Order
+from .models import MonAn, NhanVien, Holiday, Order, MiniGameScore
 from .forms import MonAnForm  # Dùng form gốc
 from collections import defaultdict
 from calendar import monthrange
@@ -144,7 +144,12 @@ def dangnhap_ma_nv(request):
             else:
                 request.session['ma_nv'] = ma_nv
                 return redirect('menu:order_history')
-    return render(request, 'menu/dangnhap.html', {'error': error})
+    top = MiniGameScore.objects.order_by("-best_score", "-updated_at")[:5]
+    top_list = [{"name": item.name, "score": item.best_score} for item in top]
+    return render(request, 'menu/dangnhap.html', {
+        'error': error,
+        'mini_game_top_json': json.dumps(top_list, ensure_ascii=False),
+    })
 
 # ================== ORDER PLACEMENT =========
 def order_menu(request, pk):
@@ -928,7 +933,55 @@ def order_menu_year(request, pk):
         last_month_order = Order.objects.filter(ma_nv=ma_nv).order_by('-ngay_giao').first()
     if not last_month_order:
         messages.error(request, "まだ注文履歴がありません。")
-        return redirect('menu:order_menu', pk=pk)
+    return redirect('menu:order_menu', pk=pk)
+
+
+@csrf_exempt
+def api_mini_game_top(request):
+    if request.method != "GET":
+        return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+    top = MiniGameScore.objects.order_by("-best_score", "-updated_at")[:5]
+    data = [{"name": item.name, "score": item.best_score} for item in top]
+    return JsonResponse({"status": "ok", "data": data})
+
+
+@csrf_exempt
+def api_mini_game_save(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+    payload = {}
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            raw = request.body.decode("utf-8") if request.body else ""
+            payload = json.loads(raw or "{}")
+        except Exception:
+            payload = {}
+    else:
+        try:
+            payload = request.POST.dict()
+        except Exception:
+            payload = {}
+    if not payload and request.GET:
+        payload = request.GET.dict()
+
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        name = str(payload.get("player", "")).strip()
+    try:
+        score = int(payload.get("score", 0))
+    except Exception:
+        score = 0
+    if not name:
+        return JsonResponse({"status": "error", "message": "name required"}, status=400)
+
+    obj, _created = MiniGameScore.objects.get_or_create(name=name, defaults={"best_score": score})
+    if score > obj.best_score:
+        obj.best_score = score
+        obj.save(update_fields=["best_score", "updated_at"])
+
+    top = MiniGameScore.objects.order_by("-best_score", "-updated_at")[:5]
+    data = [{"name": item.name, "score": item.best_score} for item in top]
+    return JsonResponse({"status": "ok", "data": data})
 
     mon_gan_nhat = last_month_order.mon_an
     calamviec = last_month_order.calamviec

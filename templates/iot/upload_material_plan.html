@@ -1,6 +1,6 @@
 {% extends "trang_chu/base.html" %}
 {% block content %}
-<h2><span class="badge bg-success me-2">材料受入</span>ZAIRYOZAIKOYOSOKU（CSV）</h2>
+<h2><span class="badge bg-success me-2">材料受入</span>ZAIRYOSIYOKEIKAKU（CSV）</h2>
 
 <div class="mb-3 d-flex gap-2">
   <a href="{% url 'iot:iot_index' %}" class="btn btn-outline-secondary">
@@ -17,7 +17,7 @@
 <div class="alert alert-success d-flex align-items-center gap-3">
   <i class="fa-solid fa-boxes-stacked fa-2x"></i>
   <div>
-    <p class="mb-1 fw-bold">生産管理システム　02.発注～仕入　23.材料在庫予測表示　処理区分7₌CSV</p>
+    <p class="mb-1 fw-bold">生産管理システム　02.発注～仕入 21.材料使用計画　処理区分7₌CSV</p>
   </div>
 </div>
 
@@ -25,7 +25,7 @@
   {% csrf_token %}
   <div class="mb-3">
     <label class="form-label fw-semibold text-success">
-      <i class="fa-solid fa-file-csv me-1"></i> ZAIRYOZAIKOYOSOKUファイル
+      <i class="fa-solid fa-file-csv me-1"></i> ZAIRYOSIYOKEIKAKUファイル
     </label>
     <input type="file" name="csv_file" accept=".csv" class="form-control" required>
   </div>
