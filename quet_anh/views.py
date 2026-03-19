@@ -28,7 +28,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count
-from django.db import OperationalError, ProgrammingError
+from django.db import OperationalError, ProgrammingError, IntegrityError
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 
@@ -46,6 +46,26 @@ import json
 import requests
 from nhap_lieu.models import PhienNhapLieu
 from nhap_lieu.models import ChuongTrinhNhapLieu, MayTinh, KetQuaNhapLieu
+
+
+def _display_login_name(user):
+    if not user:
+        return ""
+    if getattr(user, "last_name", "") and getattr(user, "first_name", ""):
+        return f"{user.last_name} {user.first_name}".strip()
+    if getattr(user, "last_name", ""):
+        return user.last_name.strip()
+    full_name = (user.get_full_name() or "").strip()
+    if full_name:
+        return full_name
+    return (user.username or "").strip()
+
+
+def _can_supervisor_confirm(user):
+    if not user or not user.is_authenticated:
+        return False
+    return bool(user.is_superuser or user.is_staff or (user.username or "").lower() == "kanri")
+
 
 def preprocess_image(image):
     img = np.array(image.convert('L'))
@@ -239,14 +259,15 @@ def _build_material_list_for_stock_in():
     try:
         master_rows = (
             QAMaterialMaster.objects.filter(is_active=True)
-            .values("material_name", "material_code", "qr_content")
+            .values("material_name", "material_code", "qr_content", "qr_content_in")
             .order_by("material_name", "material_code")
         )
         material_list = [
             {
                 "material": row.get("material_name") or "",
                 "material_code": row.get("material_code") or "",
-                "qr_content": row.get("qr_content") or "",
+                # 入庫フロー: ưu tiên QR nhập kho, fallback QR xuất kho nếu chưa cấu hình riêng
+                "qr_content": (row.get("qr_content_in") or row.get("qr_content") or ""),
             }
             for row in master_rows
         ]
@@ -371,8 +392,7 @@ def upload_image(request):
             qa_result.image = image_file
             qa_result.device = device
 
-            user = request.user
-            qa_result.operator_name = f"{user.last_name}".strip()
+            qa_result.operator_name = _display_login_name(request.user)
 
             image_file.seek(0)
             image = Image.open(image_file)
@@ -702,6 +722,7 @@ def material_master_list(request):
             Q(material_name__icontains=keyword)
             | Q(material_code__icontains=keyword)
             | Q(qr_content__icontains=keyword)
+            | Q(qr_content_in__icontains=keyword)
         )
     items = qs.order_by("material_name", "material_code", "id")
     return render(
@@ -719,9 +740,15 @@ def material_master_add(request):
     if request.method == "POST":
         form = QAMaterialMasterForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, "材料マスターを追加しました。")
-            return redirect("material_master_list")
+            try:
+                form.save()
+                messages.success(request, "材料マスターを追加しました。")
+                return redirect("material_master_list")
+            except IntegrityError:
+                messages.error(
+                    request,
+                    "保存時に一意制約エラーが発生しました。DBマイグレーション未適用の可能性があります。",
+                )
         messages.error(request, "入力内容を確認してください。")
     else:
         form = QAMaterialMasterForm()
@@ -741,9 +768,15 @@ def material_master_edit(request, pk):
     if request.method == "POST":
         form = QAMaterialMasterForm(request.POST, instance=item)
         if form.is_valid():
-            form.save()
-            messages.success(request, "材料マスターを更新しました。")
-            return redirect("material_master_list")
+            try:
+                form.save()
+                messages.success(request, "材料マスターを更新しました。")
+                return redirect("material_master_list")
+            except IntegrityError:
+                messages.error(
+                    request,
+                    "更新時に一意制約エラーが発生しました。DBマイグレーション未適用の可能性があります。",
+                )
         messages.error(request, "入力内容を確認してください。")
     else:
         form = QAMaterialMasterForm(instance=item)
@@ -1002,6 +1035,7 @@ def material_stock_ledger(request):
             "keyword": keyword,
             "date": date,
             "confirmed": confirmed,
+            "can_supervisor_confirm": _can_supervisor_confirm(request.user),
         },
     )
 
@@ -1045,6 +1079,7 @@ def material_out_stock_ledger(request):
             "keyword": keyword,
             "date": date,
             "confirmed": confirmed,
+            "can_supervisor_confirm": _can_supervisor_confirm(request.user),
         },
     )
 
@@ -1056,14 +1091,7 @@ def material_stock_ledger_edit(request, pk):
     if request.method == "POST":
         form = QAMaterialStockLedgerForm(request.POST, instance=row)
         if form.is_valid():
-            obj = form.save(commit=False)
-            if obj.supervisor_confirmed:
-                if not obj.supervisor_confirmed_at:
-                    obj.supervisor_confirmed_at = timezone.now()
-            else:
-                obj.supervisor_confirmed_at = None
-                obj.supervisor_name = ""
-            obj.save()
+            form.save()
             messages.success(request, "原材料入庫台帳を更新しました。")
             return redirect("material_stock_ledger")
         messages.error(request, "入力内容を確認してください。")
@@ -1087,14 +1115,7 @@ def material_out_stock_ledger_edit(request, pk):
     if request.method == "POST":
         form = QAMaterialOutStockLedgerForm(request.POST, instance=row)
         if form.is_valid():
-            obj = form.save(commit=False)
-            if obj.supervisor_confirmed:
-                if not obj.supervisor_confirmed_at:
-                    obj.supervisor_confirmed_at = timezone.now()
-            else:
-                obj.supervisor_confirmed_at = None
-                obj.supervisor_name = ""
-            obj.save()
+            form.save()
             messages.success(request, "原材料出庫台帳を更新しました。")
             return redirect("material_out_stock_ledger")
         messages.error(request, "入力内容を確認してください。")
@@ -1159,6 +1180,54 @@ def material_out_stock_ledger_delete(request, pk):
         return redirect("material_out_stock_ledger")
     row.delete()
     messages.success(request, "出庫台帳データを削除しました。")
+    return redirect("material_out_stock_ledger")
+
+
+@login_required
+@require_POST
+def material_stock_ledger_confirm(request, pk):
+    if not _can_supervisor_confirm(request.user):
+        messages.error(request, "上長確認権限がありません。")
+        return redirect("material_stock_ledger")
+
+    row = get_object_or_404(QAMaterialStockLedger, pk=pk)
+    action = (request.POST.get("action") or "confirm").strip()
+    if action == "unconfirm":
+        row.supervisor_confirmed = False
+        row.supervisor_name = ""
+        row.supervisor_confirmed_at = None
+        row.save(update_fields=["supervisor_confirmed", "supervisor_name", "supervisor_confirmed_at", "updated_at"])
+        messages.success(request, "入庫台帳の上長確認を解除しました。")
+    else:
+        row.supervisor_confirmed = True
+        row.supervisor_name = _display_login_name(request.user)
+        row.supervisor_confirmed_at = timezone.now()
+        row.save(update_fields=["supervisor_confirmed", "supervisor_name", "supervisor_confirmed_at", "updated_at"])
+        messages.success(request, "入庫台帳を上長確認しました。")
+    return redirect("material_stock_ledger")
+
+
+@login_required
+@require_POST
+def material_out_stock_ledger_confirm(request, pk):
+    if not _can_supervisor_confirm(request.user):
+        messages.error(request, "上長確認権限がありません。")
+        return redirect("material_out_stock_ledger")
+
+    row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
+    action = (request.POST.get("action") or "confirm").strip()
+    if action == "unconfirm":
+        row.supervisor_confirmed = False
+        row.supervisor_name = ""
+        row.supervisor_confirmed_at = None
+        row.save(update_fields=["supervisor_confirmed", "supervisor_name", "supervisor_confirmed_at", "updated_at"])
+        messages.success(request, "出庫台帳の上長確認を解除しました。")
+    else:
+        row.supervisor_confirmed = True
+        row.supervisor_name = _display_login_name(request.user)
+        row.supervisor_confirmed_at = timezone.now()
+        row.save(update_fields=["supervisor_confirmed", "supervisor_name", "supervisor_confirmed_at", "updated_at"])
+        messages.success(request, "出庫台帳を上長確認しました。")
     return redirect("material_out_stock_ledger")
 
 

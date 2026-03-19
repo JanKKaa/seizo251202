@@ -1,7 +1,14 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 {% load static %}
 {% block content %}
-<h2 class="mb-4 text-primary font-weight-bold text-center">画像検査ダッシュボード</h2>
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0 text-primary font-weight-bold">画像検査ダッシュボード</h2>
+    <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> インデックスへ戻る
+    </a>
+</div>
 
 <div class="row mb-4">
     <div class="col-md-3 col-6 mb-3">
@@ -231,4 +238,8 @@ const barChart = new Chart(ctx, {
     <span style="display:inline-block;width:20px;height:20px;background:rgba(255,206,86,0.7);margin:0 4px 0 16px;border-radius:3px;"></span> 遅番 (13:00～22:00)
     <span style="display:inline-block;width:20px;height:20px;background:rgba(255,99,132,0.7);margin:0 4px 0 16px;border-radius:3px;"></span> 夜勤 (22:00～7:00)
 </div>
+
+</div>
 {% endblock %}
+
+

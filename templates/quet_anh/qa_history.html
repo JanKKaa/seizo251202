@@ -1,11 +1,18 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 {% load static %}
 
 {% block title %}検査結果一覧{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container-fluid mt-4">
-    <h2 class="mb-4">材料投入履歴書</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">材料投入履歴書</h2>
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> インデックスへ戻る
+        </a>
+    </div>
     {% if message %}
       <div class="alert alert-info">{{ message }}</div>
     {% endif %}
@@ -191,4 +198,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+</div>
 {% endblock %}
+
+

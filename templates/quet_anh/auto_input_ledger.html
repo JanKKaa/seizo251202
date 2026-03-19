@@ -1,8 +1,10 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 
 {% block title %}自動入力ジョブ台帳{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="text-primary mb-0">自動入力ジョブ台帳</h3>
@@ -165,4 +167,8 @@
     }, interval);
 })();
 </script>
+
+</div>
 {% endblock %}
+
+

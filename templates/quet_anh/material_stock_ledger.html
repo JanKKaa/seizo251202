@@ -1,10 +1,41 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 
 {% block title %}原材料入庫台帳{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container-fluid mt-4">
-    <h2 class="mb-3">原材料入庫台帳</h2>
+    <style>
+        .lot-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #d0d7de;
+            background: #fff;
+        }
+        .lot-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid rgba(0, 0, 0, 0.25);
+        }
+        .lot-green { background: #2bbf6a; }
+        .lot-black { background: #111111; }
+        .lot-blue { background: #2f80ed; }
+        .lot-red { background: #e53935; }
+    </style>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">原材料入庫台帳</h2>
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> インデックスへ戻る
+        </a>
+    </div>
 
     {% if messages %}
         {% for message in messages %}
@@ -51,8 +82,8 @@
                             <th>袋順番号</th>
                             <th>ロット番号</th>
                             <th>端末管理番号</th>
+                            <th>作業者</th>
                             <th>上長確認</th>
-                            <th>確認者</th>
                             <th>確認日時</th>
                             <th>操作</th>
                         </tr>
@@ -63,20 +94,47 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td>{{ row.material_name }}</td>
                                 <td>{{ row.material_code }}</td>
-                                <td>{{ row.stock_in_date|date:"Y-m-d" }}</td>
-                                <td>{{ row.get_lot_color_display }}</td>
+                                <td>
+                                    {{ row.stock_in_date|date:"Y-m-d" }}
+                                    <div class="small text-muted">{{ row.created_at|date:"H:i" }}</div>
+                                </td>
+                                <td>
+                                    {% if row.lot_color == "green" %}
+                                        <span class="lot-chip"><span class="lot-dot lot-green"></span>緑</span>
+                                    {% elif row.lot_color == "black" %}
+                                        <span class="lot-chip"><span class="lot-dot lot-black"></span>黒</span>
+                                    {% elif row.lot_color == "blue" %}
+                                        <span class="lot-chip"><span class="lot-dot lot-blue"></span>青</span>
+                                    {% elif row.lot_color == "red" %}
+                                        <span class="lot-chip"><span class="lot-dot lot-red"></span>赤</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td class="text-end">{{ row.weight_kg }}</td>
                                 <td>{{ row.bag_sequence_no }}</td>
                                 <td>{{ row.lot_number }}</td>
                                 <td>{{ row.workstation_management_no }}</td>
+                                <td>{{ row.qa_result.operator_name|default:"-" }}</td>
                                 <td>
-                                    {% if row.supervisor_confirmed %}
-                                        <span class="badge bg-success">確認済み</span>
+                                    {% if can_supervisor_confirm %}
+                                        <form method="post" action="{% url 'material_stock_ledger_confirm' row.id %}" style="display:inline;">
+                                            {% csrf_token %}
+                                            {% if row.supervisor_confirmed %}
+                                                <input type="hidden" name="action" value="unconfirm">
+                                                <button type="submit" class="btn btn-sm btn-success">確認済み: {{ row.supervisor_name|default:"-" }}</button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary">未確認</button>
+                                            {% endif %}
+                                        </form>
                                     {% else %}
-                                        <span class="badge bg-secondary">未確認</span>
+                                        {% if row.supervisor_confirmed %}
+                                            <span class="badge bg-success">確認済み: {{ row.supervisor_name|default:"-" }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">未確認</span>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
-                                <td>{{ row.supervisor_name }}</td>
                                 <td>{% if row.supervisor_confirmed_at %}{{ row.supervisor_confirmed_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
                                 <td>
                                     <a href="{% url 'material_stock_ledger_edit' row.id %}" class="btn btn-sm btn-warning">編集</a>
@@ -117,4 +175,8 @@
         </div>
     </div>
 </div>
+
+</div>
 {% endblock %}
+
+

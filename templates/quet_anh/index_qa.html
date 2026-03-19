@@ -1,66 +1,390 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 {% load static %}
 
-{% block title %}画像検査管理{% endblock %}
+{% block title %}材料管理システム{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 {% if success_message %}
 <div class="alert alert-success alert-dismissible fade show" role="alert">
     {{ success_message }}
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
+<style>
+.qa-index-shell {
+    background: linear-gradient(180deg, #f6f7fb 0%, #f2f4f8 100%);
+    border-radius: 24px;
+    padding: 24px;
+}
+.qa-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+.qa-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1d1d1f;
+    letter-spacing: 0.2px;
+    margin-bottom: 0.2rem;
+}
+.qa-subtitle {
+    color: #6e6e73;
+    margin-bottom: 0;
+}
+.qa-mini-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.qa-mini-link {
+    border: 1px solid #d2d2d7;
+    background: rgba(255, 255, 255, 0.92);
+    color: #1d1d1f;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    text-decoration: none;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    touch-action: manipulation;
+}
+.qa-mini-link:hover {
+    background: #fff;
+    color: #000;
+    border-color: #bfc7d4;
+}
+.qa-mode-card {
+    border: 1px solid #e5e5ea;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+.qa-mode-card.out-mode {
+    border-color: #cfe0ff;
+    box-shadow: 0 12px 30px rgba(10, 88, 202, 0.12);
+}
+.qa-mode-card.in-mode {
+    border-color: #cfead8;
+    box-shadow: 0 12px 30px rgba(15, 81, 50, 0.12);
+}
+.qa-mode-head {
+    border-bottom: 1px solid #ececf1;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.qa-mode-card.out-mode .qa-mode-head {
+    background: linear-gradient(90deg, #eff5ff 0%, #f9fbff 100%);
+    border-bottom-color: #dce7fb;
+}
+.qa-mode-card.in-mode .qa-mode-head {
+    background: linear-gradient(90deg, #eefbf3 0%, #f9fdfa 100%);
+    border-bottom-color: #d8eadf;
+}
+.qa-mode-title {
+    margin: 0;
+    font-size: 1.06rem;
+    font-weight: 700;
+    color: #1d1d1f;
+}
+.qa-badge {
+    font-size: 0.74rem;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-weight: 600;
+}
+.qa-badge-out { background: #e8f1ff; color: #0a58ca; }
+.qa-badge-in { background: #e8f7ee; color: #0f5132; }
+.qa-mode-body {
+    padding: 18px 20px;
+}
+.qa-soft-note {
+    margin-top: 8px;
+    background: #f7fbff;
+    border: 1px solid #dbe7f5;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    color: #4b5563;
+    padding: 10px 12px;
+}
+.qa-mode-launcher {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.qa-mode-btn {
+    border: 1px solid #d7dbe2;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #1d1d1f;
+    border-radius: 16px;
+    padding: 22px 22px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    min-height: 110px;
+    touch-action: manipulation;
+}
+.qa-mode-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15,23,42,0.12);
+    border-color: #bcc5d3;
+}
+.qa-mode-btn:focus-visible {
+    outline: 3px solid rgba(59, 130, 246, 0.35);
+    outline-offset: 2px;
+}
+.qa-mode-btn#open-out-mode {
+    border-color: #c9dcff;
+}
+.qa-mode-btn#open-in-mode {
+    border-color: #cfead8;
+}
+.qa-mode-btn .title {
+    font-size: 1.08rem;
+    font-weight: 700;
+}
+.qa-mode-btn .desc {
+    margin-top: 4px;
+    font-size: 0.9rem;
+    color: #5e6570;
+}
+.mode-panel {
+    display: none;
+}
+.mode-panel.active {
+    display: block;
+}
+.qa-mode-body .form-control,
+.qa-mode-body .form-select {
+    min-height: 54px;
+    border-radius: 12px;
+    font-size: 1.08rem;
+    border-color: #d2d7e0;
+}
+.qa-mode-body .btn {
+    min-height: 54px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    touch-action: manipulation;
+}
+.qa-mode-head .btn {
+    min-height: 46px;
+    font-size: 0.96rem;
+    padding: 0 14px;
+    touch-action: manipulation;
+}
+.qa-mode-card.out-mode .btn-primary {
+    background: linear-gradient(180deg, #2f7ef8 0%, #0d6efd 100%);
+    border-color: #0d6efd;
+}
+.qa-mode-card.in-mode .btn-success {
+    background: linear-gradient(180deg, #2ca763 0%, #198754 100%);
+    border-color: #198754;
+}
+@media (max-width: 768px) {
+    .qa-mode-launcher {
+        grid-template-columns: 1fr;
+    }
+    .qa-index-shell {
+        padding: 18px;
+        border-radius: 18px;
+    }
+    .qa-title {
+        font-size: 1.6rem;
+    }
+    .qa-subtitle {
+        font-size: 1rem;
+    }
+    .qa-mini-nav {
+        width: 100%;
+        justify-content: flex-start;
+        margin-top: 6px;
+    }
+    .qa-mini-link {
+        min-height: 48px;
+        padding: 10px 16px;
+        font-size: 0.98rem;
+    }
+    .qa-mode-btn {
+        min-height: 120px;
+    }
+    .qa-mode-btn .title {
+        font-size: 1.22rem;
+    }
+    .qa-mode-btn .desc {
+        font-size: 1rem;
+    }
+    .qa-mode-body .form-control,
+    .qa-mode-body .form-select {
+        min-height: 58px;
+        font-size: 1.12rem;
+    }
+    .qa-mode-body .btn {
+        min-height: 58px;
+        font-size: 1.1rem;
+    }
+    .qa-mode-head .btn {
+        min-height: 50px;
+        font-size: 1rem;
+    }
+}
+@media (min-width: 768px) and (max-width: 1200px) {
+    .qa-title {
+        font-size: 2.1rem;
+    }
+    .qa-mode-btn {
+        padding: 24px 24px;
+        min-height: 126px;
+    }
+    .qa-mode-btn .title {
+        font-size: 1.26rem;
+    }
+    .qa-mode-btn .desc {
+        font-size: 1.04rem;
+    }
+    .qa-mini-link {
+        font-size: 1rem;
+        padding: 10px 16px;
+        min-height: 48px;
+    }
+    .qa-mode-body .form-control,
+    .qa-mode-body .form-select {
+        min-height: 60px;
+        font-size: 1.14rem;
+    }
+    .qa-mode-body .btn {
+        min-height: 60px;
+        font-size: 1.12rem;
+    }
+    .qa-mode-head .btn {
+        min-height: 52px;
+        font-size: 1rem;
+    }
+    #device_id,
+    #material_name {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+.qr-guide-wrap {
+    position: relative;
+    width: min(100%, 360px);
+    margin: 0 auto;
+    display: none;
+}
+.qr-guide-wrap > div[id$="qr-reader"] {
+    border-radius: 12px;
+    overflow: hidden;
+}
+.qr-guide-corners {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.qr-guide-corner {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 4px solid #f0ad4e;
+    opacity: 0.55;
+}
+.qr-guide-corner.tl { top: 8px; left: 8px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.qr-guide-corner.tr { top: 8px; right: 8px; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.qr-guide-corner.bl { bottom: 8px; left: 8px; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.qr-guide-corner.br { bottom: 8px; right: 8px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.qr-guide-wrap.is-scanning .qr-guide-corner {
+    animation: qrCornerBlink 0.85s infinite;
+    opacity: 1;
+}
+.qr-guide-wrap.is-locked .qr-guide-corner {
+    border-color: #28a745;
+    opacity: 1;
+    animation: qrCornerPulse 0.35s 2;
+}
+.qr-guide-hint {
+    margin-top: 6px;
+    font-size: 0.86rem;
+    text-align: center;
+    color: #d97706;
+    font-weight: 600;
+}
+.qr-guide-wrap.is-locked .qr-guide-hint {
+    color: #1f7a3a;
+}
+.qr-detect-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 3px solid #ff7a00;
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(255, 122, 0, 0.9);
+    pointer-events: none;
+    z-index: 6;
+}
+.qr-detect-corner[data-qr-corner="0"] { border-right: 0; border-bottom: 0; }
+.qr-detect-corner[data-qr-corner="1"] { border-left: 0; border-bottom: 0; }
+.qr-detect-corner[data-qr-corner="2"] { border-left: 0; border-top: 0; }
+.qr-detect-corner[data-qr-corner="3"] { border-right: 0; border-top: 0; }
+@keyframes qrCornerBlink {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(240,173,78,0)); }
+    50% { opacity: 0.35; filter: drop-shadow(0 0 6px rgba(240,173,78,0.7)); }
+}
+@keyframes qrCornerPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+</style>
 
-<div class="container mt-5">
-    <h1 class="display-4 text-center mb-4 text-primary font-weight-bold" style="letter-spacing:2px;">材料投入管理</h1>
+<div class="container mt-4">
+    <div class="qa-index-shell">
+        <div class="qa-hero">
+            <div>
+                <h1 class="qa-title">材料管理システム</h1>
+                <p class="qa-subtitle">出庫 / 入庫のモードを選択して処理を開始します。</p>
+            </div>
+            <div class="qa-mini-nav">
+                <a href="{% url 'qa_history' %}" class="qa-mini-link"><i class="fas fa-list me-1"></i>履歴</a>
+                <a href="{% url 'qa_device_list' %}" class="qa-mini-link"><i class="fas fa-microchip me-1"></i>機械</a>
+                <a href="{% url 'material_master_list' %}" class="qa-mini-link"><i class="fas fa-boxes me-1"></i>マスター</a>
+                <a href="{% url 'dashboard_qa' %}" class="qa-mini-link"><i class="fas fa-chart-line me-1"></i>分析</a>
+                <a href="{% url 'material_stock_ledger' %}" class="qa-mini-link"><i class="fas fa-warehouse me-1"></i>入庫台帳</a>
+                <a href="{% url 'material_out_stock_ledger' %}" class="qa-mini-link"><i class="fas fa-dolly-flatbed me-1"></i>出庫台帳</a>
+            </div>
+        </div>
 
-    <!-- ナビゲーションボタンエリア -->
-    <div class="row justify-content-center mb-4">
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'qa_history' %}" class="btn btn-info btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-list"></i> 履歴
-            </a>
+        <div class="qa-mode-launcher">
+            <button type="button" id="open-out-mode" class="qa-mode-btn">
+                <div class="title"><i class="fas fa-dolly-flatbed me-2"></i>出庫モード</div>
+                <div class="desc">材料袋を読み取り、出庫処理を開始</div>
+            </button>
+            <button type="button" id="open-in-mode" class="qa-mode-btn">
+                <div class="title"><i class="fas fa-warehouse me-2"></i>入庫モード</div>
+                <div class="desc">購買品注文書QRを読み取り、入庫対象を選択</div>
+            </button>
         </div>
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'qa_device_list' %}" class="btn btn-secondary btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-database"></i> 機械番号管理
-            </a>
-        </div>
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'material_master_list' %}" class="btn btn-dark btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-boxes"></i> 材料マスター一覧
-            </a>
-        </div>
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'dashboard_qa' %}" class="btn btn-primary btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-tachometer-alt"></i> ダッシュボード
-            </a>
-        </div>
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'material_stock_ledger' %}" class="btn btn-success btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-warehouse"></i> 原材料入庫台帳
-            </a>
-        </div>
-        <div class="col-lg-2 col-md-4 text-center mb-2">
-            <a href="{% url 'material_out_stock_ledger' %}" class="btn btn-danger btn-lg btn-block shadow rounded-pill px-4 py-2">
-                <i class="fas fa-dolly-flatbed"></i> 原材料出庫台帳
-            </a>
-        </div>
-    </div>
 
-    <!-- 時計表示エリア -->
-    <div class="text-center mb-4">
-        <iframe scrolling="no" frameborder="no" clocktype="html5" style="overflow:hidden;border:0;margin:0;padding:0;width:227px;height:75px;" src="https://www.clocklink.com/html5embed.php?clock=008&timezone=Japan_Tokyo&color=white&size=227&Title=&Message=&Target=&From=2025,1,1,0,0,0&Color=white"></iframe>
-    </div>
-
-    <!-- 出庫/入庫 フロー選択エリア -->
-    <div class="row justify-content-center">
-        <div class="col-lg-6 mb-3">
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-primary text-white py-3 rounded-top">
-                    <h5 class="m-0 font-weight-bold text-center">出庫フロー: 機械番号を選択</h5>
-                </div>
-                <div class="card-body bg-light">
+        <div class="row g-3">
+            <div id="out-mode-panel" class="col-12 mode-panel">
+                <div class="qa-mode-card out-mode">
+                    <div class="qa-mode-head">
+                        <h5 class="qa-mode-title">出庫モード</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="qa-badge qa-badge-out">OUT STOCK</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="back-to-mode-select-1">戻る</button>
+                        </div>
+                    </div>
+                    <div class="qa-mode-body">
                     <form method="get" action="{% url 'upload_image' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
                         <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
                             {% for d in device_list %}
@@ -71,11 +395,9 @@
                             <i class="fas fa-search"></i>  選択
                         </button>
                     </form>
-                    <!-- Thông báo chọn thành công -->
                     <div id="device-selected-msg" class="mt-2 mb-2 text-center" style="font-weight:bold; color:#155724; display:none;">
                         <i class="fas fa-check-circle"></i> 機械番号「<span id="selected-device-name"></span>」が選択されました！
                     </div>
-                    <!-- Nút QR và refocus -->
                     <div class="w-100 text-center mb-2">
                         <button type="button" class="btn btn-outline-success" id="start-qr-btn" style="min-width:120px;">
                             <i class="fas fa-qrcode"></i> QRで選択
@@ -85,23 +407,33 @@
                         </button>
                     </div>
                     <div class="row align-items-center">
-                        <div class="col-7">
-                            <div id="qr-reader" style="width:260px; margin: 0 auto; display:none;"></div>
-                        </div>
-                        <div class="col-5 text-center">
-                            <img src="{% static 'img/thietbiQR.JPG' %}" alt="機械番号QR参考画像" style="max-width:200px; border:1px solid #ccc; border-radius:8px;">
-                            <div style="font-size:0.95rem; color:#888;">機械番号QR参考画像</div>
+                        <div class="col-12">
+                            <div id="qr-guide-wrap-device" class="qr-guide-wrap">
+                                <div id="qr-reader" style="width:100%;"></div>
+                                <div class="qr-guide-corners">
+                                    <span class="qr-guide-corner tl"></span>
+                                    <span class="qr-guide-corner tr"></span>
+                                    <span class="qr-guide-corner bl"></span>
+                                    <span class="qr-guide-corner br"></span>
+                                </div>
+                                <div class="qr-guide-hint">QRを枠内で固定してください</div>
+                            </div>
                         </div>
                     </div>
+                    <div class="qa-soft-note">包装ラベルを読み取り、正しい機械・材料で出庫処理します。</div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-6 mb-3">
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-success text-white py-3 rounded-top">
-                    <h5 class="m-0 font-weight-bold text-center">入庫フロー: 原材料QRを選択</h5>
-                </div>
-                <div class="card-body bg-light">
+            <div id="in-mode-panel" class="col-12 mode-panel">
+                <div class="qa-mode-card in-mode">
+                    <div class="qa-mode-head">
+                        <h5 class="qa-mode-title">入庫モード</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="qa-badge qa-badge-in">IN STOCK</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="back-to-mode-select-2">戻る</button>
+                        </div>
+                    </div>
+                    <div class="qa-mode-body">
                     <form method="get" action="{% url 'stock_in_start' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
                         <select id="material_name" name="material_name" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
                             {% for m in material_list %}
@@ -125,42 +457,280 @@
                         </button>
                     </div>
                     <div class="row align-items-center">
-                        <div class="col-7">
-                            <div id="material-qr-reader" style="width:260px; margin: 0 auto; display:none;"></div>
-                        </div>
-                        <div class="col-5 text-center">
-                            <img src="{% static 'img/thamkhaoQR.JPEG' %}" alt="原材料QR参考画像" style="max-width:200px; border:1px solid #ccc; border-radius:8px;">
-                            <div style="font-size:0.95rem; color:#888;">原材料QR参考画像</div>
+                        <div class="col-12">
+                            <div id="qr-guide-wrap-material" class="qr-guide-wrap">
+                                <div id="material-qr-reader" style="width:100%;"></div>
+                                <div class="qr-guide-corners">
+                                    <span class="qr-guide-corner tl"></span>
+                                    <span class="qr-guide-corner tr"></span>
+                                    <span class="qr-guide-corner bl"></span>
+                                    <span class="qr-guide-corner br"></span>
+                                </div>
+                                <div class="qr-guide-hint">QRを枠内で固定してください</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="alert alert-info mt-3 mb-0 py-2">
-                        この画面は入庫フローのUI先行版です。次段階で処理ロジックを接続します。
-                    </div>
+                    <div class="qa-soft-note">購買品注文書のQRを基準に、入庫対象の原材料を選択します。</div>
                 </div>
             </div>
         </div>
     </div>
+    </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
+<script defer src="https://unpkg.com/html5-qrcode"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 const startQrBtn = document.getElementById('start-qr-btn');
 const refocusQrBtn = document.getElementById('refocus-qr-btn');
 const qrReader = document.getElementById('qr-reader');
+const qrGuideWrapDevice = document.getElementById('qr-guide-wrap-device');
 const selectDevice = document.getElementById('device_id');
 const deviceMsg = document.getElementById('device-selected-msg');
 const selectedDeviceName = document.getElementById('selected-device-name');
 const startMaterialQrBtn = document.getElementById('start-material-qr-btn');
 const refocusMaterialQrBtn = document.getElementById('refocus-material-qr-btn');
 const materialQrReader = document.getElementById('material-qr-reader');
+const qrGuideWrapMaterial = document.getElementById('qr-guide-wrap-material');
 const selectMaterial = document.getElementById('material_name');
 const hiddenMaterialCode = document.getElementById('material_code');
 const materialMsg = document.getElementById('material-selected-msg');
 const selectedMaterialName = document.getElementById('selected-material-name');
+const outModePanel = document.getElementById('out-mode-panel');
+const inModePanel = document.getElementById('in-mode-panel');
+const openOutModeBtn = document.getElementById('open-out-mode');
+const openInModeBtn = document.getElementById('open-in-mode');
+const backModeBtn1 = document.getElementById('back-to-mode-select-1');
+const backModeBtn2 = document.getElementById('back-to-mode-select-2');
 let html5QrCode = null;
 let qrRunning = false;
 let materialQrCode = null;
 let materialQrRunning = false;
+let deviceCornerTracker = null;
+let materialCornerTracker = null;
+const cornerCanvas = document.createElement("canvas");
+const cornerCtx = cornerCanvas.getContext("2d", { willReadFrequently: true });
+
+function stopDeviceScanner() {
+    stopCornerTracking("device", qrGuideWrapDevice);
+    qrGuideWrapDevice.style.display = 'none';
+    startQrBtn.style.display = 'inline-block';
+    refocusQrBtn.style.display = 'none';
+    setGuideState(qrGuideWrapDevice, '', 'QRを枠内で固定してください');
+    qrRunning = false;
+
+    if (html5QrCode) {
+        html5QrCode.stop()
+            .catch(() => {})
+            .finally(() => {
+                qrReader.innerHTML = '';
+                html5QrCode = null;
+            });
+    } else {
+        qrReader.innerHTML = '';
+    }
+}
+
+function stopMaterialScanner() {
+    stopCornerTracking("material", qrGuideWrapMaterial);
+    qrGuideWrapMaterial.style.display = 'none';
+    startMaterialQrBtn.style.display = 'inline-block';
+    refocusMaterialQrBtn.style.display = 'none';
+    setGuideState(qrGuideWrapMaterial, '', 'QRを枠内で固定してください');
+    materialQrRunning = false;
+
+    if (materialQrCode) {
+        materialQrCode.stop()
+            .catch(() => {})
+            .finally(() => {
+                materialQrReader.innerHTML = '';
+                materialQrCode = null;
+            });
+    } else {
+        materialQrReader.innerHTML = '';
+    }
+}
+
+function stopAllScanners() {
+    stopDeviceScanner();
+    stopMaterialScanner();
+}
+
+function showModePanel(mode) {
+    stopAllScanners();
+    if (mode === 'out') {
+        outModePanel.classList.add('active');
+        inModePanel.classList.remove('active');
+    } else if (mode === 'in') {
+        inModePanel.classList.add('active');
+        outModePanel.classList.remove('active');
+    } else {
+        outModePanel.classList.remove('active');
+        inModePanel.classList.remove('active');
+    }
+}
+
+openOutModeBtn?.addEventListener('click', () => showModePanel('out'));
+openInModeBtn?.addEventListener('click', () => showModePanel('in'));
+backModeBtn1?.addEventListener('click', () => showModePanel('none'));
+backModeBtn2?.addEventListener('click', () => showModePanel('none'));
+
+function setGuideState(wrapEl, state, message) {
+    if (!wrapEl) return;
+    wrapEl.classList.remove('is-scanning', 'is-locked');
+    if (state === 'scanning') wrapEl.classList.add('is-scanning');
+    if (state === 'locked') wrapEl.classList.add('is-locked');
+    const hint = wrapEl.querySelector('.qr-guide-hint');
+    if (hint && message) hint.textContent = message;
+}
+
+function clearDetectedCorners(wrapEl) {
+    if (!wrapEl) return;
+    wrapEl.querySelectorAll('.qr-detect-corner').forEach(el => el.remove());
+}
+
+function mapPointToWrap(readerEl, wrapEl, point) {
+    const video = readerEl ? readerEl.querySelector("video") : null;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+        const fallbackW = readerEl ? readerEl.clientWidth : 1;
+        const fallbackH = readerEl ? readerEl.clientHeight : 1;
+        return {
+            x: (point.x || 0) * (fallbackW / Math.max(fallbackW, 1)),
+            y: (point.y || 0) * (fallbackH / Math.max(fallbackH, 1)),
+        };
+    }
+    const wrapRect = wrapEl.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+    const sx = videoRect.width / Math.max(video.videoWidth, 1);
+    const sy = videoRect.height / Math.max(video.videoHeight, 1);
+    return {
+        x: (point.x * sx) + (videoRect.left - wrapRect.left),
+        y: (point.y * sy) + (videoRect.top - wrapRect.top),
+    };
+}
+
+function renderDetectedCornersFromPoints(wrapEl, readerEl, points) {
+    if (!wrapEl || !readerEl || !points || points.length < 4) return;
+    clearDetectedCorners(wrapEl);
+    points.slice(0, 4).forEach((p, idx) => {
+        const marker = document.createElement('span');
+        marker.className = 'qr-detect-corner';
+        marker.setAttribute('data-qr-corner', String(idx));
+        const pos = mapPointToWrap(readerEl, wrapEl, p);
+        marker.style.left = `${Math.max(0, pos.x - 7)}px`;
+        marker.style.top = `${Math.max(0, pos.y - 7)}px`;
+        wrapEl.appendChild(marker);
+    });
+}
+
+function startCornerTracking(readerEl, wrapEl, type) {
+    stopCornerTracking(type, wrapEl);
+    const timer = setInterval(() => {
+        try {
+            if (typeof jsQR === "undefined") return;
+            const video = readerEl ? readerEl.querySelector("video") : null;
+            if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+            if (cornerCanvas.width !== video.videoWidth || cornerCanvas.height !== video.videoHeight) {
+                cornerCanvas.width = video.videoWidth;
+                cornerCanvas.height = video.videoHeight;
+            }
+            cornerCtx.drawImage(video, 0, 0, cornerCanvas.width, cornerCanvas.height);
+            const frame = cornerCtx.getImageData(0, 0, cornerCanvas.width, cornerCanvas.height);
+            const qr = jsQR(frame.data, cornerCanvas.width, cornerCanvas.height, { inversionAttempts: "dontInvert" });
+            if (!qr || !qr.location) return;
+            const loc = qr.location;
+            const points = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner]
+                .filter(Boolean)
+                .map(p => ({ x: Number(p.x), y: Number(p.y) }));
+            if (points.length >= 4) {
+                renderDetectedCornersFromPoints(wrapEl, readerEl, points);
+            }
+        } catch (e) {
+            // ignore frame errors
+        }
+    }, 120);
+
+    if (type === "device") deviceCornerTracker = timer;
+    if (type === "material") materialCornerTracker = timer;
+}
+
+function stopCornerTracking(type, wrapEl) {
+    if (type === "device" && deviceCornerTracker) {
+        clearInterval(deviceCornerTracker);
+        deviceCornerTracker = null;
+    }
+    if (type === "material" && materialCornerTracker) {
+        clearInterval(materialCornerTracker);
+        materialCornerTracker = null;
+    }
+    clearDetectedCorners(wrapEl);
+}
+
+function extractQrPoints(decodedResult) {
+    if (!decodedResult) return [];
+    const candidates = [
+        decodedResult?.result?.resultPoints,
+        decodedResult?.resultPoints,
+        decodedResult?.cornerPoints,
+        decodedResult?.result?.cornerPoints,
+    ];
+    for (const arr of candidates) {
+        if (Array.isArray(arr) && arr.length >= 4) {
+            return arr.map((p) => ({
+                x: Number(p.x ?? p.X ?? p[0]),
+                y: Number(p.y ?? p.Y ?? p[1]),
+            })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+        }
+    }
+    const loc = decodedResult.location || decodedResult.result?.location;
+    if (loc && loc.topLeftCorner) {
+        return [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner]
+            .filter(Boolean)
+            .map(p => ({ x: Number(p.x), y: Number(p.y) }));
+    }
+    return [];
+}
+
+function renderDetectedCorners(wrapEl, readerEl, decodedResult) {
+    if (!wrapEl || !readerEl) return;
+    clearDetectedCorners(wrapEl);
+    const points = extractQrPoints(decodedResult);
+    if (!points || points.length < 4) return;
+
+    const video = readerEl.querySelector("video");
+    const normalized = points.every((p) => p.x >= 0 && p.x <= 1.01 && p.y >= 0 && p.y <= 1.01);
+    const corrected = normalized && video && video.videoWidth && video.videoHeight
+        ? points.map((p) => ({ x: p.x * video.videoWidth, y: p.y * video.videoHeight }))
+        : points;
+
+    corrected.slice(0, 4).forEach((p, idx) => {
+        const marker = document.createElement('span');
+        marker.className = 'qr-detect-corner';
+        marker.setAttribute('data-qr-corner', String(idx));
+        const pos = mapPointToWrap(readerEl, wrapEl, p);
+        marker.style.left = `${Math.max(0, pos.x - 7)}px`;
+        marker.style.top = `${Math.max(0, pos.y - 7)}px`;
+        wrapEl.appendChild(marker);
+    });
+}
+
+function getQrScanConfig() {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const cfg = {
+        fps: isMobile ? 8 : 10,
+        qrbox: isMobile ? { width: 250, height: 250 } : { width: 240, height: 240 },
+        disableFlip: false,
+        videoConstraints: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: isMobile ? 1280 : 1280 },
+            height: { ideal: isMobile ? 720 : 720 }
+        }
+    };
+    if (typeof Html5QrcodeSupportedFormats !== "undefined" && Html5QrcodeSupportedFormats.QR_CODE !== undefined) {
+        cfg.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+    }
+    return cfg;
+}
 
 function showDeviceSelectedMsg() {
     const selectedOption = selectDevice.options[selectDevice.selectedIndex];
@@ -194,7 +764,8 @@ function showMaterialSelectedMsg() {
 }
 
 startQrBtn.addEventListener('click', function() {
-    qrReader.style.display = 'block';
+    qrGuideWrapDevice.style.display = 'block';
+    setGuideState(qrGuideWrapDevice, 'scanning', 'QRを枠内で固定してください');
     startQrBtn.style.display = 'none';
     refocusQrBtn.style.display = 'inline-block';
     if (!html5QrCode) {
@@ -202,8 +773,9 @@ startQrBtn.addEventListener('click', function() {
     }
     html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 200 },
-        qrCodeMessage => {
+        getQrScanConfig(),
+        (qrCodeMessage, decodedResult) => {
+            renderDetectedCorners(qrGuideWrapDevice, qrReader, decodedResult);
             // Tìm thiết bị theo id hoặc tên
             let found = false;
             for (let i = 0; i < selectDevice.options.length; i++) {
@@ -218,29 +790,38 @@ startQrBtn.addEventListener('click', function() {
                 }
             }
             if (found) {
-                html5QrCode.stop();
-                qrReader.style.display = 'none';
-                startQrBtn.style.display = 'inline-block';
-                refocusQrBtn.style.display = 'none';
-                showDeviceSelectedMsg();
+                setGuideState(qrGuideWrapDevice, 'locked', 'QRを確認しました');
+                setTimeout(() => {
+                    html5QrCode.stop();
+                    stopCornerTracking("device", qrGuideWrapDevice);
+                    qrGuideWrapDevice.style.display = 'none';
+                    startQrBtn.style.display = 'inline-block';
+                    refocusQrBtn.style.display = 'none';
+                    qrRunning = false;
+                    showDeviceSelectedMsg();
+                }, 700);
             } else {
                 alert("QRコードがリストに一致しません: " + qrCodeMessage);
             }
         },
         errorMessage => {}
     );
+    startCornerTracking(qrReader, qrGuideWrapDevice, "device");
     qrRunning = true;
 });
 
 refocusQrBtn.addEventListener('click', function() {
     if (html5QrCode && qrRunning) {
         html5QrCode.stop().then(() => {
-            qrReader.innerHTML = "";
-            html5QrCode = new Html5Qrcode("qr-reader");
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 200 },
-                qrCodeMessage => {
+                stopCornerTracking("device", qrGuideWrapDevice);
+                qrReader.innerHTML = "";
+                html5QrCode = new Html5Qrcode("qr-reader");
+                setGuideState(qrGuideWrapDevice, 'scanning', 'QRを枠内で固定してください');
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    getQrScanConfig(),
+                (qrCodeMessage, decodedResult) => {
+                    renderDetectedCorners(qrGuideWrapDevice, qrReader, decodedResult);
                     let found = false;
                     for (let i = 0; i < selectDevice.options.length; i++) {
                         if (
@@ -254,17 +835,23 @@ refocusQrBtn.addEventListener('click', function() {
                         }
                     }
                     if (found) {
-                        html5QrCode.stop();
-                        qrReader.style.display = 'none';
-                        startQrBtn.style.display = 'inline-block';
-                        refocusQrBtn.style.display = 'none';
-                        showDeviceSelectedMsg();
+                        setGuideState(qrGuideWrapDevice, 'locked', 'QRを確認しました');
+                        setTimeout(() => {
+                            html5QrCode.stop();
+                            stopCornerTracking("device", qrGuideWrapDevice);
+                            qrGuideWrapDevice.style.display = 'none';
+                            startQrBtn.style.display = 'inline-block';
+                            refocusQrBtn.style.display = 'none';
+                            qrRunning = false;
+                            showDeviceSelectedMsg();
+                        }, 700);
                     } else {
                         alert("QRコードがリストに一致しません: " + qrCodeMessage);
                     }
                 },
                 errorMessage => {}
             );
+            startCornerTracking(qrReader, qrGuideWrapDevice, "device");
         });
     }
 });
@@ -275,7 +862,8 @@ if (selectMaterial) {
 }
 
 startMaterialQrBtn.addEventListener('click', function() {
-    materialQrReader.style.display = 'block';
+    qrGuideWrapMaterial.style.display = 'block';
+    setGuideState(qrGuideWrapMaterial, 'scanning', 'QRを枠内で固定してください');
     startMaterialQrBtn.style.display = 'none';
     refocusMaterialQrBtn.style.display = 'inline-block';
     if (!materialQrCode) {
@@ -283,8 +871,9 @@ startMaterialQrBtn.addEventListener('click', function() {
     }
     materialQrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 200 },
-        qrCodeMessage => {
+        getQrScanConfig(),
+        (qrCodeMessage, decodedResult) => {
+            renderDetectedCorners(qrGuideWrapMaterial, materialQrReader, decodedResult);
             const scanned = (qrCodeMessage || "").trim();
             let found = false;
             for (let i = 0; i < selectMaterial.options.length; i++) {
@@ -298,29 +887,38 @@ startMaterialQrBtn.addEventListener('click', function() {
                 }
             }
             if (found) {
-                materialQrCode.stop();
-                materialQrReader.style.display = 'none';
-                startMaterialQrBtn.style.display = 'inline-block';
-                refocusMaterialQrBtn.style.display = 'none';
-                showMaterialSelectedMsg();
+                setGuideState(qrGuideWrapMaterial, 'locked', 'QRを確認しました');
+                setTimeout(() => {
+                    materialQrCode.stop();
+                    stopCornerTracking("material", qrGuideWrapMaterial);
+                    qrGuideWrapMaterial.style.display = 'none';
+                    startMaterialQrBtn.style.display = 'inline-block';
+                    refocusMaterialQrBtn.style.display = 'none';
+                    materialQrRunning = false;
+                    showMaterialSelectedMsg();
+                }, 700);
             } else {
                 alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
             }
         },
         errorMessage => {}
     );
+    startCornerTracking(materialQrReader, qrGuideWrapMaterial, "material");
     materialQrRunning = true;
 });
 
 refocusMaterialQrBtn.addEventListener('click', function() {
     if (materialQrCode && materialQrRunning) {
         materialQrCode.stop().then(() => {
+            stopCornerTracking("material", qrGuideWrapMaterial);
             materialQrReader.innerHTML = "";
             materialQrCode = new Html5Qrcode("material-qr-reader");
+            setGuideState(qrGuideWrapMaterial, 'scanning', 'QRを枠内で固定してください');
             materialQrCode.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: 200 },
-                qrCodeMessage => {
+                getQrScanConfig(),
+                (qrCodeMessage, decodedResult) => {
+                    renderDetectedCorners(qrGuideWrapMaterial, materialQrReader, decodedResult);
                     const scanned = (qrCodeMessage || "").trim();
                     let found = false;
                     for (let i = 0; i < selectMaterial.options.length; i++) {
@@ -334,19 +932,29 @@ refocusMaterialQrBtn.addEventListener('click', function() {
                         }
                     }
                     if (found) {
-                        materialQrCode.stop();
-                        materialQrReader.style.display = 'none';
-                        startMaterialQrBtn.style.display = 'inline-block';
-                        refocusMaterialQrBtn.style.display = 'none';
-                        showMaterialSelectedMsg();
+                        setGuideState(qrGuideWrapMaterial, 'locked', 'QRを確認しました');
+                        setTimeout(() => {
+                            materialQrCode.stop();
+                            stopCornerTracking("material", qrGuideWrapMaterial);
+                            qrGuideWrapMaterial.style.display = 'none';
+                            startMaterialQrBtn.style.display = 'inline-block';
+                            refocusMaterialQrBtn.style.display = 'none';
+                            materialQrRunning = false;
+                            showMaterialSelectedMsg();
+                        }, 700);
                     } else {
                         alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
                     }
                 },
                 errorMessage => {}
             );
+            startCornerTracking(materialQrReader, qrGuideWrapMaterial, "material");
         });
     }
 });
 </script>
+
+</div>
 {% endblock %}
+
+

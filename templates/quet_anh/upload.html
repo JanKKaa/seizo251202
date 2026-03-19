@@ -1,7 +1,181 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 {% load static %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
+<style>
+.qr-guide-wrap {
+    position: relative;
+    width: 100%;
+}
+.qr-guide-corners {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.qr-guide-corner {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 4px solid #f0ad4e;
+    opacity: 0.55;
+}
+.qr-guide-corner.tl { top: 8px; left: 8px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.qr-guide-corner.tr { top: 8px; right: 8px; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.qr-guide-corner.bl { bottom: 8px; left: 8px; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.qr-guide-corner.br { bottom: 8px; right: 8px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.qr-guide-wrap.is-scanning .qr-guide-corner {
+    animation: qrCornerBlink 0.85s infinite;
+    opacity: 1;
+}
+.qr-guide-wrap.is-locked .qr-guide-corner {
+    border-color: #28a745;
+    opacity: 1;
+    animation: qrCornerPulse 0.35s 2;
+}
+.qr-guide-hint {
+    margin-top: 6px;
+    font-size: 0.86rem;
+    text-align: center;
+    color: #d97706;
+    font-weight: 600;
+}
+.qr-guide-wrap.is-locked .qr-guide-hint {
+    color: #1f7a3a;
+}
+.step-note {
+    font-size: 0.88rem;
+    border-radius: 10px;
+}
+.kg-modal-dialog {
+    max-width: min(92vw, 680px);
+}
+.kg-modal .modal-content {
+    border-radius: 18px;
+}
+.kg-modal .modal-body {
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
+}
+.kg-display {
+    height: 62px;
+    font-size: 2rem;
+    letter-spacing: 0.5px;
+}
+.kg-pad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+.kg-pad-btn {
+    height: 72px;
+    font-size: 1.45rem;
+    font-weight: 700;
+    border-radius: 14px;
+    touch-action: manipulation;
+}
+.kg-pad-btn.zero {
+    grid-column: span 2;
+}
+.kg-modal .modal-footer {
+    padding: 0.75rem 1.25rem 1.25rem 1.25rem;
+}
+.kg-modal .btn-done {
+    min-width: 180px;
+    height: 52px;
+    font-size: 1.1rem;
+    border-radius: 999px;
+}
+.kg-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+.quick-kg-inline {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(90px, 1fr));
+    gap: 8px;
+}
+.quick-kg-inline .quick-kg-btn {
+    min-height: 46px;
+    font-weight: 700;
+    border-radius: 12px;
+}
+.quick-kg-inline #open-numpad-modal-btn {
+    min-height: 46px;
+    border-radius: 12px;
+    font-weight: 700;
+}
+.camera-frame-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #111;
+    border-radius: 8px;
+    overflow: hidden;
+}
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.captured-preview {
+    max-width: 72%;
+    margin: 10px auto 0 auto;
+    display: none;
+}
+.camera-capture-guide {
+    position: absolute;
+    left: 6%;
+    top: 27%;
+    width: 88%;
+    height: 44%;
+    border: 3px solid rgba(255, 193, 7, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.22), 0 0 12px rgba(255, 193, 7, 0.6);
+    pointer-events: none;
+    z-index: 5;
+}
+.camera-guide-text {
+    position: absolute;
+    top: calc(27% - 28px);
+    left: 6%;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    z-index: 6;
+    pointer-events: none;
+}
+.qr-detect-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 3px solid #ff7a00;
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(255, 122, 0, 0.9);
+    pointer-events: none;
+    z-index: 6;
+}
+.qr-detect-corner[data-qr-corner="0"] { border-right: 0; border-bottom: 0; }
+.qr-detect-corner[data-qr-corner="1"] { border-left: 0; border-bottom: 0; }
+.qr-detect-corner[data-qr-corner="2"] { border-left: 0; border-top: 0; }
+.qr-detect-corner[data-qr-corner="3"] { border-right: 0; border-top: 0; }
+@keyframes qrCornerBlink {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(240,173,78,0)); }
+    50% { opacity: 0.35; filter: drop-shadow(0 0 6px rgba(240,173,78,0.7)); }
+}
+@keyframes qrCornerPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+</style>
 <div class="container mt-4">
     <h2 class="text-center text-primary mb-4 fw-bold" style="letter-spacing:1px;">撮影して処理</h2>
     
@@ -58,26 +232,24 @@
                         カメラ &amp; 撮影
                     </div>
                     <div class="card-body bg-light">
-                        <div class="mb-2 text-center">
-                            <button id="frontCam" class="btn btn-outline-primary btn-sm mx-1" type="button">フロントカメラ</button>
-                            <button id="backCam" class="btn btn-outline-secondary btn-sm mx-1" type="button">バックカメラ</button>
-                        </div>
-                       
                         <div class="text-center mb-2">
-                            <video id="video" width="100%" height="320" autoplay style="border-radius:8px;box-shadow:0 2px 8px #e3e3e3;max-width:100%;"></video>
-                            <canvas id="canvas" style="display:none;max-width:100%;height:auto;margin-top:10px;border-radius:8px;box-shadow:0 2px 8px #e3e3e3;"></canvas>
+                            <div class="camera-frame-wrap" id="camera-preview-wrap">
+                                <video id="video" autoplay playsinline style="box-shadow:0 2px 8px #e3e3e3;"></video>
+                                <div class="camera-capture-guide" aria-hidden="true"></div>
+                                <div class="camera-guide-text" aria-hidden="true">この横長枠に原材料名 + グレードを合わせてください</div>
+                            </div>
+                            <canvas id="canvas" class="captured-preview" style="height:auto;border-radius:8px;box-shadow:0 2px 8px #e3e3e3;"></canvas>
                         </div>
                         <div class="mb-2 text-center">
                             <button id="refocusCam" class="btn btn-outline-warning btn-sm mx-1" type="button">
                                 <i class="fas fa-crosshairs"></i> 再フォーカス
                             </button>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center mt-3">
-                            <button id="snap" class="btn btn-primary px-4 rounded-pill" type="button" style="min-width:120px;">
+                        <div class="d-flex justify-content-center align-items-center mt-3">
+                            <button id="snap" class="btn btn-primary btn-lg rounded-pill py-3 px-5 shadow" type="button" style="min-width:220px;font-size:1.12rem;">
                                 <i class="fas fa-camera"></i> 撮影
                             </button>
                         </div>
-                        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
                         <!-- ĐÃ LOẠI BỎ input file upload -->
                     </div>
                 </div>
@@ -88,18 +260,34 @@
                         情報 &amp; QRコード読み取り
                     </div>
                     <div class="card-body bg-light">
-                        <div class="form-group mb-3">
+                        <div id="step-note-qr" class="alert alert-secondary step-note mb-3 {% if expected_text %}d-none{% endif %}">
+                            手順2: 先に左側で撮影を完了すると、QR読み取りが有効になります。
+                        </div>
+                        <div id="qr-step-section" class="form-group mb-3 {% if expected_text %}{% else %}d-none{% endif %}">
                             <label><strong>QRコードを読み取って比較内容を取得:</strong></label>
                             <div class="row align-items-center">
                                 <div class="col-md-7 col-12 mb-2 mb-md-0">
-                                    <div id="qr-reader" style="width:100%;"></div>
+                                    <div id="qr-guide-wrap-upload" class="qr-guide-wrap">
+                                        <div id="qr-reader" style="width:100%;"></div>
+                                        <div class="qr-guide-corners">
+                                            <span class="qr-guide-corner tl"></span>
+                                            <span class="qr-guide-corner tr"></span>
+                                            <span class="qr-guide-corner bl"></span>
+                                            <span class="qr-guide-corner br"></span>
+                                        </div>
+                                        <div class="qr-guide-hint">QRを枠内で固定してください</div>
+                                    </div>
                                     <input type="text" class="form-control mt-2" id="expected_text" name="expected_text" placeholder="QR読み取り後、自動入力されます" value="{{ expected_text }}" readonly>
+                                    <div id="qr-done-badge" class="small text-success fw-bold mt-2 {% if expected_text %}{% else %}d-none{% endif %}">
+                                        <i class="fas fa-check-circle"></i> QR読み取り完了
+                                    </div>
                                     <div class="d-flex justify-content-end gap-2 mt-2">
                                         <button type="button" class="btn btn-outline-warning" id="refocus-qr-btn" style="min-width:120px;">
                                             <i class="fas fa-crosshairs"></i> 再フォーカス
                                         </button>
                                         <button type="button" class="btn btn-outline-primary" id="start-qr-btn" style="min-width:120px;">QR読み取り開始</button>
                                         <button type="button" class="btn btn-outline-secondary" id="stop-qr-btn" style="display:none;min-width:120px;">停止</button>
+                                        <button type="button" class="btn btn-outline-success {% if expected_text %}{% else %}d-none{% endif %}" id="rescan-qr-btn" style="min-width:120px;">再スキャン</button>
                                     </div>
                                 </div>
                                 <div class="col-md-5 col-12 text-center">
@@ -108,70 +296,76 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="step-note-input" class="alert alert-secondary step-note mb-3 {% if expected_text %}d-none{% endif %}">
+                            手順3: QRを読み取り後、重量・ロット情報を入力して送信してください。
+                        </div>
+                        <div id="qr-info-summary" class="alert alert-success step-note mb-3 {% if expected_text %}{% else %}d-none{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <i class="fas fa-qrcode"></i>
+                                    <strong>読み取り済みQR:</strong>
+                                    <span id="qr-summary-text">{{ expected_text }}</span>
+                                </div>
+                                <button type="button" class="btn btn-outline-success btn-sm {% if expected_text %}{% else %}d-none{% endif %}" id="rescan-qr-btn-summary">再スキャン</button>
+                            </div>
+                        </div>
+                        <div id="input-step-section" class="{% if expected_text %}{% else %}d-none{% endif %}">
                         {% if device %}
                         <div class="form-group mb-3">
                             <label><strong>選択した機械情報：</strong></label>
                             <div class="border rounded p-2 mb-2 bg-light">
-                                <div><strong>機械No.:</strong> {{ device.name }}</div>
-                                <div><strong>材料名：</strong> {{ device.material }}</div>
-                                <div><strong>材料コード：</strong> {{ device.material_code }}</div>
-                                <div><strong>製品名：</strong> {{ device.product }}</div>
-                                <div><strong>混合率：</strong> {{ device.ratio }}</div>
+                                <div class="row g-2">
+                                    <div class="col-md-6"><strong>機械No.:</strong> {{ device.name }}</div>
+                                    <div class="col-md-6"><strong>材料名：</strong> {{ device.material }}</div>
+                                    <div class="col-md-6"><strong>材料コード：</strong> {{ device.material_code }}</div>
+                                    <div class="col-md-6"><strong>製品名：</strong> {{ device.product }}</div>
+                                    <div class="col-md-6"><strong>混合率：</strong> {{ device.ratio }}</div>
+                                </div>
                             </div>
                             <input type="hidden" name="device" value="{{ device.id }}">
                             <input type="hidden" name="machine_number" value="{{ device.name }}">
                         </div>
                         {% endif %}
-                        <div class="form-group mb-3">
-                            <label><strong>作業者：</strong></label>
-                            <span class="form-control-plaintext" style="font-weight:bold;">
-                                {% if form.instance.operator_name %}
-                                    {{ form.instance.operator_name }}
-                                {% else %}
-                                    {{ request.user.last_name }} {{ request.user.first_name }}
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="input_weight"><strong>投入した材料の重さ (kg)：</strong></label>
-                            <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="decimal">
-                            <div id="virtual-numpad" class="d-flex flex-column align-items-center mt-2" style="max-width:260px;margin:0 auto;gap:4px;">
-    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="7">7</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="8">8</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="9">9</button>
-    </div>
-    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="4">4</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="5">5</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="6">6</button>
-    </div>
-    <div class="d-flex w-100 justify-content-center gap-2 mb-1">
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="1">1</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="2">2</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="3">3</button>
-    </div>
-    <div class="d-flex w-100 justify-content-center gap-2">
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num="0" style="flex:1;">0</button>
-        <button type="button" class="btn btn-outline-secondary num-btn" data-num=".">.</button>
-        <button type="button" class="btn btn-danger num-btn" data-num="del">⌫</button>
-        <button type="button" class="btn btn-warning num-btn" data-num="clear">C</button>
-    </div>
-</div>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="lot_color"><strong>ロット識別色（必須）：</strong></label>
-                            <select class="form-control" id="lot_color" name="lot_color" required>
-                                <option value="">選択してください</option>
-                                <option value="green">緑</option>
-                                <option value="black">黒</option>
-                                <option value="blue">青</option>
-                                <option value="red">赤</option>
-                            </select>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="lot_number"><strong>ロット番号：</strong></label>
-                            <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label><strong>作業者：</strong></label>
+                                <span class="form-control-plaintext" style="font-weight:bold;">
+                                    {% if form.instance.operator_name %}
+                                        {{ form.instance.operator_name }}
+                                    {% else %}
+                                        {{ request.user.last_name }} {{ request.user.first_name }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="lot_number"><strong>ロット番号：</strong></label>
+                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="input_weight"><strong>投入した材料の重さ (kg)：</strong></label>
+                                <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="none" readonly>
+                                <div class="quick-kg-inline mt-2 mb-1">
+                                    <button type="button" class="btn btn-outline-success quick-kg-btn" data-kg="20">20kg</button>
+                                    <button type="button" class="btn btn-outline-primary quick-kg-btn" data-kg="25">25kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="40">40kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="50">50kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="60">60kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="75">75kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="80">80kg</button>
+                                    <button type="button" class="btn btn-outline-secondary quick-kg-btn" data-kg="100">100kg</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="open-numpad-modal-btn" data-bs-toggle="modal" data-bs-target="#kgNumpadModal">テンキー入力</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="lot_color"><strong>ロット識別色（必須）：</strong></label>
+                                <select class="form-control" id="lot_color" name="lot_color" required>
+                                    <option value="">選択してください</option>
+                                    <option value="green">🟢 緑</option>
+                                    <option value="black">⚫ 黒</option>
+                                    <option value="blue">🔵 青</option>
+                                    <option value="red">🔴 赤</option>
+                                </select>
+                            </div>
                         </div>
                         <input type="hidden" id="captured_image" name="captured_image">
                          <div class="card p-3">
@@ -181,11 +375,57 @@
                             </button>
                          </div>
                          </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </form>
+
+    <div class="modal fade kg-modal" id="kgNumpadModal" tabindex="-1" aria-labelledby="kgNumpadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered kg-modal-dialog">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="kgNumpadModalLabel">重量入力テンキー</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="kg-modal-display" class="form-control text-end fw-bold mb-3 kg-display" value="" readonly>
+                    <div id="virtual-numpad-modal" class="kg-pad-grid">
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="7">7</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="8">8</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="9">9</button>
+                        <button type="button" class="btn btn-danger num-btn kg-pad-btn" data-num="del">⌫</button>
+
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="4">4</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="5">5</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="6">6</button>
+                        <button type="button" class="btn btn-warning num-btn kg-pad-btn" data-num="clear">C</button>
+
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="1">1</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="2">2</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="3">3</button>
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num=".">.</button>
+
+                        <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn zero" data-num="0">0</button>
+                    </div>
+                    <div class="kg-quick-grid">
+                        <button type="button" class="btn btn-outline-success quick-kg-btn kg-pad-btn" data-kg="20">20kg</button>
+                        <button type="button" class="btn btn-outline-primary quick-kg-btn kg-pad-btn" data-kg="25">25kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="40">40kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="50">50kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="60">60kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="75">75kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="80">80kg</button>
+                        <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="100">100kg</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary btn-done" data-bs-dismiss="modal">完了</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {% if form.instance.image or form.instance.processed_image or data %}
     <div class="row mt-4 justify-content-center">
@@ -360,57 +600,102 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
 });
 </script>
 <!-- QRコード読み取りライブラリ -->
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script defer src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 <script>
     // カメラ切り替え
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
+    const cameraPreviewWrap = document.getElementById('camera-preview-wrap');
     const snap = document.getElementById('snap');
     const capturedImage = document.getElementById('captured_image');
-    const frontCam = document.getElementById('frontCam');
-    const backCam = document.getElementById('backCam');
     const refocusCam = document.getElementById('refocusCam');
     let currentStream = null;
+    let preferredFacingMode = "environment";
 
-    function startCamera(facingMode = "environment") {
+    function stopCurrentStream() {
         if (currentStream) {
             currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
         }
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } })
+    }
+
+    function startCamera(facingMode = "environment") {
+        stopCurrentStream();
+        const isMobile = window.matchMedia("(max-width: 1024px)").matches;
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: facingMode,
+                aspectRatio: { ideal: 1.7777778 },
+                width: { ideal: isMobile ? 1280 : 1920 },
+                height: { ideal: isMobile ? 720 : 1080 }
+            }
+        })
             .then(function(stream) {
                 currentStream = stream;
                 video.srcObject = stream;
                 video.play();
+                preferredFacingMode = facingMode;
             })
-            .catch(function(err) {
-                alert("カメラにアクセスできません: " + err);
+            .catch(function() {
+                if (facingMode === "environment") {
+                    navigator.mediaDevices.getUserMedia({ video: true })
+                        .then(function(stream) {
+                            currentStream = stream;
+                            video.srcObject = stream;
+                            video.play();
+                            preferredFacingMode = "user";
+                        })
+                        .catch(function(err2) {
+                            alert("カメラにアクセスできません: " + err2);
+                        });
+                } else {
+                    alert("カメラにアクセスできません。");
+                }
             });
     }
 
-    // デフォルトはバックカメラ
+    // デフォルトはバックカメラ優先
     startCamera("environment");
 
-    frontCam.addEventListener("click", function() {
-        startCamera("user");
-    });
-
-    backCam.addEventListener("click", function() {
-        startCamera("environment");
-    });
-
     snap.addEventListener("click", function() {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!vw || !vh) {
+            alert("カメラ映像を取得できません。もう一度お試しください。");
+            return;
+        }
+
+        // 横長のガイド枠（表示と同じ比率）で切り出し
+        const cropX = Math.floor(vw * 0.06);
+        const cropY = Math.floor(vh * 0.27);
+        const cropW = Math.floor(vw * 0.88);
+        const cropH = Math.floor(vh * 0.44);
+
+        canvas.width = cropW;
+        canvas.height = cropH;
         canvas.style.display = "block";
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d').drawImage(
+            video,
+            cropX, cropY, cropW, cropH,
+            0, 0, cropW, cropH
+        );
         const dataURL = canvas.toDataURL('image/png');
         capturedImage.value = dataURL;
+        stopCurrentStream();
+        if (cameraPreviewWrap) {
+            cameraPreviewWrap.style.display = "none";
+        }
+        updateUploadStepLayout();
+        qrStepSection?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
     refocusCam.addEventListener("click", function() {
-        // Dừng stream hiện tại và khởi động lại camera để lấy nét lại
-        startCamera(currentStream && currentStream.getVideoTracks()[0].getSettings().facingMode || "environment");
+        if (cameraPreviewWrap) {
+            cameraPreviewWrap.style.display = "block";
+        }
+        startCamera(preferredFacingMode || "environment");
     });
 
 
@@ -418,53 +703,360 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
     // QRコード読み取り
     let html5QrCode;
     const qrReader = document.getElementById('qr-reader');
+    const qrGuideWrapUpload = document.getElementById('qr-guide-wrap-upload');
     const expectedTextInput = document.getElementById('expected_text');
     const startQrBtn = document.getElementById('start-qr-btn');
     const stopQrBtn = document.getElementById('stop-qr-btn');
+    const rescanQrBtn = document.getElementById('rescan-qr-btn');
+    const rescanQrBtnSummary = document.getElementById('rescan-qr-btn-summary');
+    const qrStepSection = document.getElementById('qr-step-section');
+    const qrInfoSummary = document.getElementById('qr-info-summary');
+    const qrSummaryText = document.getElementById('qr-summary-text');
+    const inputStepSection = document.getElementById('input-step-section');
+    const stepNoteQr = document.getElementById('step-note-qr');
+    const stepNoteInput = document.getElementById('step-note-input');
+    const qrDoneBadge = document.getElementById('qr-done-badge');
+    let uploadCornerTracker = null;
+    const uploadCornerCanvas = document.createElement("canvas");
+    const uploadCornerCtx = uploadCornerCanvas.getContext("2d", { willReadFrequently: true });
+
+    function getUploadQrScanConfig() {
+        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+        const cfg = {
+            fps: isMobile ? 8 : 10,
+            qrbox: isMobile ? { width: 270, height: 270 } : { width: 250, height: 250 },
+            disableFlip: false,
+            videoConstraints: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: isMobile ? 1280 : 1280 },
+                height: { ideal: isMobile ? 720 : 720 }
+            }
+        };
+        if (typeof Html5QrcodeSupportedFormats !== "undefined" && Html5QrcodeSupportedFormats.QR_CODE !== undefined) {
+            cfg.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+        }
+        return cfg;
+    }
+
+    function setUploadGuideState(state, message) {
+        if (!qrGuideWrapUpload) return;
+        qrGuideWrapUpload.classList.remove('is-scanning', 'is-locked');
+        if (state === 'scanning') qrGuideWrapUpload.classList.add('is-scanning');
+        if (state === 'locked') qrGuideWrapUpload.classList.add('is-locked');
+        const hint = qrGuideWrapUpload.querySelector('.qr-guide-hint');
+        if (hint && message) hint.textContent = message;
+    }
+
+    function hasCapturedImage() {
+        return !!(capturedImage && capturedImage.value && capturedImage.value.startsWith("data:image"));
+    }
+
+    function hasQrValue() {
+        const value = (expectedTextInput?.value || "").trim();
+        return value !== "" && value !== "None";
+    }
+
+    function updateUploadStepLayout() {
+        const capturedReady = hasCapturedImage();
+        const qrReady = hasQrValue();
+        const qrStepReady = capturedReady || qrReady;
+
+        if (stepNoteQr) stepNoteQr.classList.toggle('d-none', qrStepReady);
+        if (qrStepSection) qrStepSection.classList.toggle('d-none', !qrStepReady || qrReady);
+
+        if (stepNoteInput) stepNoteInput.classList.toggle('d-none', qrReady || !qrStepReady);
+        if (inputStepSection) inputStepSection.classList.toggle('d-none', !qrReady);
+        if (qrInfoSummary) qrInfoSummary.classList.toggle('d-none', !qrReady);
+        if (qrSummaryText && qrReady) qrSummaryText.textContent = expectedTextInput.value || "";
+
+        if (qrDoneBadge) qrDoneBadge.classList.toggle('d-none', !qrReady);
+        if (startQrBtn) startQrBtn.style.display = qrReady ? "none" : "inline-block";
+        if (rescanQrBtn) rescanQrBtn.classList.toggle('d-none', !qrReady);
+        if (rescanQrBtnSummary) rescanQrBtnSummary.classList.toggle('d-none', !qrReady);
+
+        if (qrGuideWrapUpload) {
+            qrGuideWrapUpload.classList.toggle('d-none', qrReady);
+        }
+    }
+
+    function resetUploadTemporaryState() {
+        try {
+            if (html5QrCode) {
+                html5QrCode.stop().catch(() => {});
+            }
+        } catch (e) {
+            // ignore
+        }
+        html5QrCode = null;
+
+        stopUploadCornerTracking();
+        clearUploadDetectedCorners();
+
+        if (expectedTextInput) expectedTextInput.value = "";
+        if (capturedImage) capturedImage.value = "";
+
+        const inputWeightEl = document.getElementById('input_weight');
+        if (inputWeightEl) inputWeightEl.value = "";
+
+        const lotColorEl = document.getElementById('lot_color');
+        if (lotColorEl) lotColorEl.value = "";
+
+        const lotNumberEl = document.getElementById('lot_number');
+        if (lotNumberEl) lotNumberEl.value = "";
+
+        const kgModalDisplay = document.getElementById('kg-modal-display');
+        if (kgModalDisplay) kgModalDisplay.value = "";
+
+        const kgModalEl = document.getElementById('kgNumpadModal');
+        if (kgModalEl && window.bootstrap) {
+            const instance = bootstrap.Modal.getInstance(kgModalEl);
+            instance?.hide();
+        }
+
+        if (startQrBtn) startQrBtn.style.display = "inline-block";
+        if (stopQrBtn) stopQrBtn.style.display = "none";
+        if (rescanQrBtn) rescanQrBtn.classList.add('d-none');
+
+        if (qrReader) qrReader.innerHTML = "";
+
+        if (canvas) {
+            canvas.style.display = "none";
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width || 0, canvas.height || 0);
+        }
+
+        if (cameraPreviewWrap) {
+            cameraPreviewWrap.style.display = "block";
+        }
+
+        setUploadGuideState('', 'QRを枠内で固定してください');
+        startCamera("environment");
+        updateUploadStepLayout();
+    }
+
+    function isReloadNavigation() {
+        const nav = performance.getEntriesByType && performance.getEntriesByType("navigation");
+        return !!(nav && nav.length && nav[0].type === "reload");
+    }
+
+    function clearUploadDetectedCorners() {
+        if (!qrGuideWrapUpload) return;
+        qrGuideWrapUpload.querySelectorAll('.qr-detect-corner').forEach(el => el.remove());
+    }
+
+    function mapUploadPointToWrap(point) {
+        const video = qrReader ? qrReader.querySelector("video") : null;
+        if (!video || !video.videoWidth || !video.videoHeight || !qrGuideWrapUpload) {
+            return { x: point.x || 0, y: point.y || 0 };
+        }
+        const wrapRect = qrGuideWrapUpload.getBoundingClientRect();
+        const videoRect = video.getBoundingClientRect();
+        const sx = videoRect.width / Math.max(video.videoWidth, 1);
+        const sy = videoRect.height / Math.max(video.videoHeight, 1);
+        return {
+            x: (point.x * sx) + (videoRect.left - wrapRect.left),
+            y: (point.y * sy) + (videoRect.top - wrapRect.top),
+        };
+    }
+
+    function renderUploadDetectedCornersFromPoints(points) {
+        if (!qrGuideWrapUpload || !qrReader || !points || points.length < 4) return;
+        clearUploadDetectedCorners();
+        points.slice(0, 4).forEach((p, idx) => {
+            const marker = document.createElement('span');
+            marker.className = 'qr-detect-corner';
+            marker.setAttribute('data-qr-corner', String(idx));
+            const pos = mapUploadPointToWrap(p);
+            marker.style.left = `${Math.max(0, pos.x - 7)}px`;
+            marker.style.top = `${Math.max(0, pos.y - 7)}px`;
+            qrGuideWrapUpload.appendChild(marker);
+        });
+    }
+
+    function startUploadCornerTracking() {
+        stopUploadCornerTracking();
+        uploadCornerTracker = setInterval(() => {
+            try {
+                if (typeof jsQR === "undefined") return;
+                const video = qrReader ? qrReader.querySelector("video") : null;
+                if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+                if (uploadCornerCanvas.width !== video.videoWidth || uploadCornerCanvas.height !== video.videoHeight) {
+                    uploadCornerCanvas.width = video.videoWidth;
+                    uploadCornerCanvas.height = video.videoHeight;
+                }
+                uploadCornerCtx.drawImage(video, 0, 0, uploadCornerCanvas.width, uploadCornerCanvas.height);
+                const frame = uploadCornerCtx.getImageData(0, 0, uploadCornerCanvas.width, uploadCornerCanvas.height);
+                const qr = jsQR(frame.data, uploadCornerCanvas.width, uploadCornerCanvas.height, { inversionAttempts: "dontInvert" });
+                if (!qr || !qr.location) return;
+                const loc = qr.location;
+                const points = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner]
+                    .filter(Boolean)
+                    .map(p => ({ x: Number(p.x), y: Number(p.y) }));
+                if (points.length >= 4) renderUploadDetectedCornersFromPoints(points);
+            } catch (e) {
+                // ignore frame errors
+            }
+        }, 120);
+    }
+
+    function stopUploadCornerTracking() {
+        if (uploadCornerTracker) {
+            clearInterval(uploadCornerTracker);
+            uploadCornerTracker = null;
+        }
+        clearUploadDetectedCorners();
+    }
+
+    function extractUploadQrPoints(decodedResult) {
+        if (!decodedResult) return [];
+        const candidates = [
+            decodedResult?.result?.resultPoints,
+            decodedResult?.resultPoints,
+            decodedResult?.cornerPoints,
+            decodedResult?.result?.cornerPoints,
+        ];
+        for (const arr of candidates) {
+            if (Array.isArray(arr) && arr.length >= 4) {
+                return arr.map((p) => ({
+                    x: Number(p.x ?? p.X ?? p[0]),
+                    y: Number(p.y ?? p.Y ?? p[1]),
+                })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+            }
+        }
+        const loc = decodedResult.location || decodedResult.result?.location;
+        if (loc && loc.topLeftCorner) {
+            return [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner]
+                .filter(Boolean)
+                .map(p => ({ x: Number(p.x), y: Number(p.y) }));
+        }
+        return [];
+    }
+
+    function renderUploadDetectedCorners(decodedResult) {
+        if (!qrGuideWrapUpload || !qrReader) return;
+        clearUploadDetectedCorners();
+        const points = extractUploadQrPoints(decodedResult);
+        if (!points || points.length < 4) return;
+
+        const video = qrReader.querySelector("video");
+        const normalized = points.every((p) => p.x >= 0 && p.x <= 1.01 && p.y >= 0 && p.y <= 1.01);
+        const corrected = normalized && video && video.videoWidth && video.videoHeight
+            ? points.map((p) => ({ x: p.x * video.videoWidth, y: p.y * video.videoHeight }))
+            : points;
+
+        corrected.slice(0, 4).forEach((p, idx) => {
+            const marker = document.createElement('span');
+            marker.className = 'qr-detect-corner';
+            marker.setAttribute('data-qr-corner', String(idx));
+            const pos = mapUploadPointToWrap(p);
+            marker.style.left = `${Math.max(0, pos.x - 7)}px`;
+            marker.style.top = `${Math.max(0, pos.y - 7)}px`;
+            qrGuideWrapUpload.appendChild(marker);
+        });
+    }
 
     startQrBtn.onclick = function() {
+        if (!hasCapturedImage()) {
+            alert("先に左側で撮影してください。");
+            return;
+        }
         startQrBtn.style.display = "none";
         stopQrBtn.style.display = "inline-block";
-        qrReader.style.display = "block";
+        setUploadGuideState('scanning', 'QRを枠内で固定してください');
         html5QrCode = new Html5Qrcode("qr-reader");
         html5QrCode.start(
             { facingMode: "environment" },
-            {
-                fps: 10,
-                qrbox: 250
-            },
-            qrCodeMessage => {
+            getUploadQrScanConfig(),
+            (qrCodeMessage, decodedResult) => {
+                renderUploadDetectedCorners(decodedResult);
                 expectedTextInput.value = qrCodeMessage;
-                html5QrCode.stop();
-                qrReader.innerHTML = "";
-                startQrBtn.style.display = "inline-block";
-                stopQrBtn.style.display = "none";
+                setUploadGuideState('locked', 'QRを確認しました');
+                updateUploadStepLayout();
+                setTimeout(() => {
+                    html5QrCode.stop();
+                    stopUploadCornerTracking();
+                    qrReader.innerHTML = "";
+                    stopQrBtn.style.display = "none";
+                    updateUploadStepLayout();
+                    inputStepSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 700);
             },
             errorMessage => {
                 // エラーをログに出力する場合
             }
         ).catch(err => {
             alert("QRコード読み取り用カメラにアクセスできません: " + err);
-            startQrBtn.style.display = "inline-block";
+            stopUploadCornerTracking();
+            setUploadGuideState('', 'QRを枠内で固定してください');
             stopQrBtn.style.display = "none";
+            updateUploadStepLayout();
         });
+        startUploadCornerTracking();
     };
 
     stopQrBtn.onclick = function() {
         if (html5QrCode) {
             html5QrCode.stop().then(() => {
                 qrReader.innerHTML = "";
-                startQrBtn.style.display = "inline-block";
+                stopUploadCornerTracking();
+                setUploadGuideState('', 'QRを枠内で固定してください');
                 stopQrBtn.style.display = "none";
+                updateUploadStepLayout();
             });
         }
     };
 
+    function handleRescanQr() {
+        expectedTextInput.value = "";
+        setUploadGuideState('', 'QRを枠内で固定してください');
+        updateUploadStepLayout();
+        startQrBtn?.click();
+    }
+
+    rescanQrBtn?.addEventListener('click', handleRescanQr);
+    rescanQrBtnSummary?.addEventListener('click', handleRescanQr);
+
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            resetUploadTemporaryState();
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
     const inputWeight = document.getElementById('input_weight');
-    const numpad = document.getElementById('virtual-numpad');
-    if (numpad && inputWeight) {
-        numpad.addEventListener('click', function(e) {
+    const modalNumpad = document.getElementById('virtual-numpad-modal');
+    const kgModalDisplay = document.getElementById('kg-modal-display');
+    const kgModalEl = document.getElementById('kgNumpadModal');
+    const quickKgButtons = document.querySelectorAll('.quick-kg-btn');
+    const openNumpadModalBtn = document.getElementById('open-numpad-modal-btn');
+
+    function syncKgDisplay() {
+        if (kgModalDisplay && inputWeight) {
+            kgModalDisplay.value = inputWeight.value || "";
+        }
+    }
+
+    quickKgButtons.forEach((btn) => {
+        btn.addEventListener('click', function() {
+            const kg = this.getAttribute('data-kg');
+            if (!kg) return;
+            inputWeight.value = kg;
+            syncKgDisplay();
+        });
+    });
+
+    openNumpadModalBtn?.addEventListener('click', function() {
+        syncKgDisplay();
+    });
+
+    if (kgModalEl) {
+        kgModalEl.addEventListener('shown.bs.modal', function() {
+            syncKgDisplay();
+        });
+    }
+
+    if (modalNumpad && inputWeight) {
+        modalNumpad.addEventListener('click', function(e) {
             if (e.target.classList.contains('num-btn')) {
                 let val = inputWeight.value || '';
                 const num = e.target.getAttribute('data-num');
@@ -475,16 +1067,22 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
                 } else {
                     inputWeight.value += num;
                 }
-                inputWeight.focus();
+                syncKgDisplay();
             }
         });
-        // Ngăn bàn phím thật hiện ra trên mobile khi nhấn input
-        inputWeight.addEventListener('focus', function(e) {
-            setTimeout(() => inputWeight.blur(), 100);
-        });
+    }
+    syncKgDisplay();
+    if (isReloadNavigation()) {
+        resetUploadTemporaryState();
+    } else {
+        updateUploadStepLayout();
     }
 });
 </script>
 </div>
 
+
+</div>
 {% endblock %}
+
+

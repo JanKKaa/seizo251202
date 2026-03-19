@@ -1,9 +1,11 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 {% load static %}
 
 {% block title %}原材料入庫フロー{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="text-success fw-bold mb-0">原材料入庫フロー（UI）</h2>
@@ -44,10 +46,10 @@
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-bold">ロット識別色</label>
                         <select class="form-control">
-                            <option>緑</option>
-                            <option>黒</option>
-                            <option>青</option>
-                            <option>赤</option>
+                            <option>🟢 緑</option>
+                            <option>⚫ 黒</option>
+                            <option>🔵 青</option>
+                            <option>🔴 赤</option>
                         </select>
                     </div>
                     <div class="col-md-4 mb-3">
@@ -64,4 +66,8 @@
         </div>
     </div>
 </div>
+
+</div>
 {% endblock %}
+
+

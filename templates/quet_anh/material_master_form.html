@@ -1,10 +1,17 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container mt-4" style="max-width: 760px;">
-    <h2 class="mb-3">{{ page_title }}</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">{{ page_title }}</h2>
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> インデックスへ戻る
+        </a>
+    </div>
 
     <div class="card shadow-sm">
         <div class="card-body">
@@ -25,11 +32,19 @@
                     {% endif %}
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold" for="{{ form.qr_content.id_for_label }}">QR内容（短縮名）</label>
+                    <label class="form-label fw-bold" for="{{ form.qr_content.id_for_label }}">出庫用QR内容</label>
                     {{ form.qr_content }}
-                    <div class="form-text">QR読取時に照合する短いテキストを登録してください。</div>
+                    <div class="form-text">出庫時（包装QR）に照合するテキストを登録してください。</div>
                     {% if form.qr_content.errors %}
                         <div class="text-danger small mt-1">{{ form.qr_content.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold" for="{{ form.qr_content_in.id_for_label }}">入庫用QR内容</label>
+                    {{ form.qr_content_in }}
+                    <div class="form-text">入庫時（帳票QR）に照合するテキストを登録してください。未入力時は出庫用QRを使用します。</div>
+                    {% if form.qr_content_in.errors %}
+                        <div class="text-danger small mt-1">{{ form.qr_content_in.errors|striptags }}</div>
                     {% endif %}
                 </div>
                 <div class="form-check mb-3">
@@ -47,5 +62,8 @@
         </div>
     </div>
 </div>
+
+</div>
 {% endblock %}
+
 

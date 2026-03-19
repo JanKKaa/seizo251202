@@ -1,8 +1,10 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 
 {% block title %}材料マスター一覧{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">材料マスター一覧</h2>
@@ -13,7 +15,7 @@
 
     <form method="get" class="row g-2 mb-3">
         <div class="col-md-6">
-            <input type="text" name="keyword" value="{{ keyword }}" class="form-control" placeholder="原材料名・コード・QR内容で検索">
+            <input type="text" name="keyword" value="{{ keyword }}" class="form-control" placeholder="原材料名・コード・入出庫QRで検索">
         </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-primary">検索</button>
@@ -30,7 +32,8 @@
                             <th class="text-center" style="width:6%;">#</th>
                             <th>原材料名</th>
                             <th>原材料コード</th>
-                            <th>QR内容（短縮名）</th>
+                            <th>出庫用QR</th>
+                            <th>入庫用QR</th>
                             <th class="text-center" style="width:10%;">有効</th>
                             <th class="text-center" style="width:18%;">操作</th>
                         </tr>
@@ -42,6 +45,7 @@
                             <td>{{ item.material_name }}</td>
                             <td>{{ item.material_code }}</td>
                             <td>{{ item.qr_content }}</td>
+                            <td>{{ item.qr_content_in|default:"-" }}</td>
                             <td class="text-center">
                                 {% if item.is_active %}
                                     <span class="badge bg-success">有効</span>
@@ -59,7 +63,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-3">データがありません。</td>
+                            <td colspan="7" class="text-center text-muted py-3">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -72,5 +76,8 @@
         <i class="fas fa-arrow-left"></i> メインページに戻る
     </a>
 </div>
+
+</div>
 {% endblock %}
+
 

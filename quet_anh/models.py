@@ -5,7 +5,8 @@ from django.contrib.auth.models import User
 class QAMaterialMaster(models.Model):
     material_name = models.CharField("原材料名", max_length=120, db_index=True)
     material_code = models.CharField("原材料コード", max_length=120, db_index=True, unique=True)
-    qr_content = models.CharField("QR内容（短縮名）", max_length=120, db_index=True, unique=True)
+    qr_content = models.CharField("出庫用QR内容", max_length=120, db_index=True)
+    qr_content_in = models.CharField("入庫用QR内容", max_length=120, db_index=True, blank=True, default="")
     is_active = models.BooleanField("有効", default=True)
     created_at = models.DateTimeField("作成日時", auto_now_add=True)
     updated_at = models.DateTimeField("更新日時", auto_now=True)

@@ -1,8 +1,10 @@
-{% extends "trang_chu/base.html" %}
+﻿{% extends "trang_chu/base.html" %}
 
 {% block title %}デバイス一覧{% endblock %}
 
 {% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
 {% if success_message %}
 <div class="alert alert-success alert-dismissible fade show" role="alert">
     {{ success_message }}
@@ -65,4 +67,8 @@
     </div>
     <a href="{% url 'index_qa' %}" class="btn btn-secondary mt-2">メインページに戻る</a>
 </div>
+
+</div>
 {% endblock %}
+
+

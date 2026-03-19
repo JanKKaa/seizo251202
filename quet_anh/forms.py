@@ -35,7 +35,7 @@ class QADeviceInfoForm(forms.ModelForm):
 class QAMaterialMasterForm(forms.ModelForm):
     class Meta:
         model = QAMaterialMaster
-        fields = ["material_name", "material_code", "qr_content", "is_active"]
+        fields = ["material_name", "material_code", "qr_content", "qr_content_in", "is_active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -58,8 +58,6 @@ class QAMaterialStockLedgerForm(forms.ModelForm):
             "bag_sequence_no",
             "lot_number",
             "workstation_management_no",
-            "supervisor_confirmed",
-            "supervisor_name",
         ]
         widgets = {
             "stock_in_date": forms.DateInput(attrs={"type": "date"}),
@@ -68,10 +66,7 @@ class QAMaterialStockLedgerForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
-            if name == "supervisor_confirmed":
-                field.widget.attrs["class"] = "form-check-input"
-            else:
-                field.widget.attrs["class"] = "form-control"
+            field.widget.attrs["class"] = "form-control"
 
 
 class QAMaterialOutStockLedgerForm(forms.ModelForm):
@@ -86,8 +81,6 @@ class QAMaterialOutStockLedgerForm(forms.ModelForm):
             "bag_sequence_no",
             "lot_number",
             "workstation_management_no",
-            "supervisor_confirmed",
-            "supervisor_name",
         ]
         widgets = {
             "stock_out_date": forms.DateInput(attrs={"type": "date"}),
@@ -96,7 +89,4 @@ class QAMaterialOutStockLedgerForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
-            if name == "supervisor_confirmed":
-                field.widget.attrs["class"] = "form-check-input"
-            else:
-                field.widget.attrs["class"] = "form-control"
+            field.widget.attrs["class"] = "form-control"
