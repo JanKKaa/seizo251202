@@ -27,6 +27,11 @@
             </a>
         </div>
         <div class="col-lg-2 col-md-4 text-center mb-2">
+            <a href="{% url 'material_master_list' %}" class="btn btn-dark btn-lg btn-block shadow rounded-pill px-4 py-2">
+                <i class="fas fa-boxes"></i> 材料マスター一覧
+            </a>
+        </div>
+        <div class="col-lg-2 col-md-4 text-center mb-2">
             <a href="{% url 'dashboard_qa' %}" class="btn btn-primary btn-lg btn-block shadow rounded-pill px-4 py-2">
                 <i class="fas fa-tachometer-alt"></i> ダッシュボード
             </a>
@@ -100,7 +105,7 @@
                     <form method="get" action="{% url 'stock_in_start' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
                         <select id="material_name" name="material_name" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
                             {% for m in material_list %}
-                                <option value="{{ m.material }}" data-material-code="{{ m.material_code }}">{{ m.material }}{% if m.material_code %} | {{ m.material_code }}{% endif %}</option>
+                                <option value="{{ m.material }}" data-material-code="{{ m.material_code }}" data-qr-content="{{ m.qr_content }}">{{ m.material }}</option>
                             {% endfor %}
                         </select>
                         <input type="hidden" id="material_code" name="material_code" value="">
@@ -280,11 +285,13 @@ startMaterialQrBtn.addEventListener('click', function() {
         { facingMode: "environment" },
         { fps: 10, qrbox: 200 },
         qrCodeMessage => {
+            const scanned = (qrCodeMessage || "").trim();
             let found = false;
             for (let i = 0; i < selectMaterial.options.length; i++) {
                 const option = selectMaterial.options[i];
-                const label = option.text.split("|")[0].trim();
-                if (option.value === qrCodeMessage || label === qrCodeMessage || option.text === qrCodeMessage) {
+                const label = (option.text || "").trim();
+                const qrContent = (option.dataset.qrContent || "").trim();
+                if (option.value === scanned || label === scanned || qrContent === scanned) {
                     selectMaterial.selectedIndex = i;
                     found = true;
                     break;
@@ -314,11 +321,13 @@ refocusMaterialQrBtn.addEventListener('click', function() {
                 { facingMode: "environment" },
                 { fps: 10, qrbox: 200 },
                 qrCodeMessage => {
+                    const scanned = (qrCodeMessage || "").trim();
                     let found = false;
                     for (let i = 0; i < selectMaterial.options.length; i++) {
                         const option = selectMaterial.options[i];
-                        const label = option.text.split("|")[0].trim();
-                        if (option.value === qrCodeMessage || label === qrCodeMessage || option.text === qrCodeMessage) {
+                        const label = (option.text || "").trim();
+                        const qrContent = (option.dataset.qrContent || "").trim();
+                        if (option.value === scanned || label === scanned || qrContent === scanned) {
                             selectMaterial.selectedIndex = i;
                             found = true;
                             break;

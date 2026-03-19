@@ -5,7 +5,58 @@
     <h2 class="mb-4">資格証明書編集</h2>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ form.loai_bang.id_for_label }}">資格の種類</label>
+            <input
+                type="text"
+                name="{{ form.loai_bang.html_name }}"
+                id="{{ form.loai_bang.id_for_label }}"
+                class="form-control {% if form.loai_bang.errors %}is-invalid{% endif %}"
+                list="loai-bang-options"
+                value="{{ form.loai_bang.value|default_if_none:'' }}"
+                placeholder="新しい分類を自由に入力できます"
+                required
+            >
+            <datalist id="loai-bang-options">
+                {% for item in form.loai_bang_suggestions %}
+                    <option value="{{ item }}"></option>
+                {% endfor %}
+            </datalist>
+            {% for error in form.loai_bang.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ form.cap_do.id_for_label }}">級</label>
+            {{ form.cap_do }}
+            {% for error in form.cap_do.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ form.file.id_for_label }}">証明書ファイル（PDFまたは画像）</label>
+            {{ form.file }}
+            {% if bangcap.file %}
+                <div class="form-text">現在のファイル: {{ bangcap.file.name }}</div>
+            {% endif %}
+            {% for error in form.file.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ form.ngay_cap.id_for_label }}">発行日</label>
+            {{ form.ngay_cap }}
+            {% for error in form.ngay_cap.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ form.ghi_chu.id_for_label }}">備考</label>
+            {{ form.ghi_chu }}
+            {% for error in form.ghi_chu.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
         <button class="btn btn-primary" type="submit">保存</button>
         <a href="{% url 'learn:bangcap_list' %}" class="btn btn-secondary ms-2">戻る</a>
     </form>

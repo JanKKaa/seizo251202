@@ -33,6 +33,15 @@
                             <td>{{ form.material_code }}</td>
                         </tr>
                         <tr>
+                            <th class="small text-right align-middle">材料マスター連携</th>
+                            <td>
+                                {{ form.material_master }}
+                                <div class="small text-muted mt-1">
+                                    選択した場合、原材料名・原材料コードはマスター値で上書きされます。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
                             <th class="small text-right align-middle">製品名</th>
                             <td>{{ form.product }}</td>
                         </tr>

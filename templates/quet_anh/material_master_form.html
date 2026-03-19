@@ -1,0 +1,51 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 760px;">
+    <h2 class="mb-3">{{ page_title }}</h2>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold" for="{{ form.material_name.id_for_label }}">原材料名</label>
+                    {{ form.material_name }}
+                    {% if form.material_name.errors %}
+                        <div class="text-danger small mt-1">{{ form.material_name.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold" for="{{ form.material_code.id_for_label }}">原材料コード</label>
+                    {{ form.material_code }}
+                    {% if form.material_code.errors %}
+                        <div class="text-danger small mt-1">{{ form.material_code.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold" for="{{ form.qr_content.id_for_label }}">QR内容（短縮名）</label>
+                    {{ form.qr_content }}
+                    <div class="form-text">QR読取時に照合する短いテキストを登録してください。</div>
+                    {% if form.qr_content.errors %}
+                        <div class="text-danger small mt-1">{{ form.qr_content.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="form-check mb-3">
+                    {{ form.is_active }}
+                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">有効</label>
+                </div>
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger py-2">{{ form.non_field_errors|striptags }}</div>
+                {% endif %}
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{% url 'material_master_list' %}" class="btn btn-outline-secondary">キャンセル</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

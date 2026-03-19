@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import QADeviceInfo, QAResult, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger
+from .models import QADeviceInfo, QAResult, QAMaterialMaster, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger
 
 
 @admin.register(QADeviceInfo)
@@ -14,6 +14,13 @@ class QAResultAdmin(admin.ModelAdmin):
     list_display = ("id", "machine_number", "operator_name", "result", "match_ratio", "created_at")
     search_fields = ("machine_number", "operator_name", "data", "result")
     list_filter = ("result", "created_at")
+
+
+@admin.register(QAMaterialMaster)
+class QAMaterialMasterAdmin(admin.ModelAdmin):
+    list_display = ("id", "material_name", "material_code", "qr_content", "is_active", "updated_at")
+    search_fields = ("material_name", "material_code", "qr_content")
+    list_filter = ("is_active", "updated_at")
 
 
 @admin.register(QAAutoInputLedger)

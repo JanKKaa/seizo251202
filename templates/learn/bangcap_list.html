@@ -9,6 +9,86 @@
         <!-- Nội dung sẽ được cập nhật bằng JavaScript -->
         集計中...
     </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-light fw-bold d-flex align-items-center justify-content-between">
+            <span><i class="fas fa-layer-group me-2 text-primary"></i>等級評価ガイド</span>
+            <span class="badge bg-primary">4級 → 特急</span>
+        </div>
+        <div class="card-body py-2">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-1">
+                    <thead>
+                        <tr>
+                            <th style="width:10%;">等級</th>
+                            <th style="width:30%;">判定イメージ</th>
+                            <th>期待スキル</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-secondary">4級</span></td>
+                            <td>入門</td>
+                            <td>基礎知識を理解し、指示のもとで安全に作業できる。</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-info text-dark">3級</span></td>
+                            <td>基礎実務</td>
+                            <td>標準手順に沿って日常業務を安定して実施できる。</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-primary">2級</span></td>
+                            <td>標準実務</td>
+                            <td>独力で作業し、軽微な異常に対して原因確認と初期対応ができる。</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-warning text-dark">1級</span></td>
+                            <td>高度実務</td>
+                            <td>難易度の高い業務を遂行し、後輩指導や改善提案を主導できる。</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-danger">特急</span></td>
+                            <td>統括・指導</td>
+                            <td>部門横断で標準化・教育・監査を推進し、全体最適を牽引できる。</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if user.is_authenticated and user.username == 'kanri' %}
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="small text-muted">管理者ビューの見方 1</div>
+                    <div class="fw-semibold">資格件数</div>
+                    <div class="small">保有数の偏りを確認し、教育計画を調整します。</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="small text-muted">管理者ビューの見方 2</div>
+                    <div class="fw-semibold">平均レベル</div>
+                    <div class="small">部署全体の実務成熟度を把握し、重点強化分野を決めます。</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="small text-muted">管理者ビューの見方 3</div>
+                    <div class="fw-semibold">分類別スキル説明</div>
+                    <div class="small">資格分類と等級から、期待できる業務適用範囲を確認します。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex flex-wrap align-items-center mb-3" style="gap: 0.5rem;">
         <form method="get" class="flex-grow-1" style="max-width:600px; min-width:220px;">
             <div class="input-group">
@@ -327,6 +407,43 @@ document.getElementById('radar-summary').innerText = getRadarSummaryJP(radarLabe
         }
     };
 
+    // 級ごとの共通評価（新しい資格分類でも自動適用）
+    const levelBaseSkill = {
+        "特急": "全社最適視点で標準化・改善を主導し、教育・監査まで担えるレベル。",
+        "1級": "高度業務を独力で遂行し、後輩指導・再発防止まで実行できるレベル。",
+        "2級": "標準業務を安定遂行し、問題発生時に原因分析と対策を実施できるレベル。",
+        "3級": "基礎業務を理解し、手順に沿って安全・品質を守って作業できるレベル。",
+        "4級": "入門レベル。基礎知識を習得し、指示のもとで作業できるレベル。",
+        "default": "実務に必要な基礎知識と安全意識を有するレベル。"
+    };
+
+    // 新規分類向け: キーワードでスキル領域を自動判定
+    const autoSkillDomainRules = [
+        { keys: ["ロボット", "robot", "産業用ロボット"], domain: "ロボット運用・ティーチング・安全柵内作業管理" },
+        { keys: ["玉掛け", "tamakake", "つり上げ"], domain: "玉掛け作業・合図連携・吊り荷安全管理" },
+        { keys: ["クレーン", "crane"], domain: "クレーン運転・吊り荷作業・安全管理" },
+        { keys: ["フォークリフト", "forklift"], domain: "搬送作業・車両安全運転・荷役管理" },
+        { keys: ["電気", "electrical"], domain: "電気保全・設備点検・安全管理" },
+        { keys: ["it", "情報", "システム"], domain: "IT運用・情報管理・業務改善" },
+        { keys: ["品質", "qc", "検査"], domain: "品質管理・工程監視・是正予防" }
+    ];
+
+    function findAutoSkillDomain(loai) {
+        const src = (loai || "").toLowerCase();
+        const hit = autoSkillDomainRules.find(rule => rule.keys.some(k => src.includes(k.toLowerCase())));
+        return hit ? hit.domain : "当該資格分野の専門実務";
+    }
+
+    function getSkillDescription(loai, levelName) {
+        const exact = loaiBangNangLuc[loai];
+        if (exact && (exact[levelName] || exact.default)) {
+            return exact[levelName] || exact.default;
+        }
+        const domain = findAutoSkillDomain(loai);
+        const levelText = levelBaseSkill[levelName] || levelBaseSkill.default;
+        return `${loai}：${domain}に関する資格。${levelName}想定: ${levelText}`;
+    }
+
     const bangcaps = JSON.parse(document.getElementById('bangcaps-data').textContent);
 
     // Thống kê tổng số bằng cấp theo từng loại
@@ -355,7 +472,7 @@ document.getElementById('radar-summary').innerText = getRadarSummaryJP(radarLabe
         const numToLevel = {5: "特急", 4: "1級", 3: "2級", 2: "3級", 1: "4級"};
         const avgLevelName = numToLevel[avgLevelNum] || "default";
         // Lấy mô tả đúng cấp độ trung bình
-        let desc = (loaiBangNangLuc[loai] && loaiBangNangLuc[loai][avgLevelName]) ? loaiBangNangLuc[loai][avgLevelName] : (loaiBangNangLuc[loai]?.default || "");
+        let desc = getSkillDescription(loai, avgLevelName);
         detail += `<li><b>${loai}</b>：${stat.count}件　平均レベル：${avg.toFixed(2)}<br>
         <span class="text-secondary small">・${avgLevelName}：${desc}</span>
     </li>`;
@@ -372,7 +489,8 @@ document.getElementById('radar-summary').innerText = getRadarSummaryJP(radarLabe
         }
     });
     let avgLevel = levelCount ? (levelSum / levelCount) : 0;
-    let summary = `資格証明書合計：<b>${total}件</b>　／　平均レベル：<b>${avgLevel.toFixed(2)}</b>`;
+    let summary = `資格証明書合計：<b>${total}件</b>　／　平均レベル：<b>${avgLevel.toFixed(2)}</b><br>
+    <span class="small text-secondary">評価基準: 4級=入門 / 3級=基礎実務 / 2級=標準実務 / 1級=高度実務 / 特急=指導・統括</span>`;
 
     if (avgLevel >= 4.5) {
         summary += "　→　会社全体の専門性は非常に高いです。新規事業や難易度の高いプロジェクトにも十分対応可能です。";

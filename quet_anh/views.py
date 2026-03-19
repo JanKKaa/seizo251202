@@ -6,14 +6,29 @@ from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponseForbidden, JsonResponse
 from django.urls import reverse
-from .forms import QAResultForm, QADeviceInfoForm, QAMaterialStockLedgerForm, QAMaterialOutStockLedgerForm
-from .models import QAResult, QADeviceInfo, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
+from .forms import (
+    QAResultForm,
+    QADeviceInfoForm,
+    QAMaterialMasterForm,
+    QAMaterialStockLedgerForm,
+    QAMaterialOutStockLedgerForm,
+)
+from .models import (
+    QAResult,
+    QADeviceInfo,
+    QAMaterialMaster,
+    QAAutoInputLedger,
+    QAMaterialStockLedger,
+    QAMaterialOutStockLedger,
+    QADeletedJobMarker,
+)
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count
+from django.db import OperationalError, ProgrammingError
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 
@@ -216,6 +231,51 @@ def _rollback_failed_qa_attempt(qa_result):
         return
     PhienNhapLieu.objects.filter(qa_result=qa_result).exclude(trang_thai="done").delete()
     qa_result.delete()
+
+
+def _build_material_list_for_stock_in():
+    # 優先: 材料マスター一覧
+    # Bảo vệ runtime: nếu chưa migrate bảng mới thì fallback dữ liệu cũ.
+    try:
+        master_rows = (
+            QAMaterialMaster.objects.filter(is_active=True)
+            .values("material_name", "material_code", "qr_content")
+            .order_by("material_name", "material_code")
+        )
+        material_list = [
+            {
+                "material": row.get("material_name") or "",
+                "material_code": row.get("material_code") or "",
+                "qr_content": row.get("qr_content") or "",
+            }
+            for row in master_rows
+        ]
+        if material_list:
+            return material_list
+    except (OperationalError, ProgrammingError):
+        pass
+
+    # 互換性維持: 旧データ（機械マスタ）をフォールバック
+    material_rows = (
+        QADeviceInfo.objects.exclude(material__exact="")
+        .values("material", "material_code")
+        .order_by("material", "material_code")
+    )
+    seen = set()
+    legacy_list = []
+    for row in material_rows:
+        key = (row.get("material") or "", row.get("material_code") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        legacy_list.append(
+            {
+                "material": key[0],
+                "material_code": key[1],
+                "qr_content": key[0],
+            }
+        )
+    return legacy_list
 
 @login_required
 def upload_image(request):
@@ -497,24 +557,7 @@ def upload_image(request):
 @login_required
 def index_qa(request):
     device_list = QADeviceInfo.objects.all()
-    material_rows = (
-        QADeviceInfo.objects.exclude(material__exact="")
-        .values("material", "material_code")
-        .order_by("material", "material_code")
-    )
-    seen = set()
-    material_list = []
-    for row in material_rows:
-        key = (row.get("material") or "", row.get("material_code") or "")
-        if key in seen:
-            continue
-        seen.add(key)
-        material_list.append(
-            {
-                "material": key[0],
-                "material_code": key[1],
-            }
-        )
+    material_list = _build_material_list_for_stock_in()
     return render(request, 'quet_anh/index_qa.html', {
         'device_list': device_list,
         'material_list': material_list,
@@ -526,19 +569,7 @@ def stock_in_start(request):
     material_name = (request.GET.get("material_name") or "").strip()
     material_code = (request.GET.get("material_code") or "").strip()
 
-    material_rows = (
-        QADeviceInfo.objects.exclude(material__exact="")
-        .values("material", "material_code")
-        .order_by("material", "material_code")
-    )
-    seen = set()
-    material_list = []
-    for row in material_rows:
-        key = (row.get("material") or "", row.get("material_code") or "")
-        if key in seen:
-            continue
-        seen.add(key)
-        material_list.append({"material": key[0], "material_code": key[1]})
+    material_list = _build_material_list_for_stock_in()
 
     return render(
         request,
@@ -600,7 +631,12 @@ def add_qa_device(request):
     if request.method == 'POST':
         form = QADeviceInfoForm(request.POST)
         if form.is_valid():
-            form.save()
+            item = form.save(commit=False)
+            master = form.cleaned_data.get("material_master")
+            if master:
+                item.material = master.material_name
+                item.material_code = master.material_code
+            item.save()
             messages.success(request, 'デバイスが正常に追加されました。')
             form = QADeviceInfoForm()
             return redirect('qa_device_list')
@@ -624,7 +660,12 @@ def edit_qa_device(request, pk):
     if request.method == 'POST':
         form = QADeviceInfoForm(request.POST, instance=item)
         if form.is_valid():
-            form.save()
+            obj = form.save(commit=False)
+            master = form.cleaned_data.get("material_master")
+            if master:
+                obj.material = master.material_name
+                obj.material_code = master.material_code
+            obj.save()
             messages.success(request, 'デバイスが正常に更新されました。')
             return redirect('qa_device_list')
         else:
@@ -650,6 +691,81 @@ def delete_qa_device(request, pk):
 def qa_device_list(request):
     device_list = QADeviceInfo.objects.all()
     return render(request, 'quet_anh/qa_device_list.html', {'device_list': device_list})
+
+
+@login_required
+def material_master_list(request):
+    keyword = (request.GET.get("keyword") or "").strip()
+    qs = QAMaterialMaster.objects.all()
+    if keyword:
+        qs = qs.filter(
+            Q(material_name__icontains=keyword)
+            | Q(material_code__icontains=keyword)
+            | Q(qr_content__icontains=keyword)
+        )
+    items = qs.order_by("material_name", "material_code", "id")
+    return render(
+        request,
+        "quet_anh/material_master_list.html",
+        {
+            "items": items,
+            "keyword": keyword,
+        },
+    )
+
+
+@login_required
+def material_master_add(request):
+    if request.method == "POST":
+        form = QAMaterialMasterForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "材料マスターを追加しました。")
+            return redirect("material_master_list")
+        messages.error(request, "入力内容を確認してください。")
+    else:
+        form = QAMaterialMasterForm()
+    return render(
+        request,
+        "quet_anh/material_master_form.html",
+        {
+            "form": form,
+            "page_title": "材料マスター追加",
+        },
+    )
+
+
+@login_required
+def material_master_edit(request, pk):
+    item = get_object_or_404(QAMaterialMaster, pk=pk)
+    if request.method == "POST":
+        form = QAMaterialMasterForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "材料マスターを更新しました。")
+            return redirect("material_master_list")
+        messages.error(request, "入力内容を確認してください。")
+    else:
+        form = QAMaterialMasterForm(instance=item)
+    return render(
+        request,
+        "quet_anh/material_master_form.html",
+        {
+            "form": form,
+            "item": item,
+            "page_title": "材料マスター編集",
+        },
+    )
+
+
+@login_required
+@require_POST
+def material_master_delete(request, pk):
+    item = get_object_or_404(QAMaterialMaster, pk=pk)
+    item.delete()
+    messages.success(request, "材料マスターを削除しました。")
+    return redirect("material_master_list")
+
 
 @login_required
 def dashboard_qa(request):
@@ -752,6 +868,11 @@ def _sync_material_stock_rows(limit=300):
     return
 
 
+def _cleanup_auto_generated_stock_rows():
+    # Xóa dữ liệu 入庫 đã sinh nhầm từ luồng 出庫 (có auto_input_ledger).
+    QAMaterialStockLedger.objects.filter(auto_input_ledger__isnull=False).delete()
+
+
 def _sync_material_out_stock_rows(limit=300):
     deleted_job_ids = QADeletedJobMarker.objects.values_list("job_id", flat=True)
     ledgers = (
@@ -845,7 +966,8 @@ def _sync_material_out_stock_rows(limit=300):
 
 @login_required
 def material_stock_ledger(request):
-    qs = QAMaterialStockLedger.objects.filter(auto_input_ledger__job_status="done")
+    _cleanup_auto_generated_stock_rows()
+    qs = QAMaterialStockLedger.objects.all()
     keyword = request.GET.get("keyword", "").strip()
     date = request.GET.get("date", "").strip()
     confirmed = request.GET.get("confirmed", "").strip()
@@ -1089,6 +1211,7 @@ def _cleanup_unlinked_ledgers():
 def sync_auto_input_ledger(limit=200):
     """Đồng bộ sổ cái job: chỉ lưu job đã hoàn thành thành công."""
     _cleanup_unlinked_ledgers()
+    _cleanup_auto_generated_stock_rows()
     # Dọn các job không thành công khỏi sổ cái quản lý job
     QAAutoInputLedger.objects.exclude(job_status="done").delete()
     deleted_job_ids = QADeletedJobMarker.objects.values_list("job_id", flat=True)

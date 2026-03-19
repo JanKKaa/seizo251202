@@ -1,6 +1,24 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
+class QAMaterialMaster(models.Model):
+    material_name = models.CharField("原材料名", max_length=120, db_index=True)
+    material_code = models.CharField("原材料コード", max_length=120, db_index=True, unique=True)
+    qr_content = models.CharField("QR内容（短縮名）", max_length=120, db_index=True, unique=True)
+    is_active = models.BooleanField("有効", default=True)
+    created_at = models.DateTimeField("作成日時", auto_now_add=True)
+    updated_at = models.DateTimeField("更新日時", auto_now=True)
+
+    class Meta:
+        ordering = ["material_name", "material_code"]
+        verbose_name = "材料マスター"
+        verbose_name_plural = "材料マスター一覧"
+
+    def __str__(self):
+        return f"{self.material_name} ({self.material_code})"
+
+
 class QADeviceInfo(models.Model):
     name = models.CharField(max_length=100)
     material_code = models.CharField("材料コード", max_length=100, blank=True, default="")

@@ -249,6 +249,15 @@
     {% endif %}
 </div>
 
+{% if show_back_to_index and is_match %}
+<script>
+    // Tự động quay về trang index để bắt đầu lượt xử lý mới.
+    setTimeout(function () {
+        window.location.href = "{% url 'index_qa' %}";
+    }, 1800);
+</script>
+{% endif %}
+
 <!-- オーバーレイローディング -->
 <style>
 #loading-overlay {

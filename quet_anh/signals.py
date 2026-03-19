@@ -57,6 +57,12 @@ def _sync_ledger_from_phien(phien):
 
 
 def _sync_material_stock_from_ledger(ledger):
+    # Luồng hiện tại chỉ vận hành 出庫 (xuất kho).
+    # Không tạo dữ liệu 入庫 (nhập kho) từ job auto input để tránh trùng sổ cái.
+    QAMaterialStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+    return
+
+    # Giữ code cũ phía dưới để tiện bật lại khi triển khai luồng 入庫 thực tế.
     if QADeletedJobMarker.objects.filter(job_id=ledger.job_id).exists():
         QAMaterialStockLedger.objects.filter(auto_input_ledger=ledger).delete()
         return
@@ -217,5 +223,4 @@ def on_ket_qua_saved(sender, instance, **kwargs):
 
 @receiver(post_save, sender=QAAutoInputLedger)
 def on_auto_ledger_saved(sender, instance, **kwargs):
-    _sync_material_stock_from_ledger(instance)
     _sync_material_out_stock_from_ledger(instance)

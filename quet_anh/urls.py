@@ -12,6 +12,10 @@ urlpatterns = [
     path('device/add/', views.add_qa_device, name='add_qa_device'),
     path('device/edit/<int:pk>/', views.edit_qa_device, name='edit_qa_device'),
     path('device/delete/<int:pk>/', views.delete_qa_device, name='delete_qa_device'),
+    path('material-master/', views.material_master_list, name='material_master_list'),
+    path('material-master/add/', views.material_master_add, name='material_master_add'),
+    path('material-master/edit/<int:pk>/', views.material_master_edit, name='material_master_edit'),
+    path('material-master/delete/<int:pk>/', views.material_master_delete, name='material_master_delete'),
 
     path('dashboard/', views.dashboard_qa, name='dashboard_qa'),
     path('auto-input-ledger/', views.auto_input_ledger_list, name='auto_input_ledger_list'),

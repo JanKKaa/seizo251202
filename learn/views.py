@@ -1075,7 +1075,15 @@ def bangcap_list(request):
         if nv:
             selected_nv = nv
             caps = BangCap.objects.filter(nhan_vien=nv)
-            radar_labels = [loai for loai, _ in BangCap.LOAI_BANG]
+            radar_labels = sorted(
+                set(
+                    list(BangCap.DEFAULT_LOAI_BANG)
+                    + list(
+                        caps.exclude(loai_bang__exact="")
+                        .values_list('loai_bang', flat=True)
+                    )
+                )
+            )
             radar_values = [caps.filter(loai_bang=loai).count() for loai in radar_labels]
             cap_do_order = {'特急': 5, '1級': 4, '2級': 3, '3級': 2, '4級': 1}
             radar_levels = []
@@ -1104,19 +1112,55 @@ def bangcap_list(request):
 
 @login_required_ma_nv
 def bangcap_upload(request):
+    is_kanri = bool(request.user.is_authenticated and request.user.username == 'kanri')
     ma_nv = request.session.get('ma_nv')
-    nhanvien = NhanVien.objects.get(ma_so=ma_nv)
+    nhanvien = NhanVien.objects.filter(ma_so=ma_nv).first()
+    nhanvien_list = []
+
+    if is_kanri:
+        nhanvien_list = NhanVien.objects.all().order_by('ma_so')
+
     if request.method == 'POST':
         form = BangCapForm(request.POST, request.FILES)
         if form.is_valid():
             bangcap = form.save(commit=False)
-            bangcap.nhan_vien = nhanvien
+            target_nhanvien = nhanvien
+
+            if is_kanri:
+                target_id = (request.POST.get('nhan_vien_id') or '').strip()
+                target_nhanvien = NhanVien.objects.filter(pk=target_id).first() if target_id else None
+                if not target_nhanvien:
+                    messages.error(request, '社員番号を選択してください。')
+                    return render(
+                        request,
+                        'learn/bangcap_upload.html',
+                        {
+                            'form': form,
+                            'is_kanri': is_kanri,
+                            'nhanvien_list': nhanvien_list,
+                            'selected_nhanvien_id': target_id,
+                        },
+                    )
+            elif not target_nhanvien:
+                messages.error(request, '社員情報が見つかりません。再ログインしてください。')
+                return redirect('learn:dangnhap')
+
+            bangcap.nhan_vien = target_nhanvien
             bangcap.save()
             messages.success(request, '資格証明書をアップロードしました。')
             return redirect('learn:bangcap_list')
     else:
         form = BangCapForm()
-    return render(request, 'learn/bangcap_upload.html', {'form': form})
+    return render(
+        request,
+        'learn/bangcap_upload.html',
+        {
+            'form': form,
+            'is_kanri': is_kanri,
+            'nhanvien_list': nhanvien_list,
+            'selected_nhanvien_id': '',
+        },
+    )
 
 @login_required_ma_nv
 def bangcap_edit(request, pk):

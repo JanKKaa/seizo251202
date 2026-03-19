@@ -98,19 +98,18 @@ class ApprovalHistory(models.Model):
         return f"{self.enrollment} - {self.get_action_display()} by {self.acted_by} at {self.acted_at}"
 
 class BangCap(models.Model):
-    LOAI_BANG = [
-        ('QC検定', 'QC検定'),
-        ('電気系資格', '電気系資格'),
-        ('プラスチック成形技能', 'プラスチック成形技能'),
-        ('国家資格', '国家資格'),
-        ('講習研修修了証', '講習研修修了証'),
-        ('クレーン運転', 'クレーン運転'),
-        ('日本語能力', '日本語能力'),
-        ('英語能力', '英語能力'),
-        ('中国語能力', '中国語能力'),
-        ('IT関係資格', 'IT関係資格'),
-        ('その他', 'その他'),
-        # Thêm loại khác nếu cần
+    DEFAULT_LOAI_BANG = [
+        'QC検定',
+        '電気系資格',
+        'プラスチック成形技能',
+        '国家資格',
+        '講習研修修了証',
+        'クレーン運転',
+        '日本語能力',
+        '英語能力',
+        '中国語能力',
+        'IT関係資格',
+        'その他',
     ]
     CAP_DO = [
         ('特急', '特急'),
@@ -121,7 +120,7 @@ class BangCap(models.Model):
         # Thêm cấp khác nếu cần
     ]
     nhan_vien = models.ForeignKey(NhanVien, on_delete=models.CASCADE, related_name='bang_caps')
-    loai_bang = models.CharField(max_length=32, choices=LOAI_BANG)
+    loai_bang = models.CharField(max_length=64, db_index=True)
     cap_do = models.CharField(max_length=8, choices=CAP_DO)
     file = models.FileField(upload_to='bangcap/')
     ngay_cap = models.DateField(null=True, blank=True)

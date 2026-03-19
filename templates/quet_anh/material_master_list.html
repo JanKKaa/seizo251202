@@ -1,0 +1,76 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}材料マスター一覧{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">材料マスター一覧</h2>
+        <a href="{% url 'material_master_add' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> 新規追加
+        </a>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input type="text" name="keyword" value="{{ keyword }}" class="form-control" placeholder="原材料名・コード・QR内容で検索">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">検索</button>
+            <a href="{% url 'material_master_list' %}" class="btn btn-outline-secondary">クリア</a>
+        </div>
+    </form>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width:6%;">#</th>
+                            <th>原材料名</th>
+                            <th>原材料コード</th>
+                            <th>QR内容（短縮名）</th>
+                            <th class="text-center" style="width:10%;">有効</th>
+                            <th class="text-center" style="width:18%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>{{ item.material_name }}</td>
+                            <td>{{ item.material_code }}</td>
+                            <td>{{ item.qr_content }}</td>
+                            <td class="text-center">
+                                {% if item.is_active %}
+                                    <span class="badge bg-success">有効</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">無効</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'material_master_edit' item.id %}" class="btn btn-info btn-sm">編集</a>
+                                <form method="post" action="{% url 'material_master_delete' item.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('このデータを削除しますか？');">削除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-3">データがありません。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary mt-3">
+        <i class="fas fa-arrow-left"></i> メインページに戻る
+    </a>
+</div>
+{% endblock %}
+
