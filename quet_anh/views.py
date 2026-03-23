@@ -2,6 +2,8 @@ import base64
 from io import BytesIO
 from decimal import Decimal
 import uuid
+import time as pytime
+import unicodedata
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponseForbidden, JsonResponse
@@ -27,18 +29,18 @@ from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count
+from django.db.models import Q
 from django.db import OperationalError, ProgrammingError, IntegrityError
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
+from django.core.files.storage import default_storage
 
 from PIL import Image
 import cv2
 import numpy as np
 import re
-from django.db.models import Q
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 import difflib
 from collections import defaultdict
 from django.utils.timezone import localtime
@@ -645,6 +647,94 @@ def delete_qa_history(request, pk):
         messages.success(request, '履歴が正常に削除されました。')
     return redirect('qa_history')
 
+
+@login_required
+@require_POST
+def cleanup_qa_history_images(request):
+    if not request.user.is_superuser:
+        return render(request, 'quet_anh/403.html', status=403)
+
+    cutoff_date_str = (request.POST.get("cutoff_date") or "").strip()
+    cutoff_date = parse_date(cutoff_date_str) if cutoff_date_str else None
+    if not cutoff_date:
+        messages.error(request, "削除基準日を正しく入力してください。")
+        return redirect("qa_history")
+
+    cutoff_dt = timezone.make_aware(
+        datetime.combine(cutoff_date, time.min),
+        timezone.get_current_timezone(),
+    )
+
+    rows = list(
+        QAResult.objects.filter(created_at__lt=cutoff_dt)
+        .filter(
+            (Q(image__isnull=False) & ~Q(image=""))
+            | (Q(processed_image__isnull=False) & ~Q(processed_image=""))
+        )
+        .values("id", "image", "processed_image")
+    )
+
+    if not rows:
+        messages.info(request, "削除対象の画像データはありません。")
+        return redirect("qa_history")
+
+    ids = []
+    count_rows = 0
+    count_image = 0
+    count_processed = 0
+
+    # 1) Xóa file vật lý trước (không giữ DB lock trong lúc xóa file)
+    for row in rows:
+        row_id = row["id"]
+        image_name = (row.get("image") or "").strip()
+        processed_name = (row.get("processed_image") or "").strip()
+        changed = False
+
+        if image_name:
+            default_storage.delete(image_name)
+            count_image += 1
+            changed = True
+
+        if processed_name:
+            default_storage.delete(processed_name)
+            count_processed += 1
+            changed = True
+
+        if changed:
+            ids.append(row_id)
+            count_rows += 1
+
+    # 2) Update DB theo lô ngắn + retry tránh SQLite lock
+    now_ts = timezone.now()
+    batch_size = 300
+    for i in range(0, len(ids), batch_size):
+        batch_ids = ids[i : i + batch_size]
+        updated = False
+        last_error = None
+        for attempt in range(3):
+            try:
+                QAResult.objects.filter(id__in=batch_ids).update(
+                    image="",
+                    processed_image=None,
+                    updated_at=now_ts,
+                )
+                updated = True
+                break
+            except OperationalError as exc:
+                last_error = exc
+                if "locked" in str(exc).lower():
+                    pytime.sleep(0.4 * (attempt + 1))
+                    continue
+                raise
+        if not updated and last_error:
+            raise last_error
+
+    messages.success(
+        request,
+        f"画像削除完了: 対象日<{cutoff_date_str} / 件数 {count_rows} / 元画像 {count_image} / 前処理画像 {count_processed}",
+    )
+    return redirect("qa_history")
+
 @login_required
 def add_qa_device(request):
     success_message = None
@@ -805,7 +895,7 @@ def dashboard_qa(request):
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
 
-    results = QAResult.objects.all()
+    results = QAResult.objects.select_related("user", "device").all()
     if from_date:
         results = results.filter(created_at__date__gte=from_date)
     if to_date:
@@ -815,53 +905,131 @@ def dashboard_qa(request):
     result_count = results.count()
     match_count = results.filter(result="一致").count()
     unmatch_count = results.filter(result="不一致").count()
+    total_weight_kg = Decimal("0")
 
-    kg_by_operator = (
-        results.values('operator_name')
-        .annotate(total_kg=Sum('input_weight'))
-        .order_by('-total_kg')
+    # 統計キーは user_id 優先にして、表示名変更時でも同一人物を集約する
+    def _operator_identity(scan):
+        if scan.user_id:
+            return f"user:{scan.user_id}", _display_login_name(scan.user) or (scan.user.username or "")
+        legacy_name = (scan.operator_name or "").strip()
+        if legacy_name:
+            return f"legacy:{legacy_name.lower()}", legacy_name
+        return "unknown", "不明"
+
+    operator_stats = {}
+    material_stats = {}
+
+    def _material_key(text):
+        s = (text or "").strip()
+        if not s:
+            return "不明"
+        # NFKCで全角/半角（英数・カナ）差を吸収し、名称は省略しない
+        s = unicodedata.normalize("NFKC", s)
+        s = s.replace("\u3000", " ")
+        s = re.sub(r"\s+", " ", s).strip()
+        return s or "不明"
+    for scan in results:
+        operator_key, operator_display = _operator_identity(scan)
+        row = operator_stats.setdefault(
+            operator_key,
+            {
+                "operator_name": operator_display or "不明",
+                "total_kg": Decimal("0"),
+                "total_count": 0,
+            },
+        )
+        if scan.input_weight is not None:
+            row["total_kg"] += scan.input_weight
+            total_weight_kg += scan.input_weight
+
+            material_name_raw = "不明"
+            product_name = "不明"
+            if scan.device and scan.device.material:
+                material_name_raw = scan.device.material
+            if scan.device and scan.device.product:
+                product_name = scan.device.product
+            material_name = _material_key(material_name_raw)
+            mkey = material_name
+            mrow = material_stats.setdefault(
+                mkey,
+                {
+                    "material_name": material_name,
+                    "product_names": set(),
+                    "total_kg": Decimal("0"),
+                    "total_count": 0,
+                },
+            )
+            mrow["total_kg"] += scan.input_weight
+            mrow["total_count"] += 1
+            if product_name and product_name != "不明":
+                mrow["product_names"].add(product_name)
+        row["total_count"] += 1
+
+    kg_by_operator = sorted(
+        operator_stats.values(),
+        key=lambda x: (x["total_kg"], x["total_count"]),
+        reverse=True,
     )
-    count_by_operator = (
-        results.values('operator_name')
-        .annotate(total_count=Count('id'))
-        .order_by('-total_count')
+    count_by_operator = sorted(
+        operator_stats.values(),
+        key=lambda x: (x["total_count"], x["total_kg"]),
+        reverse=True,
     )
     top10_operators = count_by_operator[:10]
+    material_rows = []
+    for _, item in material_stats.items():
+        products = sorted(item["product_names"])
+        material_rows.append(
+            {
+                "material_name": item["material_name"],
+                "product_names_display": " / ".join(products) if products else "不明",
+                "total_kg": item["total_kg"],
+                "total_count": item["total_count"],
+            }
+        )
+
+    kg_by_material = sorted(
+        material_rows,
+        key=lambda x: (x["total_kg"], x["total_count"]),
+        reverse=True,
+    )
 
     # ===== Thống kê theo khung giờ và người thực hiện =====
     hour_stats = defaultdict(lambda: {'count': 0, 'users': set(), 'materials': set()})
     for scan in results:
         hour = localtime(scan.created_at).hour
-        # Lấy tên người thực hiện
-        if scan.user and (scan.user.get_full_name() or scan.user.username):
-            user_display = scan.user.get_full_name() or scan.user.username
-        elif scan.operator_name:
-            user_display = scan.operator_name
-        else:
-            user_display = "不明"
+        # user_id ベースの同一人物表示（改名後も統一）
+        _, user_display = _operator_identity(scan)
         # Lấy tên nguyên liệu (材料)
         material = scan.device.material if scan.device and scan.device.material else "不明"
         hour_stats[hour]['count'] += 1
         hour_stats[hour]['users'].add(user_display)
         hour_stats[hour]['materials'].add(material)
+        if scan.input_weight is not None:
+            hour_stats[hour].setdefault('kg', Decimal("0"))
+            hour_stats[hour]['kg'] += scan.input_weight
 
     hour_stats_list = []
     labels = []
     data = []
+    hour_kg_data = []
     users = []
     materials = []
     bar_colors = []
     for h in range(24):
         user_list = ', '.join(hour_stats[h]['users']) if hour_stats[h]['users'] else ''
         material_list = ', '.join(hour_stats[h]['materials']) if hour_stats[h]['materials'] else ''
+        hour_kg = hour_stats[h].get('kg', Decimal("0"))
         hour_stats_list.append({
             'hour_range': f"{h:02d}:00 - {h+1:02d}:00",
             'count': hour_stats[h]['count'],
+            'kg': float(hour_kg),
             'users': user_list,
             'materials': material_list,
         })
         labels.append(f"{h:02d}:00")
         data.append(hour_stats[h]['count'])
+        hour_kg_data.append(float(hour_kg))
         users.append(user_list)
         materials.append(material_list)
 
@@ -874,24 +1042,35 @@ def dashboard_qa(request):
         else:
             bar_colors.append('rgba(200,200,200,0.3)')        # Ngoài ca: xám nhạt
 
+    # Top10 chart data: 回数 + kg を同時表示
+    top10_labels = [row.get("operator_name", "-") for row in top10_operators]
+    top10_count_data = [int(row.get("total_count") or 0) for row in top10_operators]
+    top10_kg_data = [float(row.get("total_kg") or 0) for row in top10_operators]
+
     # ===== Truyền thêm dữ liệu cho template =====
     return render(request, 'quet_anh/dashboard.html', {
         'device_count': device_count,
         'result_count': result_count,
         'match_count': match_count,
         'unmatch_count': unmatch_count,
+        'total_weight_kg': float(total_weight_kg),
         'kg_by_operator': kg_by_operator,
         'count_by_operator': count_by_operator,
         'top10_operators': top10_operators,
+        'kg_by_material': kg_by_material,
         'from_date': from_date,
         'to_date': to_date,
         # Thêm các biến sau:
         'hour_stats_list': hour_stats_list,
         'chart_labels': json.dumps(labels),
         'chart_data': json.dumps(data),
+        'chart_hour_kg_data': json.dumps(hour_kg_data),
         'chart_users': json.dumps(users),
         'chart_materials': json.dumps(materials),
         'bar_colors': json.dumps(bar_colors),
+        'chart_top10_labels': json.dumps(top10_labels),
+        'chart_top10_count_data': json.dumps(top10_count_data),
+        'chart_top10_kg_data': json.dumps(top10_kg_data),
     })
 
 

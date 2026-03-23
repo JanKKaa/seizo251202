@@ -33,25 +33,46 @@
         </div>
     </form>
 
+    {% if request.user.is_superuser %}
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white fw-bold">
+            画像データ一括削除（管理者）
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'cleanup_qa_history_images' %}" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-4">
+                    <label class="form-label mb-1"><strong>削除基準日</strong></label>
+                    <input type="date" name="cutoff_date" class="form-control" required>
+                    <div class="form-text">この日付より前の画像ファイルのみ削除します（テキスト履歴は保持）。</div>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-danger w-100"
+                            onclick="return confirm('指定日より前の画像ファイルを削除します。実行しますか？');">
+                        画像一括削除
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle w-100" style="min-width:1200px;">
             <thead class="table-light">
                 <tr>
-                    <th class="text-center">#</th>
-                    <th class="text-center">アップロード画像</th>
+                    <th class="text-center">No.</th>
+                    <th class="text-center">画像</th>
                     <th class="text-center">機械番号</th>
                     <th class="text-center">材料コード</th>
                     <th class="text-center">材料名</th>
                     <th class="text-center">製品名</th>
-                    <th class="text-center">混合率</th>
-                    <th class="text-center">スキャンデータ</th>
+                    <th class="text-center">重量 / 混合率</th>
                     <th class="text-center">結果</th>
-                    <th class="text-center">一致率</th>
-                    <th class="text-center">ロット識別色</th>
+                    <th class="text-center">識別色</th>
                     <th class="text-center">ロット番号</th>
                     <th class="text-center">日時</th>
                     <th class="text-center">作業者</th>
-                    <th class="text-center">材料重量(kg)</th> <!-- Đưa lên trước -->
                     <th class="text-center">操作</th>
                 </tr>
             </thead>
@@ -61,17 +82,31 @@
                     <td class="text-center">{{ forloop.counter }}</td>
                     <td class="text-center">
                         {% if item.image %}
-                            <img src="{{ item.image.url }}" alt="アップロード画像" class="img-fluid" style="max-width:120px;">
+                            <img src="{{ item.image.url }}"
+                                 alt="アップロード画像"
+                                 class="img-thumbnail qa-thumb js-history-image"
+                                 style="max-width:72px; cursor:pointer;"
+                                 data-full="{{ item.image.url }}">
+                        {% elif item.processed_image %}
+                            <img src="{{ item.processed_image.url }}"
+                                 alt="前処理画像"
+                                 class="img-thumbnail qa-thumb js-history-image"
+                                 style="max-width:72px; cursor:pointer;"
+                                 data-full="{{ item.processed_image.url }}">
+                        {% else %}
+                            <span class="text-muted small">画像なし</span>
                         {% endif %}
                     </td>
                     <td>{{ item.device.name }}</td>
                     <td>{{ item.device.material_code }}</td>
                     <td>{{ item.device.material }}</td>
                     <td>{{ item.device.product }}</td>
-                    <td class="text-center">{{ item.device.ratio }}</td>
-                    <td>
-                        <div class="scan-data-cell" style="background:#f8f9fa; padding:10px; max-height:90px; max-width:250px; overflow:auto; white-space:pre; font-size:0.8rem;">
-                         {{ item.data }}
+                    <td class="text-center">
+                        <div class="fw-bold" style="font-size:1.06rem;">
+                            {% if item.input_weight %}{{ item.input_weight }} kg{% else %}-{% endif %}
+                        </div>
+                        <div class="small text-muted mt-1">
+                            {{ item.device.ratio|default:"-" }}
                         </div>
                     </td>
                     <td class="text-center">
@@ -84,16 +119,26 @@
                                 {{ item.result }}
                             {% endif %}
                         </span>
+                        <div class="small text-muted mt-1">
+                            {% if item.match_ratio is not None %}
+                                {{ item.match_ratio|floatformat:2 }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
                     </td>
                     <td class="text-center">
-                        {% if item.match_ratio is not None %}
-                        {{ item.match_ratio|floatformat:2 }}%
+                        {% if item.lot_color == "red" %}
+                            <span class="fw-bold text-danger">赤</span>
+                        {% elif item.lot_color == "blue" %}
+                            <span class="fw-bold text-primary">青</span>
+                        {% elif item.lot_color == "green" %}
+                            <span class="fw-bold text-success">緑</span>
+                        {% elif item.lot_color == "black" %}
+                            <span class="fw-bold text-dark">黒</span>
                         {% else %}
-                            -
+                            <span class="text-muted">{{ item.get_lot_color_display }}</span>
                         {% endif %}
-                    </td>
-                    <td class="text-center">
-                        {{ item.get_lot_color_display }}
                     </td>
                     <td class="text-center">
                         {{ item.lot_number }}
@@ -105,9 +150,6 @@
                         {{ item.operator_name }}                       
                     </td>
                     <td class="text-center">
-                        {{ item.input_weight }}
-                    </td>
-                    <td class="text-center">
                         <form method="post" action="{% url 'delete_qa_history' item.id %}" style="display:inline;">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当にこの画像とデータを削除しますか？');">削除</button>
@@ -116,7 +158,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="16" class="text-center text-muted">結果がありません。</td>
+                    <td colspan="13" class="text-center text-muted">結果がありません。</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -189,12 +231,34 @@
     </ul>
 </nav>
 </div>
+
+<div class="modal fade" id="historyImageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">画像プレビュー</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="historyImageModalImg" src="" alt="preview" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.scan-data-cell').forEach(function(div) {
-        // Xóa dòng trống và khoảng trắng thừa
-        let lines = div.innerText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-        div.innerText = lines.join('\n');
+    const imageModalEl = document.getElementById('historyImageModal');
+    const imageModalImg = document.getElementById('historyImageModalImg');
+    const imageModal = imageModalEl ? new bootstrap.Modal(imageModalEl) : null;
+
+    document.querySelectorAll('.js-history-image').forEach(function(imgEl) {
+        imgEl.addEventListener('click', function() {
+            const full = imgEl.getAttribute('data-full') || '';
+            if (!full || !imageModal || !imageModalImg) return;
+            imageModalImg.src = full;
+            imageModal.show();
+        });
     });
 });
 </script>

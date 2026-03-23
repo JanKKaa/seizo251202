@@ -107,6 +107,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            # Wait for locked writes instead of failing immediately.
+            'timeout': 30,
+        },
     }
 }
 

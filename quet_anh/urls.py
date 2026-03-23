@@ -7,6 +7,7 @@ urlpatterns = [
     path('stock-in/start/', views.stock_in_start, name='stock_in_start'),
     path('history/', views.qa_history, name='qa_history'),
     path('history/delete/<int:pk>/', views.delete_qa_history, name='delete_qa_history'),
+    path('history/cleanup-images/', views.cleanup_qa_history_images, name='cleanup_qa_history_images'),
 
     path('device/', views.qa_device_list, name='qa_device_list'),
     path('device/add/', views.add_qa_device, name='add_qa_device'),
