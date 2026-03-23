@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 class QAMaterialMaster(models.Model):
     material_name = models.CharField("原材料名", max_length=120, db_index=True)
     material_code = models.CharField("原材料コード", max_length=120, db_index=True, unique=True)
+    bag_weight_kg = models.DecimalField("1袋重量(kg)", max_digits=8, decimal_places=2, default=20)
     qr_content = models.CharField("出庫用QR内容", max_length=120, db_index=True)
     qr_content_in = models.CharField("入庫用QR内容", max_length=120, db_index=True, blank=True, default="")
     is_active = models.BooleanField("有効", default=True)

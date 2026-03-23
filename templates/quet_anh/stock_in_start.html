@@ -1,4 +1,4 @@
-﻿{% extends "trang_chu/base.html" %}
+{% extends "trang_chu/base.html" %}
 {% load static %}
 
 {% block title %}原材料入庫フロー{% endblock %}
@@ -8,66 +8,187 @@
 <div class="qa-sync">
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="text-success fw-bold mb-0">原材料入庫フロー（UI）</h2>
+        <h2 class="text-success fw-bold mb-0">原材料入庫フロー</h2>
         <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary rounded-pill">
             <i class="fas fa-arrow-left"></i> 戻る
         </a>
     </div>
 
-    <div class="alert alert-info">
-        この画面は入庫処理のUI先行版です。次段階で自動入力ロジックを接続します。
-    </div>
-
-    <div class="card shadow border-0 mb-3">
-        <div class="card-header bg-success text-white fw-bold">選択された原材料</div>
-        <div class="card-body bg-light">
-            <div class="row">
-                <div class="col-md-6 mb-2">
+    <form method="post" id="stock-in-form" class="card shadow border-0">
+        {% csrf_token %}
+        <div class="card-header bg-success text-white fw-bold">入庫情報</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
                     <label class="form-label fw-bold">原材料名</label>
-                    <input type="text" class="form-control" value="{{ material_name }}" readonly>
+                    <select class="form-select" id="material_name" name="material_name" required>
+                        {% for m in material_list %}
+                            <option
+                                value="{{ m.material }}"
+                                data-material-code="{{ m.material_code }}"
+                                data-bag-weight="{{ m.bag_weight_kg }}"
+                                {% if m.material == material_name %}selected{% endif %}
+                            >
+                                {{ m.material }}
+                            </option>
+                        {% empty %}
+                            <option value="">原材料マスターが未登録です</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="col-md-6 mb-2">
+                <div class="col-md-6">
                     <label class="form-label fw-bold">原材料コード</label>
-                    <input type="text" class="form-control" value="{{ material_code }}" readonly>
+                    <input type="text" class="form-control" id="material_code" name="material_code" value="{{ material_code }}" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">重量 (kg)</label>
+                    <input type="number" class="form-control" id="input_weight" name="input_weight" step="0.01" min="0.01" required placeholder="例: 25.00">
+                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="20">20kg</button>
+                        <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="25">25kg</button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">ロット識別色</label>
+                    <select class="form-select" name="lot_color" required>
+                        <option value="green">🟢 緑</option>
+                        <option value="black">⚫ 黒</option>
+                        <option value="blue">🔵 青</option>
+                        <option value="red">🔴 赤</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">ロット番号</label>
+                    <input type="text" class="form-control" name="lot_number" placeholder="ロット番号">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">袋数（自動計算）</label>
+                    <input type="text" class="form-control" id="bag_count_preview" readonly placeholder="重量入力後に自動計算">
+                    <div class="form-text">計算式: 重量 ÷ 1袋重量（切り上げ、最小1）</div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="card shadow border-0">
-        <div class="card-header bg-primary text-white fw-bold">入庫情報入力（画面先行）</div>
-        <div class="card-body">
-            <form>
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">重量 (kg)</label>
-                        <input type="text" class="form-control" placeholder="例: 25.00">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">ロット識別色</label>
-                        <select class="form-control">
-                            <option>🟢 緑</option>
-                            <option>⚫ 黒</option>
-                            <option>🔵 青</option>
-                            <option>🔴 赤</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">ロット番号</label>
-                        <input type="text" class="form-control" placeholder="ロット番号">
-                    </div>
-                </div>
-                <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-success rounded-pill px-4" disabled>
-                        <i class="fas fa-play"></i> 入庫処理開始（準備中）
-                    </button>
-                </div>
-            </form>
+            <div class="mt-4 d-flex justify-content-end gap-2">
+                <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary rounded-pill px-4">キャンセル</a>
+                <button type="submit" id="stock-in-submit-btn" class="btn btn-success rounded-pill px-4">
+                    <i class="fas fa-play"></i> 入庫処理開始
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+</div>
+<style>
+#stockin-loading-overlay {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    inset: 0;
+    background: linear-gradient(135deg, #f4f8fb 60%, #e3eefd 100%);
+}
+#stockin-loading-overlay .loading-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    padding: 36px 30px 28px;
+    min-width: 320px;
+    text-align: center;
+}
+.stockin-loading-logo {
+    width: 110px;
+    margin-bottom: 12px;
+    animation: stockinLogoPulse 1.8s infinite;
+}
+@keyframes stockinLogoPulse {
+    0%, 100% { transform: scale(1); opacity: 0.92; }
+    50% { transform: scale(1.06); opacity: 1; }
+}
+.stockin-custom-spinner {
+    margin: 0 auto 12px auto;
+    width: 48px;
+    height: 48px;
+    border: 4px solid #d6e4ff;
+    border-top: 4px solid #198754;
+    border-radius: 50%;
+    animation: stockinSpin 0.9s linear infinite;
+}
+@keyframes stockinSpin {
+    to { transform: rotate(360deg); }
+}
+.stockin-loading-text {
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.5;
+}
+</style>
+
+<div id="stockin-loading-overlay" aria-hidden="true">
+    <div class="loading-box">
+        <img src="{% static 'img/logo1.png' %}" alt="Company Logo" class="stockin-loading-logo">
+        <div class="stockin-custom-spinner"></div>
+        <div class="stockin-loading-text">
+            入庫処理を実行中です。<br>
+            しばらくお待ちください...
         </div>
     </div>
 </div>
 
-</div>
+<script>
+(() => {
+    const materialSelect = document.getElementById("material_name");
+    const materialCodeInput = document.getElementById("material_code");
+    const weightInput = document.getElementById("input_weight");
+    const bagCountPreview = document.getElementById("bag_count_preview");
+    const form = document.getElementById("stock-in-form");
+    const submitBtn = document.getElementById("stock-in-submit-btn");
+    const loadingOverlay = document.getElementById("stockin-loading-overlay");
+
+    function syncMaterialCode() {
+        if (!materialSelect || !materialCodeInput) return;
+        const opt = materialSelect.options[materialSelect.selectedIndex];
+        materialCodeInput.value = opt ? (opt.dataset.materialCode || "") : "";
+        updateBagCountPreview();
+    }
+
+    function updateBagCountPreview() {
+        if (!bagCountPreview || !materialSelect || !weightInput) return;
+        const opt = materialSelect.options[materialSelect.selectedIndex];
+        const bagWeight = Number(opt ? (opt.dataset.bagWeight || 0) : 0);
+        const weight = Number(weightInput.value || 0);
+        if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(bagWeight) || bagWeight <= 0) {
+            bagCountPreview.value = "";
+            return;
+        }
+        bagCountPreview.value = String(Math.max(1, Math.ceil(weight / bagWeight)));
+    }
+
+    materialSelect?.addEventListener("change", syncMaterialCode);
+    syncMaterialCode();
+
+    document.querySelectorAll(".js-kg").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            if (!weightInput) return;
+            weightInput.value = btn.dataset.kg || "";
+            weightInput.dispatchEvent(new Event("input", { bubbles: true }));
+            updateBagCountPreview();
+        });
+    });
+    weightInput?.addEventListener("input", updateBagCountPreview);
+    updateBagCountPreview();
+
+    form?.addEventListener("submit", () => {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中';
+        }
+        if (loadingOverlay) {
+            loadingOverlay.style.display = "block";
+        }
+    });
+})();
+</script>
 {% endblock %}
-
-

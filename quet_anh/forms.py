@@ -35,7 +35,7 @@ class QADeviceInfoForm(forms.ModelForm):
 class QAMaterialMasterForm(forms.ModelForm):
     class Meta:
         model = QAMaterialMaster
-        fields = ["material_name", "material_code", "qr_content", "qr_content_in", "is_active"]
+        fields = ["material_name", "material_code", "bag_weight_kg", "qr_content", "qr_content_in", "is_active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from nhap_lieu.models import KetQuaNhapLieu, PhienNhapLieu
 
-from .models import QAAutoInputLedger, QAResult, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
+from .models import QAAutoInputLedger, QAResult, QAMaterialMaster, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
 
 
 def _find_qa_result_for_phien(phien):
@@ -14,6 +14,26 @@ def _find_qa_result_for_phien(phien):
     if getattr(phien, "qa_result_id", None):
         return phien.qa_result
     return None
+
+
+def _calculate_bag_count_by_material_code(material_code, weight_kg):
+    code = (material_code or "").strip()
+    if not code:
+        return ""
+    master = QAMaterialMaster.objects.filter(material_code=code).first()
+    if not master or master.bag_weight_kg is None:
+        return ""
+    try:
+        weight = Decimal(weight_kg)
+        bag_weight = Decimal(master.bag_weight_kg)
+    except Exception:
+        return ""
+    if weight <= 0 or bag_weight <= 0:
+        return ""
+    count = (weight / bag_weight).to_integral_value(rounding=ROUND_CEILING)
+    if count < 1:
+        count = Decimal("1")
+    return str(int(count))
 
 
 def _sync_ledger_from_phien(phien):
@@ -79,6 +99,7 @@ def _sync_material_stock_from_ledger(ledger):
     material_name = (device.material if device else "") or ledger.qa_material or ""
     material_code = (device.material_code if device else "") or ""
     weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+    bag_count = _calculate_bag_count_by_material_code(material_code, weight_kg)
     mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
 
     row, created = QAMaterialStockLedger.objects.get_or_create(
@@ -122,6 +143,12 @@ def _sync_material_stock_from_ledger(ledger):
 
 
 def _sync_material_out_stock_from_ledger(ledger):
+    # Chỉ tạo 出庫台帳 khi ledger có liên kết trực tiếp từ luồng quét ảnh (qa_result tồn tại).
+    # Job nhập kho không có qa_result, không được sync sang 出庫台帳.
+    if not getattr(ledger, "qa_result_id", None):
+        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=ledger).delete()
+        return
+
     if QADeletedJobMarker.objects.filter(job_id=ledger.job_id).exists():
         QAMaterialOutStockLedger.objects.filter(auto_input_ledger=ledger).delete()
         return
@@ -175,6 +202,7 @@ def _sync_material_out_stock_from_ledger(ledger):
                 "stock_out_date": stock_out_date,
                 "lot_color": (qa_result.lot_color if qa_result and qa_result.lot_color else QAMaterialOutStockLedger.LOT_COLOR_GREEN),
                 "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
+                "bag_sequence_no": bag_count,
                 "lot_number": (qa_result.lot_number if qa_result else ""),
                 "workstation_management_no": mgmt_no,
             },
@@ -192,6 +220,9 @@ def _sync_material_out_stock_from_ledger(ledger):
         changed = True
     if (row.weight_kg is None or row.weight_kg == 0) and weight_kg is not None:
         row.weight_kg = weight_kg
+        changed = True
+    if not row.bag_sequence_no and bag_count:
+        row.bag_sequence_no = bag_count
         changed = True
     if not row.workstation_management_no and mgmt_no:
         row.workstation_management_no = mgmt_no

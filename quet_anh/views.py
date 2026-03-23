@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 import uuid
 import time as pytime
 import unicodedata
@@ -28,6 +28,7 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db import OperationalError, ProgrammingError, IntegrityError
@@ -86,6 +87,7 @@ def _upsert_out_stock_from_qa_result(qa_result):
     device = qa_result.device
     material_name = device.material if device else ""
     material_code = device.material_code if device else ""
+    bag_count = _calculate_bag_count_by_material_code(material_code, qa_result.input_weight if qa_result else None)
     out_date = timezone.localtime(qa_result.created_at).date()
 
     row, _ = QAMaterialOutStockLedger.objects.get_or_create(
@@ -96,7 +98,7 @@ def _upsert_out_stock_from_qa_result(qa_result):
             "stock_out_date": out_date,
             "lot_color": qa_result.lot_color or QAMaterialOutStockLedger.LOT_COLOR_GREEN,
             "weight_kg": qa_result.input_weight or Decimal("0"),
-            "bag_sequence_no": "",
+            "bag_sequence_no": bag_count,
             "lot_number": qa_result.lot_number or "",
             "workstation_management_no": "",
         },
@@ -121,6 +123,9 @@ def _upsert_out_stock_from_qa_result(qa_result):
     if (row.weight_kg is None or row.weight_kg == 0) and qa_result.input_weight is not None:
         row.weight_kg = qa_result.input_weight
         changed = True
+    if not row.bag_sequence_no and bag_count:
+        row.bag_sequence_no = bag_count
+        changed = True
 
     if changed:
         row.save()
@@ -133,7 +138,35 @@ def _is_valid_ipv4(ip):
     return bool(re.match(pattern, ip))
 
 
-def _auto_send_to_nhap_lieu(qa_result, expected_text=""):
+def _get_master_by_material_code(material_code: str):
+    code = (material_code or "").strip()
+    if not code:
+        return None
+    return QAMaterialMaster.objects.filter(material_code=code).first()
+
+
+def _calculate_bag_count(weight_kg, bag_weight_kg):
+    try:
+        weight = Decimal(weight_kg)
+        bag_weight = Decimal(bag_weight_kg)
+    except Exception:
+        return ""
+    if weight <= 0 or bag_weight <= 0:
+        return ""
+    count = (weight / bag_weight).to_integral_value(rounding=ROUND_CEILING)
+    if count < 1:
+        count = Decimal("1")
+    return str(int(count))
+
+
+def _calculate_bag_count_by_material_code(material_code: str, weight_kg):
+    master = _get_master_by_material_code(material_code)
+    if not master or master.bag_weight_kg is None:
+        return ""
+    return _calculate_bag_count(weight_kg, master.bag_weight_kg)
+
+
+def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
     """
     Tự động gửi job sang app nhập liệu dựa trên material_code.
     Trả về (ok, message, phien_or_none).
@@ -145,9 +178,10 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text=""):
     if not material_code:
         return False, "材料コードが未設定のため自動入力を実行できません。", None
 
-    chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=material_code).first()
+    auto_program_name = (getattr(settings, "NHAP_LIEU_XUAT_KHO_PROGRAM_NAME", "5209-02") or "5209-02").strip()
+    chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
     if not chuong_trinh:
-        return False, f"入力プログラム '{material_code}' が見つかりません。", None
+        return False, f"入力プログラム '{auto_program_name}' が見つかりません。", None
 
     may_tinh = MayTinh.objects.filter(ten_may="server").first()
     if not may_tinh:
@@ -178,6 +212,8 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text=""):
         "ten_chuong_trinh": chuong_trinh.ten_chuong_trinh,
         "quy_tac": quy_tac_gui,
         "kg_value": str(qa_result.input_weight or "").strip(),
+        "material_code_value": material_code,
+        "mode_value": str(mode_value or "2"),
         "delay": 0.1,
         "qa_result_id": qa_result.id,
     }
@@ -248,6 +284,122 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text=""):
         return False, f"自動入力送信エラー: {exc}", phien
 
 
+def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decimal, lot_number: str = ""):
+    """
+    入庫フロー向けの自動入力送信（mode=1）。
+    Trả về (ok, message, phien_or_none, ma_nhap_lieu).
+    """
+    material_code = (material_code or "").strip()
+    if not material_code:
+        return False, "材料コードが未設定のため自動入力を実行できません。", None, ""
+
+    auto_program_name = (
+        getattr(
+            settings,
+            "NHAP_LIEU_NHAP_KHO_PROGRAM_NAME",
+            getattr(settings, "NHAP_LIEU_XUAT_KHO_PROGRAM_NAME", "5209-01"),
+        )
+        or "5209-01"
+    ).strip()
+    chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
+    if not chuong_trinh:
+        return False, f"入力プログラム '{auto_program_name}' が見つかりません。", None, ""
+
+    may_tinh = MayTinh.objects.filter(ten_may="server").first()
+    if not may_tinh:
+        return False, "固定送信先 server が見つかりません。", None, ""
+    if may_tinh.trang_thai != "active":
+        return False, "固定送信先 server が非アクティブです。", None, ""
+    if not _is_valid_ipv4(may_tinh.ip):
+        return False, "固定送信先 server のIPが無効です。", None, ""
+
+    try:
+        quy_tac = json.loads(chuong_trinh.quy_tac or "[]")
+    except Exception:
+        quy_tac = []
+
+    dong_map = {
+        "Dòng 1": material_code,
+        "Dòng 2": str(input_weight or ""),
+        "Dòng 3": lot_number or "",
+    }
+    quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
+
+    ma_job = f"job_{uuid.uuid4().hex[:16]}"
+    payload = {
+        "job_id": ma_job,
+        "ten_chuong_trinh": chuong_trinh.ten_chuong_trinh,
+        "quy_tac": quy_tac_gui,
+        "kg_value": str(input_weight or "").strip(),
+        "material_code_value": material_code,
+        "mode_value": "1",  # 入庫
+        "delay": 0.1,
+    }
+
+    phien = PhienNhapLieu.objects.create(
+        ma_job=ma_job,
+        chuong_trinh=chuong_trinh,
+        may_tinh=may_tinh,
+        qa_result=None,
+        ip_may=may_tinh.ip,
+        payload_json=json.dumps(payload, ensure_ascii=False),
+        trang_thai="sending",
+        thong_bao="入庫フローから自動送信",
+    )
+
+    try:
+        url = f"http://{may_tinh.ip}:5000/send_input"
+        response = requests.post(url, json=payload, timeout=20)
+        if response.status_code != 200:
+            phien.trang_thai = "failed"
+            phien.thong_bao = f"送信失敗 HTTP {response.status_code}"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, f"自動入力送信失敗: HTTP {response.status_code}", phien, ""
+
+        data = response.json()
+        callback_ok = bool(data.get("callback_ok"))
+        data_ocr = (data.get("data_ocr") or "").strip()
+
+        if callback_ok and data_ocr:
+            if data_ocr == "---":
+                phien.trang_thai = "failed"
+                phien.thong_bao = "管理番号が無効です (---)"
+                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+                return False, "管理番号が取得できませんでした。再実行してください。", phien, ""
+
+            if (
+                KetQuaNhapLieu.objects.filter(ma_nhap_lieu=data_ocr, trang_thai="Thành công")
+                .exclude(phien=phien)
+                .exists()
+            ):
+                phien.trang_thai = "failed"
+                phien.thong_bao = f"管理番号重複: {data_ocr}"
+                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+                return False, f"管理番号が重複しています: {data_ocr}", phien, ""
+
+            phien.trang_thai = "done"
+            phien.ma_nhap_lieu = data_ocr
+            phien.thong_bao = "自動入力完了（入庫）"
+            phien.save(update_fields=["trang_thai", "ma_nhap_lieu", "thong_bao", "ngay_cap_nhat"])
+            return True, f"自動入力完了（入庫）: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", phien, data_ocr
+
+        if callback_ok:
+            phien.trang_thai = "failed"
+            phien.thong_bao = "管理番号未取得。処理未完了"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, "入力処理は完了していません（管理番号未取得）。", phien, ""
+
+        phien.trang_thai = "failed"
+        phien.thong_bao = f"Callback lỗi: {data.get('callback_info') or 'unknown'}"
+        phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+        return False, "自動入力のコールバックに失敗しました。", phien, ""
+    except Exception as exc:
+        phien.trang_thai = "failed"
+        phien.thong_bao = f"送信例外: {exc}"
+        phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+        return False, f"自動入力送信エラー: {exc}", phien, ""
+
+
 def _rollback_failed_qa_attempt(qa_result):
     if not qa_result or not qa_result.pk:
         return
@@ -261,13 +413,14 @@ def _build_material_list_for_stock_in():
     try:
         master_rows = (
             QAMaterialMaster.objects.filter(is_active=True)
-            .values("material_name", "material_code", "qr_content", "qr_content_in")
+            .values("material_name", "material_code", "bag_weight_kg", "qr_content", "qr_content_in")
             .order_by("material_name", "material_code")
         )
         material_list = [
             {
                 "material": row.get("material_name") or "",
                 "material_code": row.get("material_code") or "",
+                "bag_weight_kg": row.get("bag_weight_kg"),
                 # 入庫フロー: ưu tiên QR nhập kho, fallback QR xuất kho nếu chưa cấu hình riêng
                 "qr_content": (row.get("qr_content_in") or row.get("qr_content") or ""),
             }
@@ -295,6 +448,7 @@ def _build_material_list_for_stock_in():
             {
                 "material": key[0],
                 "material_code": key[1],
+                "bag_weight_kg": "",
                 "qr_content": key[0],
             }
         )
@@ -518,7 +672,11 @@ def upload_image(request):
                 if not material_code:
                     messages.warning(request, "材料コード未設定のため、自動入力はスキップしました。画像検査結果のみ保存します。")
                 else:
-                    auto_ok, auto_msg, _ = _auto_send_to_nhap_lieu(qa_result, expected_text=expected_text or "")
+                    auto_ok, auto_msg, _ = _auto_send_to_nhap_lieu(
+                        qa_result,
+                        expected_text=expected_text or "",
+                        mode_value="2",  # 出庫
+                    )
                     if auto_ok:
                         messages.success(request, auto_msg)
                     else:
@@ -588,10 +746,144 @@ def index_qa(request):
 
 @login_required
 def stock_in_start(request):
-    material_name = (request.GET.get("material_name") or "").strip()
-    material_code = (request.GET.get("material_code") or "").strip()
+    material_name = (request.POST.get("material_name") or request.GET.get("material_name") or "").strip()
+    material_code = (request.POST.get("material_code") or request.GET.get("material_code") or "").strip()
 
     material_list = _build_material_list_for_stock_in()
+    material_map = {
+        ((item.get("material") or "").strip(), (item.get("material_code") or "").strip()): item
+        for item in material_list
+    }
+    name_to_first_code = {}
+    for item in material_list:
+        n = (item.get("material") or "").strip()
+        c = (item.get("material_code") or "").strip()
+        if n and c and n not in name_to_first_code:
+            name_to_first_code[n] = c
+
+    # Nếu chỉ có tên nhưng chưa có mã, tự map theo master
+    if material_name and not material_code:
+        material_code = name_to_first_code.get(material_name, "")
+
+    # Khi vào thẳng URL mà chưa chọn gì, tự gán item đầu tiên để UI thao tác được ngay
+    if not material_name and not material_code and material_list:
+        material_name = (material_list[0].get("material") or "").strip()
+        material_code = (material_list[0].get("material_code") or "").strip()
+
+    if request.method == "POST":
+        input_weight_raw = (request.POST.get("input_weight") or "").strip()
+        lot_color = (request.POST.get("lot_color") or "").strip()
+        lot_number = (request.POST.get("lot_number") or "").strip()
+
+        # Ưu tiên map theo mã, fallback theo tên để không bị kẹt luồng nhập kho
+        matched = material_map.get((material_name, material_code))
+        if not matched and material_name and material_code:
+            matched = next(
+                (item for item in material_list if (item.get("material") or "").strip() == material_name),
+                None,
+            )
+        if not matched and material_name and not material_code:
+            mapped_code = name_to_first_code.get(material_name, "")
+            if mapped_code:
+                material_code = mapped_code
+                matched = next(
+                    (
+                        item
+                        for item in material_list
+                        if (item.get("material") or "").strip() == material_name
+                        and (item.get("material_code") or "").strip() == material_code
+                    ),
+                    None,
+                )
+        if not matched:
+            messages.error(request, "原材料マスターから対象原材料を選択してください。")
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "material_list": material_list,
+                },
+            )
+
+        try:
+            input_weight = Decimal(input_weight_raw)
+        except (InvalidOperation, TypeError):
+            messages.error(request, "重量(kg)を正しく入力してください。")
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "material_list": material_list,
+                },
+            )
+
+        if input_weight <= 0:
+            messages.error(request, "重量(kg)は0より大きい値を入力してください。")
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "material_list": material_list,
+                },
+            )
+
+        if lot_color not in {
+            QAMaterialStockLedger.LOT_COLOR_GREEN,
+            QAMaterialStockLedger.LOT_COLOR_BLACK,
+            QAMaterialStockLedger.LOT_COLOR_BLUE,
+            QAMaterialStockLedger.LOT_COLOR_RED,
+        }:
+            messages.error(request, "ロット識別色を選択してください。")
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "material_list": material_list,
+                },
+            )
+
+        ok, auto_msg, phien, ma_nhap_lieu = _auto_send_stock_in_to_nhap_lieu(
+            material_code=material_code,
+            input_weight=input_weight,
+            lot_number=lot_number,
+        )
+        if not ok:
+            messages.error(request, auto_msg)
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "material_list": material_list,
+                },
+            )
+
+        bag_sequence_no = _calculate_bag_count_by_material_code(material_code, input_weight) or "1"
+        QAMaterialStockLedger.objects.create(
+            auto_input_ledger=(
+                QAAutoInputLedger.objects.filter(phien_nhap_lieu=phien).first() if phien else None
+            ),
+            qa_result=None,
+            material_name=material_name or "",
+            material_code=material_code or "",
+            stock_in_date=timezone.localdate(),
+            lot_color=lot_color,
+            weight_kg=input_weight,
+            bag_sequence_no=bag_sequence_no,
+            lot_number=lot_number,
+            workstation_management_no=ma_nhap_lieu or "",
+        )
+        messages.success(request, f"入庫処理が完了しました。管理番号: {ma_nhap_lieu}")
+        return redirect("material_stock_ledger")
 
     return render(
         request,
@@ -808,12 +1100,17 @@ def material_master_list(request):
     keyword = (request.GET.get("keyword") or "").strip()
     qs = QAMaterialMaster.objects.all()
     if keyword:
-        qs = qs.filter(
+        q = (
             Q(material_name__icontains=keyword)
             | Q(material_code__icontains=keyword)
             | Q(qr_content__icontains=keyword)
             | Q(qr_content_in__icontains=keyword)
         )
+        try:
+            q |= Q(bag_weight_kg=Decimal(keyword))
+        except Exception:
+            pass
+        qs = qs.filter(q)
     items = qs.order_by("material_name", "material_code", "id")
     return render(
         request,
@@ -894,7 +1191,6 @@ def material_master_delete(request, pk):
 def dashboard_qa(request):
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
-
     results = QAResult.objects.select_related("user", "device").all()
     if from_date:
         results = results.filter(created_at__date__gte=from_date)
@@ -907,7 +1203,6 @@ def dashboard_qa(request):
     unmatch_count = results.filter(result="不一致").count()
     total_weight_kg = Decimal("0")
 
-    # 統計キーは user_id 優先にして、表示名変更時でも同一人物を集約する
     def _operator_identity(scan):
         if scan.user_id:
             return f"user:{scan.user_id}", _display_login_name(scan.user) or (scan.user.username or "")
@@ -923,11 +1218,11 @@ def dashboard_qa(request):
         s = (text or "").strip()
         if not s:
             return "不明"
-        # NFKCで全角/半角（英数・カナ）差を吸収し、名称は省略しない
         s = unicodedata.normalize("NFKC", s)
         s = s.replace("\u3000", " ")
         s = re.sub(r"\s+", " ", s).strip()
         return s or "不明"
+
     for scan in results:
         operator_key, operator_display = _operator_identity(scan)
         row = operator_stats.setdefault(
@@ -976,6 +1271,7 @@ def dashboard_qa(request):
         reverse=True,
     )
     top10_operators = count_by_operator[:10]
+
     material_rows = []
     for _, item in material_stats.items():
         products = sorted(item["product_names"])
@@ -987,20 +1283,24 @@ def dashboard_qa(request):
                 "total_count": item["total_count"],
             }
         )
-
     kg_by_material = sorted(
         material_rows,
         key=lambda x: (x["total_kg"], x["total_count"]),
         reverse=True,
     )
 
-    # ===== Thống kê theo khung giờ và người thực hiện =====
     hour_stats = defaultdict(lambda: {'count': 0, 'users': set(), 'materials': set()})
+    weekday_stats = {
+        0: {"label": "月曜日", "count": 0, "kg": Decimal("0")},
+        1: {"label": "火曜日", "count": 0, "kg": Decimal("0")},
+        2: {"label": "水曜日", "count": 0, "kg": Decimal("0")},
+        3: {"label": "木曜日", "count": 0, "kg": Decimal("0")},
+        4: {"label": "金曜日", "count": 0, "kg": Decimal("0")},
+    }
     for scan in results:
         hour = localtime(scan.created_at).hour
-        # user_id ベースの同一人物表示（改名後も統一）
+        weekday = localtime(scan.created_at).weekday()
         _, user_display = _operator_identity(scan)
-        # Lấy tên nguyên liệu (材料)
         material = scan.device.material if scan.device and scan.device.material else "不明"
         hour_stats[hour]['count'] += 1
         hour_stats[hour]['users'].add(user_display)
@@ -1008,8 +1308,13 @@ def dashboard_qa(request):
         if scan.input_weight is not None:
             hour_stats[hour].setdefault('kg', Decimal("0"))
             hour_stats[hour]['kg'] += scan.input_weight
+            if weekday in weekday_stats:
+                weekday_stats[weekday]["kg"] += scan.input_weight
+        if weekday in weekday_stats:
+            weekday_stats[weekday]["count"] += 1
 
     hour_stats_list = []
+    weekday_stats_list = []
     labels = []
     data = []
     hour_kg_data = []
@@ -1034,20 +1339,28 @@ def dashboard_qa(request):
         materials.append(material_list)
 
         if 8 <= h <= 17:
-            bar_colors.append('rgba(54, 162, 235, 0.7)')      # Ca 1: xanh dương
+            bar_colors.append('rgba(54, 162, 235, 0.7)')
         elif 13 <= h <= 22:
-            bar_colors.append('rgba(255, 206, 86, 0.7)')      # Ca 2: vàng
+            bar_colors.append('rgba(255, 206, 86, 0.7)')
         elif h > 22 or h <= 7:
-            bar_colors.append('rgba(255, 99, 132, 0.7)')      # Ca 3: đỏ
+            bar_colors.append('rgba(255, 99, 132, 0.7)')
         else:
-            bar_colors.append('rgba(200,200,200,0.3)')        # Ngoài ca: xám nhạt
+            bar_colors.append('rgba(200,200,200,0.3)')
 
-    # Top10 chart data: 回数 + kg を同時表示
+    for wd in [0, 1, 2, 3, 4]:
+        row = weekday_stats[wd]
+        weekday_stats_list.append(
+            {
+                "label": row["label"],
+                "count": row["count"],
+                "kg": float(row["kg"]),
+            }
+        )
+
     top10_labels = [row.get("operator_name", "-") for row in top10_operators]
     top10_count_data = [int(row.get("total_count") or 0) for row in top10_operators]
     top10_kg_data = [float(row.get("total_kg") or 0) for row in top10_operators]
 
-    # ===== Truyền thêm dữ liệu cho template =====
     return render(request, 'quet_anh/dashboard.html', {
         'device_count': device_count,
         'result_count': result_count,
@@ -1060,8 +1373,8 @@ def dashboard_qa(request):
         'kg_by_material': kg_by_material,
         'from_date': from_date,
         'to_date': to_date,
-        # Thêm các biến sau:
         'hour_stats_list': hour_stats_list,
+        'weekday_stats_list': weekday_stats_list,
         'chart_labels': json.dumps(labels),
         'chart_data': json.dumps(data),
         'chart_hour_kg_data': json.dumps(hour_kg_data),
@@ -1081,15 +1394,16 @@ def _sync_material_stock_rows(limit=300):
 
 
 def _cleanup_auto_generated_stock_rows():
-    # Xóa dữ liệu 入庫 đã sinh nhầm từ luồng 出庫 (có auto_input_ledger).
-    QAMaterialStockLedger.objects.filter(auto_input_ledger__isnull=False).delete()
+    # Giữ nguyên dữ liệu 入庫 thực tế.
+    # Hàm cũ từng xóa toàn bộ dòng có auto_input_ledger, gây mất dữ liệu nhập kho.
+    return
 
 
 def _sync_material_out_stock_rows(limit=300):
     deleted_job_ids = QADeletedJobMarker.objects.values_list("job_id", flat=True)
     ledgers = (
         QAAutoInputLedger.objects.select_related("qa_result__device")
-        .filter(job_status="done")
+        .filter(job_status="done", qa_result__isnull=False)
         .exclude(job_id__in=deleted_job_ids)
         .order_by("-created_at")[:limit]
     )
@@ -1103,6 +1417,7 @@ def _sync_material_out_stock_rows(limit=300):
         source_date = qa_result.created_at if qa_result else ledger.created_at
         stock_out_date = timezone.localtime(source_date).date()
         weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+        bag_count = _calculate_bag_count_by_material_code(material_code, weight_kg)
         mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
 
         row = None
@@ -1140,7 +1455,7 @@ def _sync_material_out_stock_rows(limit=300):
                     "stock_out_date": stock_out_date,
                     "lot_color": (qa_result.lot_color if qa_result and qa_result.lot_color else QAMaterialOutStockLedger.LOT_COLOR_GREEN),
                     "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
-                    "bag_sequence_no": "",
+                    "bag_sequence_no": bag_count,
                     "lot_number": (qa_result.lot_number if qa_result else ""),
                     "workstation_management_no": mgmt_no,
                 },
@@ -1158,6 +1473,9 @@ def _sync_material_out_stock_rows(limit=300):
             changed = True
         if (row.weight_kg is None or row.weight_kg == 0) and weight_kg is not None:
             row.weight_kg = weight_kg
+            changed = True
+        if not row.bag_sequence_no and bag_count:
+            row.bag_sequence_no = bag_count
             changed = True
         if not row.workstation_management_no and mgmt_no:
             row.workstation_management_no = mgmt_no
@@ -1178,7 +1496,6 @@ def _sync_material_out_stock_rows(limit=300):
 
 @login_required
 def material_stock_ledger(request):
-    _cleanup_auto_generated_stock_rows()
     qs = QAMaterialStockLedger.objects.all()
     keyword = request.GET.get("keyword", "").strip()
     date = request.GET.get("date", "").strip()
@@ -1331,12 +1648,14 @@ def auto_input_ledger_delete(request, pk):
 def material_stock_ledger_delete(request, pk):
     row = get_object_or_404(QAMaterialStockLedger, pk=pk)
     if row.auto_input_ledger_id:
+        linked = row.auto_input_ledger
         QADeletedJobMarker.objects.get_or_create(
-            job_id=row.auto_input_ledger.job_id,
+            job_id=linked.job_id,
             defaults={"note": "削除操作: 原材料入庫台帳"},
         )
-        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=row.auto_input_ledger).delete()
-        row.auto_input_ledger.delete()
+        QAMaterialOutStockLedger.objects.filter(auto_input_ledger=linked).delete()
+        row.delete()
+        linked.delete()
         messages.success(request, "入庫台帳データを削除しました。")
         return redirect("material_stock_ledger")
     row.delete()
@@ -1349,12 +1668,14 @@ def material_stock_ledger_delete(request, pk):
 def material_out_stock_ledger_delete(request, pk):
     row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
     if row.auto_input_ledger_id:
+        linked = row.auto_input_ledger
         QADeletedJobMarker.objects.get_or_create(
-            job_id=row.auto_input_ledger.job_id,
+            job_id=linked.job_id,
             defaults={"note": "削除操作: 原材料出庫台帳"},
         )
-        QAMaterialStockLedger.objects.filter(auto_input_ledger=row.auto_input_ledger).delete()
-        row.auto_input_ledger.delete()
+        QAMaterialStockLedger.objects.filter(auto_input_ledger=linked).delete()
+        row.delete()
+        linked.delete()
         messages.success(request, "出庫台帳データを削除しました。")
         return redirect("material_out_stock_ledger")
     row.delete()
@@ -1450,10 +1771,11 @@ def _pick_related_qa_result(phien):
 
 
 def _cleanup_unlinked_ledgers():
-    """Xóa dữ liệu ledger không có liên kết trực tiếp tới QAResult."""
-    QAMaterialStockLedger.objects.filter(auto_input_ledger__qa_result__isnull=True).delete()
+    """
+    Chỉ dọn dữ liệu xuất kho bị lạc liên kết.
+    Không đụng dữ liệu nhập kho (qa_result có thể null hợp lệ).
+    """
     QAMaterialOutStockLedger.objects.filter(auto_input_ledger__qa_result__isnull=True).delete()
-    QAAutoInputLedger.objects.filter(qa_result__isnull=True).delete()
 
 
 def sync_auto_input_ledger(limit=200):

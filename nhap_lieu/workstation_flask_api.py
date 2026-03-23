@@ -9,6 +9,7 @@ import pyautogui
 import pyperclip
 import requests
 import urllib3
+import unicodedata
 
 app = Flask(__name__)
 
@@ -40,14 +41,32 @@ pyautogui.FAILSAFE = True
 JOB_LOCK = threading.Lock()
 
 
-def extract_invoice_number(full_text: str) -> str:
-    match1 = re.search(r"(\d{5,6})\s*に登録", full_text)
-    if match1:
-        return match1.group(1)
+def _to_ascii_digits(text: str) -> str:
+    if not text:
+        return ""
+    # NFKC để đổi số full-width (０１２３...) về ASCII
+    return unicodedata.normalize("NFKC", text)
 
-    match2 = re.search(r"(\d{5,6})", full_text)
-    if match2:
-        return match2.group(1)
+
+def extract_invoice_number(full_text: str) -> str:
+    text = _to_ascii_digits(full_text or "")
+    if not text:
+        return "---"
+
+    # 1) Ưu tiên các pattern có ngữ nghĩa "mã quản lý / số đăng ký"
+    strong_patterns = [
+        r"(?:管理番号|登録番号|伝票番号|処理番号|No\.?|NO\.?|番号)\s*[:：]?\s*([0-9]{4,10})",
+        r"([0-9]{4,10})\s*(?:に登録|を登録|登録|完了)",
+    ]
+    for pattern in strong_patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1)
+
+    # 2) Fallback: lấy cụm số cuối cùng 4-10 chữ số (thường là mã vừa sinh mới nhất)
+    candidates = re.findall(r"([0-9]{4,10})", text)
+    if candidates:
+        return candidates[-1]
 
     return "---"
 
@@ -83,12 +102,69 @@ def normalize_kg_value(raw: str) -> str:
     return value
 
 
+def normalize_material_code(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    # Normalize full-width/half-width and unify dash variants to ASCII '-'
+    value = unicodedata.normalize("NFKC", value)
+    value = (
+        value.replace("ー", "-")
+        .replace("－", "-")
+        .replace("―", "-")
+        .replace("‐", "-")
+        .replace("‑", "-")
+        .replace("‒", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace("―", "-")
+    )
+    return value
+
+
+def normalize_mode_value(raw: str) -> str:
+    value = (raw or "").strip()
+    if value in {"1", "2"}:
+        return value
+    return ""
+
+
 def type_kg_keys(kg_value: str):
     """Nhập kg bằng từng phím số thay vì paste clipboard."""
     normalized = normalize_kg_value(kg_value)
     if not normalized:
         raise ValueError("kg_value không hợp lệ hoặc rỗng cho token KG_KEYS")
     pyautogui.write(normalized, interval=0.03)
+
+
+def type_material_code_keys(material_code_value: str):
+    """Nhập mã nguyên liệu bằng chuỗi phím."""
+    normalized = normalize_material_code(material_code_value)
+    if not normalized:
+        raise ValueError("material_code_value rỗng cho token MATERIAL_CODE_KEYS")
+    # Không dùng clipboard/paste để tránh app đích chặn Ctrl+V.
+    # Ưu tiên phím cứng cho '-' (numpad subtract), fallback sang minus.
+    for ch in normalized:
+        if ch.isdigit():
+            pyautogui.press(ch)
+        elif "A" <= ch <= "Z" or "a" <= ch <= "z":
+            pyautogui.press(ch.lower())
+        elif ch == "-":
+            try:
+                pyautogui.press("subtract")
+            except Exception:
+                pyautogui.press("minus")
+        else:
+            pyautogui.write(ch, interval=0.01)
+        time.sleep(0.02)
+
+
+def type_inout_mode_keys(mode_value: str):
+    """Nhập chế độ 入/出庫: 1=入庫, 2=出庫."""
+    normalized = normalize_mode_value(mode_value)
+    if not normalized:
+        raise ValueError("mode_value không hợp lệ cho token INOUT_MODE_KEYS (chỉ nhận 1 hoặc 2)")
+    pyautogui.press(normalized)
 
 
 def copy_selected_text() -> str:
@@ -183,6 +259,8 @@ def send_input():
         data = request.get_json(force=True) or {}
         quy_tac = data.get("quy_tac", [])
         kg_value = str(data.get("kg_value") or "").strip()
+        material_code_value = str(data.get("material_code_value") or "").strip()
+        mode_value = str(data.get("mode_value") or "").strip()
         delay = float(data.get("delay", 0.1))
         job_id = str(data.get("job_id") or data.get("ma_job") or "").strip()
         ten_chuong_trinh = str(data.get("ten_chuong_trinh") or "").strip()
@@ -203,6 +281,14 @@ def send_input():
         screen_w, screen_h = pyautogui.size()
         pyautogui.click(screen_w // 2, screen_h // 2)
 
+        normalized_mode = normalize_mode_value(mode_value)
+        has_mode_token = any(str(raw).strip() in {"INOUT_MODE_KEYS", "入/出庫"} for raw in quy_tac)
+        # Fallback an toàn: nếu payload có mode nhưng template chưa chèn token,
+        # tự gõ mode ngay đầu luồng để tránh sai nhánh 入庫/出庫.
+        if normalized_mode and not has_mode_token:
+            type_inout_mode_keys(normalized_mode)
+            time.sleep(delay)
+
         for raw in quy_tac:
             item = str(raw).strip()
             if not item:
@@ -213,6 +299,14 @@ def send_input():
 
             if item == "KG_KEYS":
                 type_kg_keys(kg_value)
+                time.sleep(delay)
+                continue
+            if item == "MATERIAL_CODE_KEYS":
+                type_material_code_keys(material_code_value)
+                time.sleep(delay)
+                continue
+            if item in {"INOUT_MODE_KEYS", "入/出庫"}:
+                type_inout_mode_keys(mode_value)
                 time.sleep(delay)
                 continue
 
@@ -239,6 +333,7 @@ def send_input():
                 "status": "success",
                 "job_id": job_id,
                 "data_ocr": ma_nhap_lieu,
+                "full_text": full_text,
                 "callback_ok": ok,
                 "callback_info": callback_info,
             }

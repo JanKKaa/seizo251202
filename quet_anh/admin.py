@@ -18,8 +18,8 @@ class QAResultAdmin(admin.ModelAdmin):
 
 @admin.register(QAMaterialMaster)
 class QAMaterialMasterAdmin(admin.ModelAdmin):
-    list_display = ("id", "material_name", "material_code", "qr_content", "is_active", "updated_at")
-    search_fields = ("material_name", "material_code", "qr_content")
+    list_display = ("id", "material_name", "material_code", "bag_weight_kg", "qr_content", "is_active", "updated_at")
+    search_fields = ("material_name", "material_code", "qr_content", "qr_content_in")
     list_filter = ("is_active", "updated_at")
 
 

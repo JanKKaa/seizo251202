@@ -22,6 +22,10 @@
     .key-btn.dong { min-width: 70px; max-width: 80px; background: #e6e6fb; color: #5b00b5; font-size: 1rem; }
     .key-btn:focus { outline: 2px solid #0071e3; }
     .table thead th { background: #f5f6fa; }
+    #table-mau-nhaplieu tbody tr.is-selected {
+        background: #eef6ff;
+        outline: 2px solid #9cc8ff;
+    }
     @media (max-width: 1200px) {
         .col-xl-12 { flex: 0 0 100%; max-width: 100%; }
     }
@@ -78,6 +82,7 @@
                                     <table class="table table-bordered align-middle" id="table-mau-nhaplieu">
                                         <thead class="table-light">
                                             <tr>
+                                                <th class="text-center" style="width: 54px;">選択</th>
                                                 <th class="text-center" style="width: 70px;">番号</th>
                                                 <th class="text-center">入力内容</th>
                                                 <th class="text-center" style="width: 50px;">削除</th>
@@ -86,6 +91,7 @@
                                         <tbody>
                                             {% for dong in quy_tac_list %}
                                             <tr>
+                                                <td class="text-center"><input type="radio" name="selected_row" class="row-selector"></td>
                                                 <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
                                                 <td><input type="text" name="content[]" class="form-control content-input" value="{{ dong }}" readonly></td>
                                                 <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
@@ -96,6 +102,12 @@
                                 </div>
                                 <button type="button" class="btn btn-primary mb-3" id="btn-them-dong">
                                     <i class="fas fa-plus"></i> 行を追加
+                                </button>
+                                <button type="button" class="btn btn-outline-primary mb-3" id="btn-chen-tren">
+                                    <i class="fas fa-arrow-up"></i> 選択行の上に挿入
+                                </button>
+                                <button type="button" class="btn btn-outline-primary mb-3" id="btn-chen-duoi">
+                                    <i class="fas fa-arrow-down"></i> 選択行の下に挿入
                                 </button>
                                 <button type="button" class="btn btn-warning mb-3" id="btn-them-delay">
                                     <i class="fas fa-clock"></i> 待機（5秒）
@@ -165,6 +177,8 @@
                                     <div class="keyboard-row">
                                         <button type="button" class="key-btn ctrl wide" data-key="CTRL+A">Ctrl+A</button>
                                         <button type="button" class="key-btn ctrl wide" data-key="CTRL+C">Ctrl+C</button>
+                                        <button type="button" class="key-btn special wide" data-key="INOUT_MODE_KEYS">入/出庫</button>
+                                        <button type="button" class="key-btn special wide" data-key="MATERIAL_CODE_KEYS">材料コード</button>
                                         <button type="button" class="key-btn special wide" data-key="KG_KEYS">KG</button>
                                         <button type="button" class="key-btn special wide" data-key="Data">Data</button>
                                         <button type="button" class="key-btn special wide" data-key="DELETE">Delete</button>
@@ -188,13 +202,50 @@
 </div>
 <script>
 let activeInput = null;
+let selectedRow = null;
 function setActiveInput(input) {
     activeInput = input;
+    if (input) {
+        const row = input.closest('tr');
+        setSelectedRow(row);
+    }
 }
-document.querySelectorAll('.content-input').forEach(function(input) {
-    input.addEventListener('focus', function() { setActiveInput(this); });
-    input.addEventListener('click', function() { setActiveInput(this); });
-});
+
+function setSelectedRow(row) {
+    document.querySelectorAll('#table-mau-nhaplieu tbody tr').forEach(function(r) {
+        r.classList.remove('is-selected');
+        const radio = r.querySelector('.row-selector');
+        if (radio) radio.checked = false;
+    });
+    selectedRow = row || null;
+    if (selectedRow) {
+        selectedRow.classList.add('is-selected');
+        const radio = selectedRow.querySelector('.row-selector');
+        if (radio) radio.checked = true;
+    }
+}
+
+function bindRowEvents(row) {
+    const input = row.querySelector('.content-input');
+    if (input) {
+        input.addEventListener('focus', function() { setActiveInput(this); });
+        input.addEventListener('click', function() { setActiveInput(this); });
+    }
+    row.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-xoa')) return;
+        setSelectedRow(row);
+        if (input) setActiveInput(input);
+    });
+    const radio = row.querySelector('.row-selector');
+    if (radio) {
+        radio.addEventListener('change', function() {
+            if (this.checked) setSelectedRow(row);
+        });
+    }
+}
+
+document.querySelectorAll('#table-mau-nhaplieu tbody tr').forEach(bindRowEvents);
+
 function updateSTT() {
     const rows = document.querySelectorAll('#table-mau-nhaplieu tbody tr');
     rows.forEach((row, idx) => {
@@ -202,7 +253,17 @@ function updateSTT() {
         if (sttInput) sttInput.value = idx + 1;
     });
 }
-function addRowByKey(key) {
+
+function getInsertPosition(mode) {
+    const tbody = document.querySelector('#table-mau-nhaplieu tbody');
+    if (!tbody) return { tbody, ref: null, where: 'append' };
+    if (!selectedRow) return { tbody, ref: null, where: 'append' };
+    if (mode === 'above') return { tbody, ref: selectedRow, where: 'before' };
+    if (mode === 'below') return { tbody, ref: selectedRow.nextSibling, where: 'before' };
+    return { tbody, ref: null, where: 'append' };
+}
+
+function addRowByKey(key, mode = 'append') {
     const tbody = document.querySelector('#table-mau-nhaplieu tbody');
     let displayValue = key;
     if (key.startsWith('dong')) {
@@ -211,13 +272,20 @@ function addRowByKey(key) {
     }
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
+        <td class="text-center"><input type="radio" name="selected_row" class="row-selector"></td>
         <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
         <td><input type="text" name="content[]" class="form-control content-input" value="${displayValue}" readonly></td>
         <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
     `;
-    tbody.appendChild(newRow);
+    const pos = getInsertPosition(mode);
+    if (pos.where === 'before') {
+        pos.tbody.insertBefore(newRow, pos.ref);
+    } else {
+        tbody.appendChild(newRow);
+    }
+    bindRowEvents(newRow);
     updateSTT();
-    // Tự động focus vào ô nội dung vừa thêm
+
     const contentInput = newRow.querySelector('.content-input');
     if (contentInput) {
         contentInput.removeAttribute('readonly');
@@ -228,29 +296,28 @@ function addRowByKey(key) {
 document.getElementById('virtual-keyboard').addEventListener('click', function(e) {
     if (e.target.classList.contains('key-btn')) {
         let key = e.target.getAttribute('data-key');
-        addRowByKey(key);
+        addRowByKey(key, 'below');
     }
 });
 document.addEventListener('click', function(e) {
     if (e.target && e.target.classList.contains('btn-xoa')) {
         const row = e.target.closest('tr');
         row.parentNode.removeChild(row);
+        if (selectedRow === row) selectedRow = null;
         updateSTT();
     }
 });
 document.getElementById('btn-them-dong').onclick = function() {
-    addRowByKey('');
+    addRowByKey('', 'below');
+};
+document.getElementById('btn-chen-tren').onclick = function() {
+    addRowByKey('', 'above');
+};
+document.getElementById('btn-chen-duoi').onclick = function() {
+    addRowByKey('', 'below');
 };
 document.getElementById('btn-them-delay').onclick = function() {
-    const tbody = document.querySelector('#table-mau-nhaplieu tbody');
-    const newRow = document.createElement('tr');
-    newRow.innerHTML = `
-        <td class="text-center"><input type="text" name="stt[]" class="form-control text-center" readonly></td>
-        <td><input type="text" name="content[]" class="form-control content-input" value="DELAY_5S" readonly></td>
-        <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-xoa">X</button></td>
-    `;
-    tbody.appendChild(newRow);
-    updateSTT();
+    addRowByKey('DELAY_5S', 'below');
 };
 updateSTT();
 </script>

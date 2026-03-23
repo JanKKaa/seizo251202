@@ -99,6 +99,9 @@ def index(request):
                 dong3 = request.POST.get("dong3", "")
                 dong4 = request.POST.get("dong4", "")
                 dong5 = request.POST.get("dong5", "")
+                inout_mode = (request.POST.get("inout_mode") or "2").strip()
+                if inout_mode not in {"1", "2"}:
+                    inout_mode = "2"
 
                 if not any((dong1.strip(), dong2.strip(), dong3.strip(), dong4.strip(), dong5.strip())):
                     message = "Vui lòng nhập ít nhất một dòng dữ liệu!"
@@ -129,6 +132,8 @@ def index(request):
                         "ten_chuong_trinh": selected.ten_chuong_trinh,
                         "quy_tac": quy_tac_gui,
                         "kg_value": dong2.strip(),
+                        "material_code_value": dong1.strip(),
+                        "mode_value": inout_mode,
                         "delay": float(request.POST.get("delay", 0.1)),
                     }
                     if qa_result:

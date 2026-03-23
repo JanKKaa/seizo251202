@@ -32,6 +32,14 @@
                     {% endif %}
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-bold" for="{{ form.bag_weight_kg.id_for_label }}">1袋重量(kg)</label>
+                    {{ form.bag_weight_kg }}
+                    <div class="form-text">袋数自動計算に使用します。（例: 20, 25）</div>
+                    {% if form.bag_weight_kg.errors %}
+                        <div class="text-danger small mt-1">{{ form.bag_weight_kg.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-bold" for="{{ form.qr_content.id_for_label }}">出庫用QR内容</label>
                     {{ form.qr_content }}
                     <div class="form-text">出庫時（包装QR）に照合するテキストを登録してください。</div>

@@ -199,6 +199,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+# Auto input: tách riêng chương trình xuất kho / nhập kho
+NHAP_LIEU_XUAT_KHO_PROGRAM_NAME = "xuatkho"
+NHAP_LIEU_NHAP_KHO_PROGRAM_NAME = "nhapkho"
+
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',

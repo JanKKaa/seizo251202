@@ -15,7 +15,7 @@
 
     <form method="get" class="row g-2 mb-3">
         <div class="col-md-6">
-            <input type="text" name="keyword" value="{{ keyword }}" class="form-control" placeholder="原材料名・コード・入出庫QRで検索">
+            <input type="text" name="keyword" value="{{ keyword }}" class="form-control" placeholder="原材料名・コード・1袋重量・入出庫QRで検索">
         </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-primary">検索</button>
@@ -32,6 +32,7 @@
                             <th class="text-center" style="width:6%;">#</th>
                             <th>原材料名</th>
                             <th>原材料コード</th>
+                            <th>1袋重量(kg)</th>
                             <th>出庫用QR</th>
                             <th>入庫用QR</th>
                             <th class="text-center" style="width:10%;">有効</th>
@@ -44,6 +45,7 @@
                             <td class="text-center">{{ forloop.counter }}</td>
                             <td>{{ item.material_name }}</td>
                             <td>{{ item.material_code }}</td>
+                            <td class="text-end">{{ item.bag_weight_kg }}</td>
                             <td>{{ item.qr_content }}</td>
                             <td>{{ item.qr_content_in|default:"-" }}</td>
                             <td class="text-center">
@@ -63,7 +65,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-3">データがありません。</td>
+                            <td colspan="8" class="text-center text-muted py-3">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
