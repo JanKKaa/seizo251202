@@ -165,6 +165,7 @@ def _sync_material_out_stock_from_ledger(ledger):
     material_name = (device.material if device else "") or ledger.qa_material or ""
     material_code = (device.material_code if device else "") or ""
     weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
+    bag_count = _calculate_bag_count_by_material_code(material_code, weight_kg)
     mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
 
     row = None

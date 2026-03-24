@@ -2,6 +2,7 @@
 import re
 import time
 import uuid
+import logging
 
 import requests
 from django.contrib import messages
@@ -18,14 +19,59 @@ from datetime import timedelta
 
 from .models import ChuongTrinhNhapLieu, KetQuaNhapLieu, MayTinh, PhienNhapLieu
 
+logger = logging.getLogger(__name__)
+
 
 def gui_du_lieu(payload, ip, timeout=120):
     """Gửi payload sang Flask máy trạm nhập liệu."""
     url = f"http://{ip}:5000/send_input"
+    connect_timeout = float(getattr(settings, "NHAP_LIEU_CONNECT_TIMEOUT_SECONDS", 5))
+    busy_retry_count = int(getattr(settings, "NHAP_LIEU_BUSY_RETRY_COUNT", 30))
+    busy_retry_delay = float(getattr(settings, "NHAP_LIEU_BUSY_RETRY_DELAY_SECONDS", 2))
+    job_id = (payload or {}).get("job_id") or (payload or {}).get("ma_job") or "-"
+    response = None
+    busy_count = 0
+    total_wait = 0.0
     try:
-        response = requests.post(url, json=payload, timeout=timeout)
+        for attempt in range(busy_retry_count + 1):
+            response = requests.post(url, json=payload, timeout=(connect_timeout, timeout))
+            if response.status_code != 409:
+                if busy_count:
+                    logger.info(
+                        "Workstation ready after busy wait: job_id=%s ip=%s busy_count=%s wait_seconds=%.1f status=%s",
+                        job_id,
+                        ip,
+                        busy_count,
+                        total_wait,
+                        response.status_code,
+                    )
+                break
+            busy_count += 1
+            logger.warning(
+                "Workstation busy (409): job_id=%s ip=%s attempt=%s/%s",
+                job_id,
+                ip,
+                busy_count,
+                busy_retry_count + 1,
+            )
+            if attempt >= busy_retry_count:
+                logger.error(
+                    "Workstation busy retry exhausted: job_id=%s ip=%s busy_count=%s wait_seconds=%.1f",
+                    job_id,
+                    ip,
+                    busy_count,
+                    total_wait,
+                )
+                break
+            time.sleep(busy_retry_delay)
+            total_wait += busy_retry_delay
+    except requests.exceptions.ConnectTimeout:
+        return False, "Không kết nối được API máy trạm (timeout cổng 5000). Kiểm tra app máy trạm / mạng / firewall.", {}
     except Exception as exc:
         return False, f"Lỗi kết nối: {exc}", {}
+
+    if response is None:
+        return False, "Lỗi: không nhận được phản hồi từ máy trạm", {}
 
     if response.status_code != 200:
         return False, f"Lỗi: HTTP {response.status_code} - {response.text}", {}
@@ -41,6 +87,10 @@ def gui_du_lieu(payload, ip, timeout=120):
 def is_valid_ip(ip):
     pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
     return bool(re.match(pattern, ip or ""))
+
+
+def is_valid_registration_code(code):
+    return bool(re.fullmatch(r"3\d{4}", (code or "").strip()))
 
 
 def tao_ma_job():
@@ -159,7 +209,7 @@ def index(request):
                         callback_info = response_data.get("callback_info") if isinstance(response_data, dict) else ""
                         data_ocr = (response_data.get("data_ocr") or "").strip() if isinstance(response_data, dict) else ""
 
-                        if callback_ok and data_ocr:
+                        if callback_ok and data_ocr and is_valid_registration_code(data_ocr):
                             phien.trang_thai = "done"
                             phien.thong_bao = "Hoàn thành (xác nhận đồng bộ từ máy trạm)"
                             phien.ma_nhap_lieu = data_ocr
@@ -183,6 +233,10 @@ def index(request):
                                     trang_thai="Thành công",
                                     ghi_chu="Lưu từ phản hồi đồng bộ máy trạm",
                                 )
+                        elif callback_ok and data_ocr:
+                            phien.trang_thai = "failed"
+                            phien.thong_bao = f"Mã đăng ký không hợp lệ: {data_ocr} (chỉ nhận 3xxxx)"
+                            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
                         elif callback_ok:
                             phien.trang_thai = "sent"
                             phien.thong_bao = "Đã gửi lệnh, callback đã xác nhận. Đang đợi mã kết quả."
@@ -395,34 +449,84 @@ def api_cap_nhat_ket_qua(request):
 
     if not ip_may:
         return JsonResponse({"status": "error", "message": "Thiếu ip"}, status=400)
+    if not ma_job:
+        return JsonResponse({"status": "error", "message": "Thiếu job_id"}, status=400)
 
     may = MayTinh.objects.filter(ip=ip_may).first()
     chuong_trinh = (
         ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=ten_chuong_trinh).first() if ten_chuong_trinh else None
     )
-
-    phien = None
-    if ma_job:
-        phien = PhienNhapLieu.objects.filter(ma_job=ma_job).first()
-    if not phien:
+    with transaction.atomic():
         phien = (
-            PhienNhapLieu.objects.filter(ip_may=ip_may, trang_thai__in=["queued", "sending", "sent"])
-            .order_by("-ngay_tao")
+            PhienNhapLieu.objects.select_for_update()
+            .filter(ma_job=ma_job)
             .first()
         )
+        if not phien:
+            return JsonResponse({"status": "error", "message": "Không tìm thấy job_id"}, status=404)
 
-    ket_qua = KetQuaNhapLieu.objects.create(
-        chuong_trinh=chuong_trinh,
-        may_tinh=may,
-        phien=phien,
-        ip_may=ip_may,
-        ma_nhap_lieu=ma_so,
-        full_text=full_text,
-        trang_thai="Thành công" if is_success else "Lỗi",
-        ghi_chu="Nhận callback từ Flask",
-    )
+        if is_success and not ma_so:
+            return JsonResponse({"status": "error", "message": "Thiếu mã đăng ký cho callback thành công"}, status=400)
+        if is_success and not is_valid_registration_code(ma_so):
+            return JsonResponse(
+                {"status": "error", "message": f"Mã đăng ký không hợp lệ: {ma_so} (chỉ nhận 3xxxx)"},
+                status=400,
+            )
 
-    if phien:
+        existing_success = (
+            KetQuaNhapLieu.objects.filter(phien=phien, trang_thai="Thành công")
+            .order_by("-id")
+            .first()
+        )
+        if existing_success and is_success:
+            old_code = (existing_success.ma_nhap_lieu or "").strip()
+            if old_code and old_code != ma_so:
+                return JsonResponse(
+                    {"status": "error", "message": "Mã đăng ký callback không khớp với giao dịch đã chốt"},
+                    status=409,
+                )
+            if full_text and (existing_success.full_text or "") != full_text:
+                existing_success.full_text = full_text
+                existing_success.save(update_fields=["full_text", "ngay_cap_nhat"])
+            if phien.trang_thai != "done":
+                phien.trang_thai = "done"
+                phien.ma_nhap_lieu = ma_so
+                phien.full_text = full_text
+                phien.thong_bao = "Hoàn thành"
+                phien.save(update_fields=["trang_thai", "ma_nhap_lieu", "full_text", "thong_bao", "ngay_cap_nhat"])
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "message": "Callback đã được xử lý trước đó",
+                    "data": {"id": existing_success.id, "ma": existing_success.ma_nhap_lieu, "job_id": ma_job},
+                },
+                status=200,
+            )
+
+        if phien.trang_thai == "done" and (phien.ma_nhap_lieu or "").strip() and is_success:
+            if (phien.ma_nhap_lieu or "").strip() != ma_so:
+                return JsonResponse(
+                    {"status": "error", "message": "Mã đăng ký callback không khớp với giao dịch đã chốt"},
+                    status=409,
+                )
+
+        if phien.trang_thai == "done" and not is_success:
+            return JsonResponse(
+                {"status": "success", "message": "Bỏ qua callback lỗi vì giao dịch đã hoàn thành", "data": {"job_id": ma_job}},
+                status=200,
+            )
+
+        ket_qua = KetQuaNhapLieu.objects.create(
+            chuong_trinh=chuong_trinh or phien.chuong_trinh,
+            may_tinh=may or phien.may_tinh,
+            phien=phien,
+            ip_may=ip_may,
+            ma_nhap_lieu=ma_so,
+            full_text=full_text,
+            trang_thai="Thành công" if is_success else "Lỗi",
+            ghi_chu="Nhận callback từ Flask",
+        )
+
         phien.ma_nhap_lieu = ma_so
         phien.full_text = full_text
         phien.trang_thai = "done" if is_success else "failed"

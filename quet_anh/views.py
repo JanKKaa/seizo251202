@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation, ROUND_CEILING
 import uuid
 import time as pytime
 import unicodedata
+import logging
 from django.core.files.base import ContentFile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponseForbidden, JsonResponse
@@ -31,7 +32,7 @@ from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.db import OperationalError, ProgrammingError, IntegrityError
+from django.db import OperationalError, ProgrammingError, IntegrityError, transaction
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.core.files.storage import default_storage
@@ -49,6 +50,8 @@ import json
 import requests
 from nhap_lieu.models import PhienNhapLieu
 from nhap_lieu.models import ChuongTrinhNhapLieu, MayTinh, KetQuaNhapLieu
+
+logger = logging.getLogger(__name__)
 
 
 def _display_login_name(user):
@@ -138,6 +141,52 @@ def _is_valid_ipv4(ip):
     return bool(re.match(pattern, ip))
 
 
+def _post_to_workstation_with_retry(ip, payload):
+    url = f"http://{ip}:5000/send_input"
+    connect_timeout = float(getattr(settings, "NHAP_LIEU_CONNECT_TIMEOUT_SECONDS", 5))
+    request_timeout = float(getattr(settings, "NHAP_LIEU_REQUEST_TIMEOUT_SECONDS", 120))
+    busy_retry_count = int(getattr(settings, "NHAP_LIEU_BUSY_RETRY_COUNT", 30))
+    busy_retry_delay = float(getattr(settings, "NHAP_LIEU_BUSY_RETRY_DELAY_SECONDS", 2))
+    job_id = (payload or {}).get("job_id") or (payload or {}).get("ma_job") or "-"
+
+    response = None
+    busy_count = 0
+    total_wait = 0.0
+    for attempt in range(busy_retry_count + 1):
+        response = requests.post(url, json=payload, timeout=(connect_timeout, request_timeout))
+        if response.status_code != 409:
+            if busy_count:
+                logger.info(
+                    "Workstation ready after busy wait: job_id=%s ip=%s busy_count=%s wait_seconds=%.1f status=%s",
+                    job_id,
+                    ip,
+                    busy_count,
+                    total_wait,
+                    response.status_code,
+                )
+            return response
+        busy_count += 1
+        logger.warning(
+            "Workstation busy (409): job_id=%s ip=%s attempt=%s/%s",
+            job_id,
+            ip,
+            busy_count,
+            busy_retry_count + 1,
+        )
+        if attempt >= busy_retry_count:
+            logger.error(
+                "Workstation busy retry exhausted: job_id=%s ip=%s busy_count=%s wait_seconds=%.1f",
+                job_id,
+                ip,
+                busy_count,
+                total_wait,
+            )
+            return response
+        pytime.sleep(busy_retry_delay)
+        total_wait += busy_retry_delay
+    return response
+
+
 def _get_master_by_material_code(material_code: str):
     code = (material_code or "").strip()
     if not code:
@@ -164,6 +213,63 @@ def _calculate_bag_count_by_material_code(material_code: str, weight_kg):
     if not master or master.bag_weight_kg is None:
         return ""
     return _calculate_bag_count(weight_kg, master.bag_weight_kg)
+
+
+def _finalize_success_phien(phien, *, data_ocr: str, full_text: str = "", done_message: str = "自動入力完了"):
+    code = (data_ocr or "").strip()
+    if not code or code == "---":
+        return False, "管理番号が取得できませんでした。再実行してください。", phien
+    if not re.fullmatch(r"3\d{4}", code):
+        return False, f"管理番号形式エラー: {code}（3で始まる5桁のみ有効）", phien
+
+    with transaction.atomic():
+        locked = (
+            PhienNhapLieu.objects.select_for_update()
+            .select_related("chuong_trinh", "may_tinh")
+            .get(pk=phien.pk)
+        )
+
+        if (
+            KetQuaNhapLieu.objects.filter(ma_nhap_lieu=code, trang_thai="Thành công")
+            .exclude(phien=locked)
+            .exists()
+        ):
+            locked.trang_thai = "failed"
+            locked.thong_bao = f"管理番号重複: {code}"
+            locked.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, f"管理番号が重複しています: {code}", locked
+
+        existing_success = (
+            KetQuaNhapLieu.objects
+            .filter(phien=locked, trang_thai="Thành công")
+            .order_by("-id")
+            .first()
+        )
+        if existing_success and (existing_success.ma_nhap_lieu or "").strip() != code:
+            return False, "同一ジョブで管理番号が不一致です。処理を中断しました。", locked
+
+        locked.trang_thai = "done"
+        locked.ma_nhap_lieu = code
+        locked.full_text = full_text or locked.full_text or ""
+        locked.thong_bao = done_message
+        locked.save(update_fields=["trang_thai", "ma_nhap_lieu", "full_text", "thong_bao", "ngay_cap_nhat"])
+
+        if not existing_success:
+            KetQuaNhapLieu.objects.create(
+                chuong_trinh=locked.chuong_trinh,
+                may_tinh=locked.may_tinh,
+                phien=locked,
+                ip_may=locked.ip_may or "",
+                ma_nhap_lieu=code,
+                full_text=locked.full_text or "",
+                trang_thai="Thành công",
+                ghi_chu="画像検査フローで確定保存",
+            )
+        elif full_text and (existing_success.full_text or "") != full_text:
+            existing_success.full_text = full_text
+            existing_success.save(update_fields=["full_text", "ngay_cap_nhat"])
+
+    return True, done_message, locked
 
 
 def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
@@ -230,8 +336,7 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
     )
 
     try:
-        url = f"http://{may_tinh.ip}:5000/send_input"
-        response = requests.post(url, json=payload, timeout=20)
+        response = _post_to_workstation_with_retry(may_tinh.ip, payload)
         if response.status_code != 200:
             phien.trang_thai = "failed"
             phien.thong_bao = f"送信失敗 HTTP {response.status_code}"
@@ -241,31 +346,24 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         data = response.json()
         callback_ok = bool(data.get("callback_ok"))
         data_ocr = (data.get("data_ocr") or "").strip()
+        full_text = (data.get("full_text") or "").strip()
 
-        if callback_ok and data_ocr:
-            if data_ocr == "---":
-                phien.trang_thai = "failed"
-                phien.thong_bao = "管理番号が無効です (---)"
-                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
-                return False, "管理番号が取得できませんでした。再実行してください。", phien
-
-            # Callback có thể đã lưu KetQuaNhapLieu cho chính job hiện tại.
-            # Chỉ coi là trùng khi cùng mã đã tồn tại ở job khác.
-            if (
-                KetQuaNhapLieu.objects.filter(ma_nhap_lieu=data_ocr, trang_thai="Thành công")
-                .exclude(phien=phien)
-                .exists()
-            ):
-                phien.trang_thai = "failed"
-                phien.thong_bao = f"管理番号重複: {data_ocr}"
-                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
-                return False, f"管理番号が重複しています: {data_ocr}", phien
-
-            phien.trang_thai = "done"
-            phien.ma_nhap_lieu = data_ocr
-            phien.thong_bao = "自動入力完了"
-            phien.save(update_fields=["trang_thai", "ma_nhap_lieu", "thong_bao", "ngay_cap_nhat"])
-            return True, f"自動入力完了: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", phien
+        # Ưu tiên dữ liệu phản hồi trực tiếp từ máy trạm.
+        # Nếu đã có mã quản lý hợp lệ thì coi là hoàn thành,
+        # kể cả callback ngược về Django tạm thời lỗi.
+        if data_ocr:
+            done_msg = "自動入力完了" if callback_ok else "自動入力完了（コールバック未達）"
+            ok, finalize_msg, updated_phien = _finalize_success_phien(
+                phien,
+                data_ocr=data_ocr,
+                full_text=full_text,
+                done_message=done_msg,
+            )
+            if not ok:
+                return False, finalize_msg or "確定保存に失敗しました。", updated_phien
+            if callback_ok:
+                return True, f"自動入力完了: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", updated_phien
+            return True, f"自動入力完了（コールバック未達）: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", updated_phien
 
         if callback_ok:
             phien.trang_thai = "failed"
@@ -278,6 +376,11 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
         return False, "自動入力のコールバックに失敗しました。", phien
     except Exception as exc:
+        if isinstance(exc, requests.exceptions.ConnectTimeout):
+            phien.trang_thai = "failed"
+            phien.thong_bao = "接続タイムアウト: 端末API(5000)に接続できません"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, "端末APIに接続できません。端末側API起動/ネットワーク/Firewallをご確認ください。", phien
         phien.trang_thai = "failed"
         phien.thong_bao = f"送信例外: {exc}"
         phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
@@ -348,8 +451,7 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
     )
 
     try:
-        url = f"http://{may_tinh.ip}:5000/send_input"
-        response = requests.post(url, json=payload, timeout=20)
+        response = _post_to_workstation_with_retry(may_tinh.ip, payload)
         if response.status_code != 200:
             phien.trang_thai = "failed"
             phien.thong_bao = f"送信失敗 HTTP {response.status_code}"
@@ -359,29 +461,19 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
         data = response.json()
         callback_ok = bool(data.get("callback_ok"))
         data_ocr = (data.get("data_ocr") or "").strip()
+        full_text = (data.get("full_text") or "").strip()
 
-        if callback_ok and data_ocr:
-            if data_ocr == "---":
-                phien.trang_thai = "failed"
-                phien.thong_bao = "管理番号が無効です (---)"
-                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
-                return False, "管理番号が取得できませんでした。再実行してください。", phien, ""
-
-            if (
-                KetQuaNhapLieu.objects.filter(ma_nhap_lieu=data_ocr, trang_thai="Thành công")
-                .exclude(phien=phien)
-                .exists()
-            ):
-                phien.trang_thai = "failed"
-                phien.thong_bao = f"管理番号重複: {data_ocr}"
-                phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
-                return False, f"管理番号が重複しています: {data_ocr}", phien, ""
-
-            phien.trang_thai = "done"
-            phien.ma_nhap_lieu = data_ocr
-            phien.thong_bao = "自動入力完了（入庫）"
-            phien.save(update_fields=["trang_thai", "ma_nhap_lieu", "thong_bao", "ngay_cap_nhat"])
-            return True, f"自動入力完了（入庫）: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", phien, data_ocr
+        if data_ocr:
+            done_msg = "自動入力完了（入庫）" if callback_ok else "自動入力完了（入庫・コールバック未達）"
+            ok, finalize_msg, updated_phien = _finalize_success_phien(
+                phien,
+                data_ocr=data_ocr,
+                full_text=full_text,
+                done_message=done_msg,
+            )
+            if not ok:
+                return False, finalize_msg or "確定保存に失敗しました。", updated_phien, ""
+            return True, f"{done_msg}: {chuong_trinh.ten_chuong_trinh} / {may_tinh.ip}", updated_phien, data_ocr
 
         if callback_ok:
             phien.trang_thai = "failed"
@@ -394,6 +486,11 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
         phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
         return False, "自動入力のコールバックに失敗しました。", phien, ""
     except Exception as exc:
+        if isinstance(exc, requests.exceptions.ConnectTimeout):
+            phien.trang_thai = "failed"
+            phien.thong_bao = "接続タイムアウト: 端末API(5000)に接続できません"
+            phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+            return False, "端末APIに接続できません。端末側API起動/ネットワーク/Firewallをご確認ください。", phien, ""
         phien.trang_thai = "failed"
         phien.thong_bao = f"送信例外: {exc}"
         phien.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
@@ -667,18 +764,22 @@ def upload_image(request):
             qa_result.save()
 
             # Tự động gọi app nhập liệu nếu ảnh khớp (xuất nguyên liệu)
+            registration_code = ""
+            flow_detail_message = "出庫データの保存と自動入力が完了しました。"
             if qa_result.result == "一致":
                 material_code = (qa_result.device.material_code or "").strip() if qa_result.device else ""
                 if not material_code:
                     messages.warning(request, "材料コード未設定のため、自動入力はスキップしました。画像検査結果のみ保存します。")
+                    flow_detail_message = "画像検査結果の保存は完了しました（自動入力はスキップ）。"
                 else:
-                    auto_ok, auto_msg, _ = _auto_send_to_nhap_lieu(
+                    auto_ok, auto_msg, auto_phien = _auto_send_to_nhap_lieu(
                         qa_result,
                         expected_text=expected_text or "",
                         mode_value="2",  # 出庫
                     )
                     if auto_ok:
                         messages.success(request, auto_msg)
+                        registration_code = ((auto_phien.ma_nhap_lieu if auto_phien else "") or "").strip()
                     else:
                         _rollback_failed_qa_attempt(qa_result)
                         messages.error(request, f"{auto_msg} / 保存しません。再スキャンしてください。")
@@ -698,21 +799,15 @@ def upload_image(request):
                             'min_ratio': min_ratio,
                         })
 
-            form = QAResultForm()
-            device_list = QADeviceInfo.objects.all()
-            return render(request, 'quet_anh/upload.html', {
-                'form': form,
-                'expected_text': expected_text,
-                'is_match': is_match,
-                'matched_text': matched_text,
-                'data': ocr_text,
-                'device_list': device_list,
-                'device_id': device_id,
-                'device': device,
-                'show_back_to_index': True,
-                'match_ratios': match_ratios,
-                'min_ratio': min_ratio,
-            })
+            return render(
+                request,
+                "quet_anh/auto_success.html",
+                {
+                    "flow_name": "出庫処理",
+                    "registration_code": registration_code,
+                    "detail_message": flow_detail_message,
+                },
+            )
         else:
             messages.error(request, "カメラから画像を取得できませんでした。")
             return redirect('upload_image')
@@ -882,8 +977,15 @@ def stock_in_start(request):
             lot_number=lot_number,
             workstation_management_no=ma_nhap_lieu or "",
         )
-        messages.success(request, f"入庫処理が完了しました。管理番号: {ma_nhap_lieu}")
-        return redirect("material_stock_ledger")
+        return render(
+            request,
+            "quet_anh/auto_success.html",
+            {
+                "flow_name": "入庫処理",
+                "registration_code": (ma_nhap_lieu or "").strip(),
+                "detail_message": "入庫データの保存と自動入力が完了しました。",
+            },
+        )
 
     return render(
         request,

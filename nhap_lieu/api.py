@@ -1,4 +1,7 @@
 ﻿from flask import Flask, jsonify, request
+import csv
+import ctypes
+from ctypes import wintypes
 import os
 import re
 import subprocess
@@ -10,6 +13,8 @@ import pyperclip
 import requests
 import urllib3
 import unicodedata
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 app = Flask(__name__)
 
@@ -31,14 +36,33 @@ APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "5"))
 PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "1"))
 CALLBACK_TIMEOUT = float(os.getenv("CALLBACK_TIMEOUT", "5"))
 CALLBACK_RETRIES = int(os.getenv("CALLBACK_RETRIES", "3"))
+OCR_READ_RETRIES = int(os.getenv("OCR_READ_RETRIES", "3"))
+OCR_RETRY_DELAY = float(os.getenv("OCR_RETRY_DELAY", "1.0"))
+CALLBACK_CONNECT_TIMEOUT = float(os.getenv("CALLBACK_CONNECT_TIMEOUT", "5"))
+CALLBACK_READ_TIMEOUT = float(os.getenv("CALLBACK_READ_TIMEOUT", "20"))
 CALLBACK_VERIFY_SSL = os.getenv("CALLBACK_VERIFY_SSL", "0").strip() in {"1", "true", "True", "yes", "YES"}
 PROCESS_KILL_NAME = os.getenv("INPUT_PROCESS_NAME", os.path.basename(PATH_EXE))
+FOCUS_RETRIES = int(os.getenv("FOCUS_RETRIES", "8"))
+FOCUS_RETRY_DELAY = float(os.getenv("FOCUS_RETRY_DELAY", "0.5"))
+AUTO_MAXIMIZE_WINDOW = os.getenv("AUTO_MAXIMIZE_WINDOW", "1").strip() in {"1", "true", "True", "yes", "YES"}
+FOCUS_PREP_ESC_COUNT = int(os.getenv("FOCUS_PREP_ESC_COUNT", "2"))
+FOCUS_PREP_USE_SHOW_DESKTOP = os.getenv("FOCUS_PREP_USE_SHOW_DESKTOP", "1").strip() in {"1", "true", "True", "yes", "YES"}
 
 if not CALLBACK_VERIFY_SSL:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 pyautogui.FAILSAFE = True
 JOB_LOCK = threading.Lock()
+
+# Session riêng cho callback để ổn định kết nối khi chạy liên tục.
+CALLBACK_SESSION = requests.Session()
+CALLBACK_ADAPTER = HTTPAdapter(
+    pool_connections=20,
+    pool_maxsize=20,
+    max_retries=Retry(total=0),
+)
+CALLBACK_SESSION.mount("http://", CALLBACK_ADAPTER)
+CALLBACK_SESSION.mount("https://", CALLBACK_ADAPTER)
 
 
 def _to_ascii_digits(text: str) -> str:
@@ -179,21 +203,51 @@ def copy_selected_text() -> str:
     return pyperclip.paste() or ""
 
 
+def capture_final_text_and_code(retries: int = OCR_READ_RETRIES, retry_delay: float = OCR_RETRY_DELAY):
+    """Đọc màn hình nhiều lần để lấy full_text cuối cùng và mã quản lý ổn định."""
+    retries = max(1, int(retries or 1))
+    retry_delay = max(0.0, float(retry_delay or 0))
+    last_text = ""
+    last_code = "---"
+
+    for idx in range(retries):
+        text = copy_selected_text().strip()
+        code = extract_invoice_number(text)
+        if text:
+            last_text = text
+        if code and code != "---":
+            last_code = code
+            return text or last_text, last_code
+        last_code = code or "---"
+        if idx < retries - 1:
+            time.sleep(retry_delay)
+
+    return last_text, last_code
+
+
 def post_callback(payload: dict):
     last_error = None
     for i in range(CALLBACK_RETRIES):
+        response = None
         try:
-            response = requests.post(
+            response = CALLBACK_SESSION.post(
                 URL_DJANGO_CALLBACK,
                 json=payload,
-                timeout=CALLBACK_TIMEOUT,
+                timeout=(CALLBACK_CONNECT_TIMEOUT, CALLBACK_READ_TIMEOUT),
                 verify=CALLBACK_VERIFY_SSL,
+                headers={"Connection": "close"},
             )
             if 200 <= response.status_code < 300:
                 return True, response.status_code
             last_error = f"HTTP {response.status_code}: {response.text}"
         except Exception as exc:
             last_error = str(exc)
+        finally:
+            try:
+                if response is not None:
+                    response.close()
+            except Exception:
+                pass
 
         time.sleep(1 + i)
 
@@ -224,6 +278,183 @@ def force_close_target_app(process=None):
         pass
 
 
+def _find_pids_by_image_name(image_name: str):
+    """Tìm PID theo tên exe (hỗ trợ app kiểu launcher)."""
+    name = (image_name or "").strip()
+    if not name:
+        return []
+    if not name.lower().endswith(".exe"):
+        name = f"{name}.exe"
+
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {name}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        return []
+
+    rows = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    pids = []
+    for row in rows:
+        if row.startswith("INFO:"):
+            continue
+        try:
+            parsed = next(csv.reader([row]))
+        except Exception:
+            continue
+        if len(parsed) < 2:
+            continue
+        try:
+            pids.append(int(parsed[1]))
+        except Exception:
+            continue
+    return pids
+
+
+def _bring_window_to_front_by_pid(pid: int) -> bool:
+    """Đưa cửa sổ top-level thuộc PID lên foreground (focus mạnh)."""
+    if not pid:
+        return False
+
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    target_hwnd = wintypes.HWND(0)
+    best_title_len = ctypes.c_int(-1)
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+    def enum_windows_proc(hwnd, _):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+
+        proc_id = ctypes.c_ulong(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
+        if proc_id.value != pid:
+            return True
+
+        title_len = int(user32.GetWindowTextLengthW(hwnd))
+        if title_len > best_title_len.value:
+            target_hwnd.value = int(hwnd)
+            best_title_len.value = title_len
+        return True
+
+    try:
+        user32.EnumWindows(enum_windows_proc, 0)
+        if not target_hwnd.value:
+            return False
+
+        hwnd = target_hwnd
+        SW_RESTORE = 9
+        SW_MAXIMIZE = 3
+        SWP_NOSIZE = 0x0001
+        SWP_NOMOVE = 0x0002
+        HWND_TOPMOST = -1
+        HWND_NOTOPMOST = -2
+
+        user32.ShowWindow(hwnd, SW_RESTORE)
+        if AUTO_MAXIMIZE_WINDOW:
+            user32.ShowWindow(hwnd, SW_MAXIMIZE)
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+        user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+
+        current_tid = kernel32.GetCurrentThreadId()
+        target_tid = user32.GetWindowThreadProcessId(hwnd, None)
+        fg_hwnd = user32.GetForegroundWindow()
+        fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None) if fg_hwnd else 0
+
+        attached1 = False
+        attached2 = False
+        try:
+            if fg_tid and fg_tid != current_tid:
+                attached1 = bool(user32.AttachThreadInput(current_tid, fg_tid, True))
+            if target_tid and target_tid != current_tid:
+                attached2 = bool(user32.AttachThreadInput(current_tid, target_tid, True))
+
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+            user32.SetActiveWindow(hwnd)
+            user32.SetFocus(hwnd)
+        finally:
+            if attached2:
+                user32.AttachThreadInput(current_tid, target_tid, False)
+            if attached1:
+                user32.AttachThreadInput(current_tid, fg_tid, False)
+
+        return bool(user32.GetForegroundWindow() == hwnd)
+    except Exception:
+        return False
+
+
+def _get_foreground_pid() -> int:
+    """Lấy PID của cửa sổ foreground hiện tại."""
+    try:
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return 0
+        proc_id = ctypes.c_ulong(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
+        return int(proc_id.value or 0)
+    except Exception:
+        return 0
+
+
+def _prepare_focus_surface(use_show_desktop: bool = True):
+    """Giảm khả năng bị popup/notification giữ foreground."""
+    try:
+        for _ in range(max(0, FOCUS_PREP_ESC_COUNT)):
+            pyautogui.press("esc")
+            time.sleep(0.05)
+    except Exception:
+        pass
+
+    if use_show_desktop and FOCUS_PREP_USE_SHOW_DESKTOP:
+        try:
+            pyautogui.hotkey("win", "d")
+            time.sleep(0.2)
+        except Exception:
+            pass
+
+
+def ensure_target_app_focus(process=None) -> bool:
+    """Buộc focus về app hệ thống sau khi mở."""
+    pids = set()
+    if process is not None:
+        try:
+            if process.poll() is None and process.pid:
+                pids.add(int(process.pid))
+        except Exception:
+            pass
+
+    for pid in _find_pids_by_image_name(PROCESS_KILL_NAME):
+        pids.add(pid)
+
+    if not pids:
+        return False
+
+    # Dọn foreground trước khi bắt đầu ép focus.
+    _prepare_focus_surface(use_show_desktop=True)
+
+    for _ in range(max(1, FOCUS_RETRIES)):
+        for pid in list(pids):
+            if _bring_window_to_front_by_pid(pid):
+                # Xác nhận foreground đã là app đích.
+                if _get_foreground_pid() in pids:
+                    return True
+        # Nếu vẫn bị popup giữ foreground thì dọn lại rồi thử tiếp.
+        _prepare_focus_surface(use_show_desktop=False)
+        time.sleep(max(0.05, FOCUS_RETRY_DELAY))
+
+    # Lần cuối: chấp nhận nếu foreground đã đúng PID.
+    if _get_foreground_pid() in pids:
+        return True
+
+    return False
+
+
 def build_callback_payload(
     *,
     job_id: str,
@@ -252,6 +483,8 @@ def send_input():
         return jsonify({"message": "BUSY", "status": "Đang bận xử lý job khác"}), 409
 
     process = None
+    app_launched = False
+    scan_started = False
     job_id = ""
     ten_chuong_trinh = ""
     workstation_ip = request.host.split(":")[0]
@@ -275,11 +508,13 @@ def send_input():
             return jsonify({"message": f"Không tìm thấy file tại {PATH_EXE}"}), 500
 
         process = subprocess.Popen([PATH_EXE], cwd=WORKING_DIR)
+        app_launched = True
         time.sleep(APP_BOOT_WAIT)
 
-        # CLICK vào giữa màn hình để đảm bảo app đích nhận focus trước khi gõ phím
-        screen_w, screen_h = pyautogui.size()
-        pyautogui.click(screen_w // 2, screen_h // 2)
+        focused = ensure_target_app_focus(process)
+        if not focused:
+            # Không click fallback để tránh chạm nhầm nút đóng app.
+            time.sleep(0.2)
 
         normalized_mode = normalize_mode_value(mode_value)
         has_mode_token = any(str(raw).strip() in {"INOUT_MODE_KEYS", "入/出庫"} for raw in quy_tac)
@@ -314,8 +549,54 @@ def send_input():
             time.sleep(delay)
 
         time.sleep(PRE_SELECT_WAIT)
-        full_text = copy_selected_text().strip()
-        ma_nhap_lieu = extract_invoice_number(full_text)
+        scan_started = True
+        full_text, ma_nhap_lieu = capture_final_text_and_code()
+
+        if not full_text:
+            err_msg = "Không đọc được full_text từ màn hình sau khi nhập liệu"
+            payload_back = build_callback_payload(
+                job_id=job_id,
+                ten_chuong_trinh=ten_chuong_trinh,
+                ip=workstation_ip,
+                status="failed",
+                error=err_msg,
+            )
+            post_callback(payload_back)
+            return jsonify(
+                {
+                    "message": err_msg,
+                    "status": "failed",
+                    "job_id": job_id,
+                    "data_ocr": "---",
+                    "full_text": "",
+                    "callback_ok": False,
+                    "callback_info": "no_full_text",
+                }
+            ), 500
+
+        if ma_nhap_lieu == "---":
+            err_msg = "Không lấy được mã đăng ký từ full_text cuối cùng"
+            payload_back = build_callback_payload(
+                job_id=job_id,
+                ten_chuong_trinh=ten_chuong_trinh,
+                ip=workstation_ip,
+                status="failed",
+                ma_nhap_lieu="---",
+                full_text=full_text,
+                error=err_msg,
+            )
+            ok, callback_info = post_callback(payload_back)
+            return jsonify(
+                {
+                    "message": err_msg,
+                    "status": "failed",
+                    "job_id": job_id,
+                    "data_ocr": "---",
+                    "full_text": full_text,
+                    "callback_ok": ok,
+                    "callback_info": callback_info,
+                }
+            ), 500
 
         payload_back = build_callback_payload(
             job_id=job_id,
@@ -351,7 +632,10 @@ def send_input():
             post_callback(payload_back)
         return jsonify({"message": f"Lỗi: {err_msg}", "status": "failed", "job_id": job_id}), 500
     finally:
-        force_close_target_app(process)
+        # Chỉ đóng app sau khi đã vào bước quét/copy.
+        # Nếu lỗi xảy ra sớm trước bước này thì giữ app mở để tránh "tắt ngang".
+        if app_launched and scan_started:
+            force_close_target_app(process)
         JOB_LOCK.release()
 
 
