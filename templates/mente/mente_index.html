@@ -1,5 +1,6 @@
 <!-- filepath: c:\Users\Shin\Downloads\seizo0 250325\seizo0\trang_chu\templates\mente\mente_index.html -->
 {% extends "trang_chu/base.html" %}
+{% load static %}
 
 {% block title %}製品一覧{% endblock %}
 
@@ -499,8 +500,42 @@
     });
 });
 
-  
 
+
+</script>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.QAStageAudio) {
+    window.QAStageAudio.bindToggle();
+  }
+
+  document.querySelectorAll('form').forEach(function (formEl) {
+    formEl.addEventListener('submit', function () {
+      window.QAStageAudio?.play('submit_start');
+    });
+  });
+
+  document.getElementById('start-check')?.addEventListener('click', function () {
+    window.QAStageAudio?.play('mode_select');
+  });
+
+  document.getElementById('end-check')?.addEventListener('click', function () {
+    window.QAStageAudio?.play('submit_start');
+  });
+
+  document.querySelectorAll('.open-camera').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      window.QAStageAudio?.play('scan_start');
+    });
+  });
+
+  document.querySelectorAll('.capture-photo').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      window.QAStageAudio?.play('capture_ok');
+    });
+  });
+});
 </script>
 {% endblock %}
 ``` 

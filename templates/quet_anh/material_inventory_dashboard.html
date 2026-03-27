@@ -1,0 +1,181 @@
+{% extends "trang_chu/base.html" %}
+{% load static %}
+
+{% block title %}原材料在庫ダッシュボード{% endblock %}
+
+{% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
+  <div class="container-fluid mt-4">
+    <style>
+      .inv-kpi-card {
+        border: 1px solid #e6ebf2;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        padding: 14px;
+        height: 100%;
+      }
+      .inv-kpi-label {
+        font-size: .82rem;
+        color: #64748b;
+        margin-bottom: 4px;
+      }
+      .inv-kpi-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .inv-status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: .78rem;
+        font-weight: 700;
+      }
+      .inv-status.ok { background: #e9f8ef; color: #0f7b3f; }
+      .inv-status.warning { background: #fff4df; color: #af6f00; }
+      .inv-status.critical { background: #ffe9e9; color: #b42318; }
+      .inv-status.danger { background: #ffe0e0; color: #9f1239; }
+      .inv-stock-negative { color: #b42318; font-weight: 700; }
+      .inv-stock-low { color: #af6f00; font-weight: 700; }
+      .inv-stock-ok { color: #0f7b3f; font-weight: 700; }
+    </style>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="mb-0">原材料在庫ダッシュボード</h2>
+      <div class="d-flex gap-2">
+        <a href="{% url 'material_stock_ledger' %}" class="btn btn-outline-success">入庫台帳</a>
+        <a href="{% url 'material_out_stock_ledger' %}" class="btn btn-outline-primary">出庫台帳</a>
+        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left"></i> インデックス
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">管理原材料数</div>
+          <div class="inv-kpi-value">{{ total_materials }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">総入庫(kg)</div>
+          <div class="inv-kpi-value">{{ total_in_kg|floatformat:2 }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">総出庫(kg)</div>
+          <div class="inv-kpi-value">{{ total_out_kg|floatformat:2 }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">現在庫(kg)</div>
+          <div class="inv-kpi-value">{{ total_stock_kg|floatformat:2 }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">注意件数</div>
+          <div class="inv-kpi-value">{{ low_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="inv-kpi-card">
+          <div class="inv-kpi-label">不足件数</div>
+          <div class="inv-kpi-value">{{ negative_count }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header">検索・在庫一覧</div>
+      <div class="card-body">
+        <form method="get" class="row g-2 mb-3">
+          <div class="col-md-4">
+            <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名/コードで検索">
+          </div>
+          <div class="col-md-3">
+            <select name="status" class="form-control">
+              <option value="" {% if not status %}selected{% endif %}>状態: すべて</option>
+              <option value="ok" {% if status == "ok" %}selected{% endif %}>正常</option>
+              <option value="warning" {% if status == "warning" %}selected{% endif %}>注意</option>
+              <option value="critical" {% if status == "critical" %}selected{% endif %}>要補充</option>
+              <option value="danger" {% if status == "danger" %}selected{% endif %}>不足</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <input type="number" class="form-control" name="low_stock_threshold" min="0" step="0.01" value="{{ low_stock_threshold }}" placeholder="警戒閾値(kg)">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="submit">適用</button>
+          </div>
+        </form>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>原材料名</th>
+                <th>原材料コード</th>
+                <th class="text-end">現在庫(kg)</th>
+                <th class="text-end">入庫(kg)</th>
+                <th class="text-end">出庫(kg)</th>
+                <th class="text-center">状態</th>
+                <th class="text-end">安全在庫(kg)</th>
+                <th class="text-end">発注点(kg)</th>
+                <th class="text-center">最終入庫</th>
+                <th class="text-center">最終出庫</th>
+                {% if can_inventory_adjust %}
+                  <th class="text-center">調整</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ row.material_name }}</td>
+                  <td>{{ row.material_code }}</td>
+                  <td class="text-end">
+                    {% if row.status == "danger" %}
+                      <span class="inv-stock-negative">{{ row.current_stock_kg|floatformat:2 }}</span>
+                    {% elif row.status == "warning" or row.status == "critical" %}
+                      <span class="inv-stock-low">{{ row.current_stock_kg|floatformat:2 }}</span>
+                    {% else %}
+                      <span class="inv-stock-ok">{{ row.current_stock_kg|floatformat:2 }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">{{ row.total_in_kg|floatformat:2 }}</td>
+                  <td class="text-end">{{ row.total_out_kg|floatformat:2 }}</td>
+                  <td class="text-center"><span class="inv-status {{ row.status }}">{{ row.status_label }}</span></td>
+                  <td class="text-end">{{ row.safety_stock_kg|floatformat:2 }}</td>
+                  <td class="text-end">{{ row.reorder_point_kg|floatformat:2 }}</td>
+                  <td class="text-center">{% if row.last_in_date %}{{ row.last_in_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+                  <td class="text-center">{% if row.last_out_date %}{{ row.last_out_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+                  {% if can_inventory_adjust %}
+                    <td class="text-center">
+                      <a href="{% url 'material_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-success">入庫</a>
+                      <a href="{% url 'material_out_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-primary">出庫</a>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="{% if can_inventory_adjust %}12{% else %}11{% endif %}" class="text-center text-muted py-3">在庫データがありません。</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

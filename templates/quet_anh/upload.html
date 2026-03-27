@@ -338,12 +338,14 @@
                                 </span>
                             </div>
                             <div class="col-md-6">
-                                <label for="lot_number"><strong>ロット番号：</strong></label>
-                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力">
+                                <label for="lot_number"><strong>ロット番号（必須）：</strong></label>
+                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力" required>
+                                <div class="invalid-feedback" id="lot-number-error"></div>
                             </div>
                             <div class="col-md-6">
                                 <label for="input_weight"><strong>投入した材料の重さ (kg)：</strong></label>
                                 <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="none" readonly>
+                                <div class="invalid-feedback" id="input-weight-error"></div>
                                 <div class="quick-kg-inline mt-2 mb-1">
                                     <button type="button" class="btn btn-outline-success quick-kg-btn" data-kg="20">20kg</button>
                                     <button type="button" class="btn btn-outline-primary quick-kg-btn" data-kg="25">25kg</button>
@@ -365,8 +367,10 @@
                                     <option value="blue">🔵 青</option>
                                     <option value="red">🔴 赤</option>
                                 </select>
+                                <div class="invalid-feedback" id="lot-color-error"></div>
                             </div>
                         </div>
+                        <div id="submit-inline-error" class="alert alert-danger mt-3 d-none mb-0"></div>
                         <input type="hidden" id="captured_image" name="captured_image">
                          <div class="card p-3">
                          <div class="d-flex justify-content-end">
@@ -571,34 +575,103 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
     const capturedImage = document.getElementById('captured_image');
     const expectedTextInput = document.getElementById('expected_text');
     const lotColor = document.getElementById('lot_color');
+    const lotNumber = document.getElementById('lot_number');
+    const submitInlineError = document.getElementById('submit-inline-error');
+
+    function clearFieldError(el, errorId) {
+        if (!el) return;
+        el.classList.remove('is-invalid');
+        const errorEl = document.getElementById(errorId);
+        if (errorEl) errorEl.textContent = '';
+    }
+
+    function setFieldError(el, errorId, message) {
+        if (!el) return;
+        el.classList.add('is-invalid');
+        const errorEl = document.getElementById(errorId);
+        if (errorEl) errorEl.textContent = message;
+    }
+
+    function showInlineError(message) {
+        if (!submitInlineError) return;
+        submitInlineError.textContent = message;
+        submitInlineError.classList.remove('d-none');
+    }
+
+    function clearInlineError() {
+        if (!submitInlineError) return;
+        submitInlineError.classList.add('d-none');
+        submitInlineError.textContent = '';
+    }
+
+    clearFieldError(inputWeight, 'input-weight-error');
+    clearFieldError(lotColor, 'lot-color-error');
+    clearFieldError(lotNumber, 'lot-number-error');
+    clearInlineError();
 
     // Kiểm tra số kg
     const val = inputWeight.value.trim();
     if (!val || !/^(\d+|\d*\.\d+)$/.test(val)) {
-        alert("重量(kg)を正しく入力してください。例: 12.5, 0.5, .5");
+        window.QAStageAudio?.play('warning');
+        setFieldError(inputWeight, 'input-weight-error', "重量(kg)を正しく入力してください。例: 12.5, 0.5, .5");
+        inputWeight.focus();
+        inputWeight.scrollIntoView({ behavior: "smooth", block: "center" });
         e.preventDefault();
         return false;
     }
     // Kiểm tra ảnh đã chụp
     if (!capturedImage.value) {
-        alert("カメラで撮影した画像がありません。『撮影』ボタンを押して画像を取得してください。");
+        window.QAStageAudio?.play('warning');
+        showInlineError("カメラで撮影した画像がありません。『撮影』ボタンを押して画像を取得してください。");
+        document.getElementById('camera-preview-wrap')?.scrollIntoView({ behavior: "smooth", block: "center" });
         e.preventDefault();
         return false;
     }
     // Kiểm tra QR code
     if (!expectedTextInput.value || expectedTextInput.value.trim() === "None"|| expectedTextInput.value.trim() === "") {
-        alert("QRコードを読み取ってください。");
+        window.QAStageAudio?.play('warning');
+        showInlineError("QRコードを読み取ってください。");
+        document.getElementById('qr-step-section')?.scrollIntoView({ behavior: "smooth", block: "center" });
         e.preventDefault();
         return false;
     }
     if (!lotColor.value) {
-        alert("ロット識別色を選択してください。");
+        window.QAStageAudio?.play('warning');
+        setFieldError(lotColor, 'lot-color-error', "ロット識別色を選択してください。");
+        lotColor.focus();
+        lotColor.scrollIntoView({ behavior: "smooth", block: "center" });
         e.preventDefault();
         return false;
     }
+    if (!lotNumber.value || !lotNumber.value.trim()) {
+        window.QAStageAudio?.play('warning');
+        setFieldError(lotNumber, 'lot-number-error', "ロット番号を入力してください。");
+        lotNumber.focus();
+        lotNumber.scrollIntoView({ behavior: "smooth", block: "center" });
+        e.preventDefault();
+        return false;
+    }
+    window.QAStageAudio?.play('submit_start');
     document.getElementById('loading-overlay').style.display = 'block';
 });
+
+['input_weight', 'lot_color', 'lot_number'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+        el.classList.remove('is-invalid');
+        const submitInlineError = document.getElementById('submit-inline-error');
+        if (submitInlineError) {
+            submitInlineError.classList.add('d-none');
+            submitInlineError.textContent = '';
+        }
+    });
+    el.addEventListener('change', () => {
+        el.classList.remove('is-invalid');
+    });
+});
 </script>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <!-- QRコード読み取りライブラリ -->
 <script defer src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -688,6 +761,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
             cameraPreviewWrap.style.display = "none";
         }
         updateUploadStepLayout();
+        window.QAStageAudio?.play('capture_ok');
         qrStepSection?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
@@ -957,9 +1031,11 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
 
     startQrBtn.onclick = function() {
         if (!hasCapturedImage()) {
+            window.QAStageAudio?.play('warning');
             alert("先に左側で撮影してください。");
             return;
         }
+        window.QAStageAudio?.play('scan_start');
         startQrBtn.style.display = "none";
         stopQrBtn.style.display = "inline-block";
         setUploadGuideState('scanning', 'QRを枠内で固定してください');
@@ -970,6 +1046,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
             (qrCodeMessage, decodedResult) => {
                 renderUploadDetectedCorners(decodedResult);
                 expectedTextInput.value = qrCodeMessage;
+                window.QAStageAudio?.play('scan_ok');
                 setUploadGuideState('locked', 'QRを確認しました');
                 updateUploadStepLayout();
                 setTimeout(() => {
@@ -985,6 +1062,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
                 // エラーをログに出力する場合
             }
         ).catch(err => {
+            window.QAStageAudio?.play('error');
             alert("QRコード読み取り用カメラにアクセスできません: " + err);
             stopUploadCornerTracking();
             setUploadGuideState('', 'QRを枠内で固定してください');
@@ -1022,7 +1100,18 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
         }
     });
 
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
+    const hasSuccess = document.querySelector('.alert-success') !== null && document.getElementById('alert-danger-custom') === null;
+    const hasError = document.getElementById('alert-danger-custom') !== null || document.querySelector('.alert-danger') !== null;
+    if (hasError) {
+        window.QAStageAudio?.play('error');
+    } else if (hasSuccess) {
+        window.QAStageAudio?.playSuccessWhenPossible();
+    }
+
     const inputWeight = document.getElementById('input_weight');
     const modalNumpad = document.getElementById('virtual-numpad-modal');
     const kgModalDisplay = document.getElementById('kg-modal-display');

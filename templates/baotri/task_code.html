@@ -1,5 +1,6 @@
 <!-- filepath: c:\seizo0\trang_chu\templates\baotri\task_code.html -->
 {% extends "trang_chu/base.html" %}
+{% load static %}
 
 {% block title %}メンテナンス作業開始{% endblock %}
 
@@ -58,5 +59,19 @@
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); /* Giảm đổ bóng khi nhấn */
   }
 </style>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
+
+    document.querySelectorAll('form').forEach(function (formEl) {
+        formEl.addEventListener('submit', function () {
+            window.QAStageAudio?.play('submit_start');
+        });
+    });
+});
+</script>
 
 {% endblock %}

@@ -1,5 +1,6 @@
 <!-- filepath: c:\seizo0\trang_chu\templates\baotri\add_task.html -->
 {% extends "trang_chu/base.html" %}
+{% load static %}
 
 {% block title %}新規作成{% endblock %}
 
@@ -118,4 +119,24 @@
         </div>
     </div>
 </div>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
+
+    document.querySelectorAll('form').forEach(function (formEl) {
+        formEl.addEventListener('submit', function () {
+            window.QAStageAudio?.play('submit_start');
+        });
+    });
+
+    document.querySelectorAll('a.btn-danger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            window.QAStageAudio?.play('warning');
+        });
+    });
+});
+</script>
 {% endblock %}

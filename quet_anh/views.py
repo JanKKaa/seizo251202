@@ -31,7 +31,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum, Max, Count
 from django.db import OperationalError, ProgrammingError, IntegrityError, transaction
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
@@ -71,6 +71,13 @@ def _can_supervisor_confirm(user):
     if not user or not user.is_authenticated:
         return False
     return bool(user.is_superuser or user.is_staff or (user.username or "").lower() == "kanri")
+
+
+def _can_inventory_adjust(user):
+    if not user or not user.is_authenticated:
+        return False
+    username = (user.username or "").lower()
+    return bool(user.is_superuser or user.is_staff or username in {"admin", "kanri"})
 
 
 def preprocess_image(image):
@@ -281,8 +288,19 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         return False, "デバイス情報がないため自動入力を実行できません。", None
 
     material_code = (qa_result.device.material_code or "").strip()
+    lot_color = (qa_result.lot_color or "").strip()
+    lot_number = (qa_result.lot_number or "").strip()
     if not material_code:
         return False, "材料コードが未設定のため自動入力を実行できません。", None
+    if lot_color not in {
+        QAResult.LOT_COLOR_GREEN,
+        QAResult.LOT_COLOR_BLACK,
+        QAResult.LOT_COLOR_BLUE,
+        QAResult.LOT_COLOR_RED,
+    }:
+        return False, "ロット識別色が未入力のため自動入力を実行できません。", None
+    if not lot_number:
+        return False, "ロット番号が未入力のため自動入力を実行できません。", None
 
     auto_program_name = (getattr(settings, "NHAP_LIEU_XUAT_KHO_PROGRAM_NAME", "5209-02") or "5209-02").strip()
     chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
@@ -306,7 +324,7 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
     dong_map = {
         "Dòng 1": material_code,
         "Dòng 2": str(qa_result.input_weight or ""),
-        "Dòng 3": qa_result.lot_number or "",
+        "Dòng 3": lot_number,
         "Dòng 4": qa_result.machine_number or "",
         "Dòng 5": expected_text or "",
     }
@@ -320,6 +338,8 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         "kg_value": str(qa_result.input_weight or "").strip(),
         "material_code_value": material_code,
         "mode_value": str(mode_value or "2"),
+        "lot_color": lot_color,
+        "lot_number": lot_number,
         "delay": 0.1,
         "qa_result_id": qa_result.id,
     }
@@ -612,6 +632,17 @@ def upload_image(request):
             QAResult.LOT_COLOR_RED,
         }:
             messages.error(request, "ロット識別色を選択してください。")
+            device_list = QADeviceInfo.objects.all()
+            return render(request, 'quet_anh/upload.html', {
+                'form': QAResultForm(request.POST),
+                'message': message,
+                'expected_text': expected_text,
+                'device_list': device_list,
+                'device_id': device_id,
+                'device': device,
+            })
+        if not lot_number:
+            messages.error(request, "ロット番号を入力してください。")
             device_list = QADeviceInfo.objects.all()
             return render(request, 'quet_anh/upload.html', {
                 'form': QAResultForm(request.POST),
@@ -1634,6 +1665,7 @@ def material_stock_ledger(request):
             "date": date,
             "confirmed": confirmed,
             "can_supervisor_confirm": _can_supervisor_confirm(request.user),
+            "can_inventory_adjust": _can_inventory_adjust(request.user),
         },
     )
 
@@ -1678,12 +1710,171 @@ def material_out_stock_ledger(request):
             "date": date,
             "confirmed": confirmed,
             "can_supervisor_confirm": _can_supervisor_confirm(request.user),
+            "can_inventory_adjust": _can_inventory_adjust(request.user),
         },
     )
 
 
 @login_required
+def material_inventory_dashboard(request):
+    keyword = (request.GET.get("keyword") or "").strip()
+    status_filter = (request.GET.get("status") or "").strip().lower()
+    try:
+        low_stock_threshold = Decimal(str(request.GET.get("low_stock_threshold") or "0") or "0")
+    except (InvalidOperation, ValueError, TypeError):
+        low_stock_threshold = Decimal("0")
+
+    in_rows = (
+        QAMaterialStockLedger.objects.values("material_code", "material_name")
+        .annotate(
+            total_in_kg=Sum("weight_kg"),
+            total_in_bags=Count("id"),
+            last_in_date=Max("stock_in_date"),
+        )
+    )
+    out_rows = (
+        QAMaterialOutStockLedger.objects.values("material_code", "material_name")
+        .annotate(
+            total_out_kg=Sum("weight_kg"),
+            total_out_bags=Count("id"),
+            last_out_date=Max("stock_out_date"),
+        )
+    )
+    master_rows = QAMaterialMaster.objects.values(
+        "material_code", "material_name", "bag_weight_kg", "is_active"
+    )
+
+    by_code = {}
+
+    def _ensure_row(code, name=""):
+        key = (code or "").strip()
+        if key not in by_code:
+            by_code[key] = {
+                "material_code": key,
+                "material_name": (name or "").strip(),
+                "bag_weight_kg": None,
+                "is_active": True,
+                "total_in_kg": Decimal("0"),
+                "total_out_kg": Decimal("0"),
+                "total_in_bags": 0,
+                "total_out_bags": 0,
+                "last_in_date": None,
+                "last_out_date": None,
+            }
+        elif name and not by_code[key]["material_name"]:
+            by_code[key]["material_name"] = (name or "").strip()
+        return by_code[key]
+
+    for row in in_rows:
+        r = _ensure_row(row.get("material_code"), row.get("material_name"))
+        r["total_in_kg"] = row.get("total_in_kg") or Decimal("0")
+        r["total_in_bags"] = int(row.get("total_in_bags") or 0)
+        r["last_in_date"] = row.get("last_in_date")
+
+    for row in out_rows:
+        r = _ensure_row(row.get("material_code"), row.get("material_name"))
+        r["total_out_kg"] = row.get("total_out_kg") or Decimal("0")
+        r["total_out_bags"] = int(row.get("total_out_bags") or 0)
+        r["last_out_date"] = row.get("last_out_date")
+
+    for row in master_rows:
+        r = _ensure_row(row.get("material_code"), row.get("material_name"))
+        r["bag_weight_kg"] = row.get("bag_weight_kg")
+        r["is_active"] = bool(row.get("is_active"))
+
+    items = []
+    total_in_kg = Decimal("0")
+    total_out_kg = Decimal("0")
+    total_stock_kg = Decimal("0")
+    negative_count = 0
+    low_count = 0
+
+    for _, row in by_code.items():
+        material_code = row["material_code"]
+        material_name = row["material_name"] or "未設定"
+        total_in = row["total_in_kg"] or Decimal("0")
+        total_out = row["total_out_kg"] or Decimal("0")
+        stock = total_in - total_out
+        bag_weight = row.get("bag_weight_kg")
+
+        safety_stock_kg = Decimal("0")
+        reorder_point_kg = Decimal("0")
+        if bag_weight:
+            safety_stock_kg = bag_weight * Decimal("5")
+            reorder_point_kg = bag_weight * Decimal("10")
+        if low_stock_threshold > 0:
+            reorder_point_kg = low_stock_threshold
+            safety_stock_kg = low_stock_threshold / Decimal("2")
+
+        if stock < 0:
+            status = "danger"
+            status_label = "不足"
+            negative_count += 1
+        elif reorder_point_kg > 0 and stock <= safety_stock_kg:
+            status = "critical"
+            status_label = "要補充"
+            low_count += 1
+        elif reorder_point_kg > 0 and stock <= reorder_point_kg:
+            status = "warning"
+            status_label = "注意"
+            low_count += 1
+        else:
+            status = "ok"
+            status_label = "正常"
+
+        searchable = f"{material_code} {material_name}".lower()
+        if keyword and keyword.lower() not in searchable:
+            continue
+        if status_filter and status_filter != status:
+            continue
+
+        total_in_kg += total_in
+        total_out_kg += total_out
+        total_stock_kg += stock
+
+        items.append(
+            {
+                **row,
+                "material_code": material_code,
+                "material_name": material_name,
+                "current_stock_kg": stock,
+                "status": status,
+                "status_label": status_label,
+                "safety_stock_kg": safety_stock_kg,
+                "reorder_point_kg": reorder_point_kg,
+            }
+        )
+
+    severity_order = {"danger": 0, "critical": 1, "warning": 2, "ok": 3}
+    items.sort(
+        key=lambda x: (
+            severity_order.get(x["status"], 99),
+            x["current_stock_kg"],
+            x["material_name"],
+        )
+    )
+
+    context = {
+        "rows": items,
+        "keyword": keyword,
+        "status": status_filter,
+        "low_stock_threshold": low_stock_threshold,
+        "total_materials": len(items),
+        "total_in_kg": total_in_kg,
+        "total_out_kg": total_out_kg,
+        "total_stock_kg": total_stock_kg,
+        "negative_count": negative_count,
+        "low_count": low_count,
+        "can_inventory_adjust": _can_inventory_adjust(request.user),
+    }
+    return render(request, "quet_anh/material_inventory_dashboard.html", context)
+
+
+@login_required
 def material_stock_ledger_edit(request, pk):
+    if not _can_inventory_adjust(request.user):
+        messages.error(request, "在庫データの編集権限がありません。")
+        return redirect("material_stock_ledger")
     row = get_object_or_404(QAMaterialStockLedger, pk=pk)
 
     if request.method == "POST":
@@ -1708,6 +1899,9 @@ def material_stock_ledger_edit(request, pk):
 
 @login_required
 def material_out_stock_ledger_edit(request, pk):
+    if not _can_inventory_adjust(request.user):
+        messages.error(request, "在庫データの編集権限がありません。")
+        return redirect("material_out_stock_ledger")
     row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
 
     if request.method == "POST":
@@ -1748,6 +1942,9 @@ def auto_input_ledger_delete(request, pk):
 @login_required
 @require_POST
 def material_stock_ledger_delete(request, pk):
+    if not _can_inventory_adjust(request.user):
+        messages.error(request, "在庫データの削除権限がありません。")
+        return redirect("material_stock_ledger")
     row = get_object_or_404(QAMaterialStockLedger, pk=pk)
     if row.auto_input_ledger_id:
         linked = row.auto_input_ledger
@@ -1768,6 +1965,9 @@ def material_stock_ledger_delete(request, pk):
 @login_required
 @require_POST
 def material_out_stock_ledger_delete(request, pk):
+    if not _can_inventory_adjust(request.user):
+        messages.error(request, "在庫データの削除権限がありません。")
+        return redirect("material_out_stock_ledger")
     row = get_object_or_404(QAMaterialOutStockLedger, pk=pk)
     if row.auto_input_ledger_id:
         linked = row.auto_input_ledger

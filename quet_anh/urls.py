@@ -26,6 +26,7 @@ urlpatterns = [
     path('material-stock-ledger/edit/<int:pk>/', views.material_stock_ledger_edit, name='material_stock_ledger_edit'),
     path('material-stock-ledger/delete/<int:pk>/', views.material_stock_ledger_delete, name='material_stock_ledger_delete'),
     path('material-out-stock-ledger/', views.material_out_stock_ledger, name='material_out_stock_ledger'),
+    path('material-inventory/', views.material_inventory_dashboard, name='material_inventory_dashboard'),
     path('material-out-stock-ledger/confirm/<int:pk>/', views.material_out_stock_ledger_confirm, name='material_out_stock_ledger_confirm'),
     path('material-out-stock-ledger/edit/<int:pk>/', views.material_out_stock_ledger_edit, name='material_out_stock_ledger_edit'),
     path('material-out-stock-ledger/delete/<int:pk>/', views.material_out_stock_ledger_delete, name='material_out_stock_ledger_delete'),

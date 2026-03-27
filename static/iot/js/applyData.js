@@ -300,7 +300,8 @@ window.applyData = function(data){
   // Gán danh sách máy đang alarm cho window.alarmMachines
   window.alarmMachines = [
     ...(data.machines_factory1 || []),
-    ...(data.machines_factory2 || [])
+    ...(data.machines_factory2 || []),
+    ...(data.machines_esp32 || [])
   ].filter(m => m.alarm_active === true || m.runtime_status_code === 'alarm');
 };
 

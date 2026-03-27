@@ -1,9 +1,11 @@
 <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\baotri\start_task.html -->
 {% extends "trang_chu/base.html" %}
+{% load static %}
 {% block title %}メンテナンス作業{% endblock %}
 
 {% block content %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <div class="container-fluid px-2 px-md-5">
     <h1 class="main-title mb-3">
         金型: {{ task.name }}
@@ -272,6 +274,32 @@ window.isFormSubmitted = false;
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
+
+    document.querySelectorAll('form').forEach(function (formEl) {
+        formEl.addEventListener('submit', function () {
+            window.QAStageAudio?.play('submit_start');
+        });
+    });
+
+    document.querySelectorAll('.open-camera').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            window.QAStageAudio?.play('scan_start');
+        });
+    });
+
+    document.querySelectorAll('.capture-photo, .capture-photo-modal').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            window.QAStageAudio?.play('capture_ok');
+        });
+    });
+
+    document.getElementById('btn-xacnhan-ocvit')?.addEventListener('click', function () {
+        window.QAStageAudio?.play('mode_select');
+    });
+
     const openCameraButtons = document.querySelectorAll('.open-camera');
     const cameraModal = document.getElementById('camera-modal');
     const videoModal = document.getElementById('camera-preview-modal');
@@ -1148,13 +1176,69 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <script>
+function pickJaVoice() {
+    try {
+        const voices = window.speechSynthesis?.getVoices?.() || [];
+        if (!voices.length) return null;
+        const jaVoices = voices.filter(v => (v.lang || "").toLowerCase().startsWith("ja"));
+        if (!jaVoices.length) return null;
+        return (
+            jaVoices.find(v => /google/i.test(v.name || "")) ||
+            jaVoices.find(v => /japan|japanese|ja-jp/i.test(v.name || "")) ||
+            jaVoices[0]
+        );
+    } catch (e) {
+        return null;
+    }
+}
+
+let ocvitSpeechTimer = null;
+
+function speakOcvitConfirm() {
+    if (!window.speechSynthesis) return;
+    const text = "全てのネジがしっかり締め付けられていますか。確認しましたボタンを押してください。";
+    try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "ja-JP";
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        const voice = pickJaVoice();
+        if (voice) utterance.voice = voice;
+        window.speechSynthesis.speak(utterance);
+    } catch (e) {
+        // ignore speech errors
+    }
+}
+
+function startOcvitSpeechLoop() {
+    stopOcvitSpeechLoop();
+    speakOcvitConfirm();
+    ocvitSpeechTimer = setInterval(() => {
+        speakOcvitConfirm();
+    }, 15000);
+}
+
+function stopOcvitSpeechLoop() {
+    if (ocvitSpeechTimer) {
+        clearInterval(ocvitSpeechTimer);
+        ocvitSpeechTimer = null;
+    }
+    try {
+        window.speechSynthesis?.cancel();
+    } catch (e) {}
+}
+
 function showOcvitPopup() {
     const popup = document.getElementById('popup-ocvit');
     popup.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    startOcvitSpeechLoop();
     document.getElementById('btn-xacnhan-ocvit').onclick = function() {
         popup.style.display = 'none';
         document.body.style.overflow = '';
+        stopOcvitSpeechLoop();
     };
 }
 

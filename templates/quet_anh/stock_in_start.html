@@ -137,6 +137,7 @@
     </div>
 </div>
 
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <script>
 (() => {
     const materialSelect = document.getElementById("material_name");
@@ -181,6 +182,7 @@
     updateBagCountPreview();
 
     form?.addEventListener("submit", () => {
+        window.QAStageAudio?.play("submit_start");
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中';
@@ -189,6 +191,10 @@
             loadingOverlay.style.display = "block";
         }
     });
+
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
 })();
 </script>
 {% endblock %}

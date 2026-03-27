@@ -1,6 +1,6 @@
 <!-- filepath: c:\seizo0\trang_chu\templates\baotri\task_code_detail.html -->
 {% extends "trang_chu/base.html" %}
-{% load humanize %}
+{% load static humanize %}
 
 {% block title %}コード: {{ task_code.code }}{% endblock %}
 
@@ -214,6 +214,28 @@
   </style>
   <script>
   document.addEventListener('DOMContentLoaded', function() {
+    if (window.QAStageAudio) {
+      window.QAStageAudio.bindToggle();
+    }
+
+    document.querySelectorAll('form').forEach(function (formEl) {
+      formEl.addEventListener('submit', function () {
+        window.QAStageAudio?.play('submit_start');
+      });
+    });
+
+    document.querySelectorAll('a.btn-success, a.btn-secondary').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        window.QAStageAudio?.play('mode_select');
+      });
+    });
+
+    document.querySelectorAll('button.btn-danger').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        window.QAStageAudio?.play('warning');
+      });
+    });
+
     document.body.addEventListener('click', function(event) {
       if (event.target.classList.contains('zoom-image')) {
         // Xóa popup cũ nếu có
@@ -248,6 +270,7 @@
     });
   });
   </script>
+  <script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
   
 
 {% endblock %}

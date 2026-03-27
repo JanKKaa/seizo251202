@@ -215,4 +215,206 @@ setTimeout(function() {
   })();
 </script>
 
+<script>
+  // Alarm notification: ưu tiên giọng nói JP (Google voice nếu có).
+  (function initAlarmSound() {
+    const SOUND_DURATION_MS = 5000;
+    const SPEECH_REPEAT_COUNT = 3;
+    const SPEECH_SAFE_STOP_MS = 10000;
+    const CHECK_INTERVAL_MS = 500;
+    const ALERT_TEXT_JA = "成形機がアラームです。";
+    let audioCtx = null;
+    let soundTimer = null;
+    let pulseTimer = null;
+    let unlocked = false;
+    let preferredJaVoice = null;
+
+    const unlockAudio = () => {
+      if (unlocked) return;
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+        unlocked = true;
+      } catch (e) {
+        // Ignore: browser may block audio
+      }
+      try {
+        window.speechSynthesis?.getVoices();
+      } catch (e) {}
+    };
+
+    const pickJaVoice = () => {
+      try {
+        const voices = window.speechSynthesis?.getVoices?.() || [];
+        if (!voices.length) return null;
+        const jaVoices = voices.filter(v => (v.lang || "").toLowerCase().startsWith("ja"));
+        if (!jaVoices.length) return null;
+        return (
+          jaVoices.find(v => /google/i.test(v.name || "")) ||
+          jaVoices.find(v => /japan|japanese|ja-jp/i.test(v.name || "")) ||
+          jaVoices[0]
+        );
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const loadVoiceCache = () => {
+      preferredJaVoice = pickJaVoice();
+    };
+
+    loadVoiceCache();
+    if (window.speechSynthesis && "onvoiceschanged" in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoiceCache;
+    }
+
+    const extractMachineLabel = (machine) => {
+      if (!machine || typeof machine !== "object") return "";
+      const candidates = [
+        machine.name,
+        machine.address,
+        machine.machine_name,
+        machine.rt_name,
+        machine.device_name,
+        machine.machine,
+        machine.title,
+      ];
+      const raw = candidates.find(v => String(v || "").trim()) || "";
+      if (!raw) return "";
+
+      const normalized = String(raw).trim().normalize("NFKC");
+      const num = normalized.match(/(\d+)/)?.[1];
+      if (num) return `${num}号機`;
+      return normalized;
+    };
+
+    const getAlarmSpeechText = () => {
+      const list = Array.isArray(window.alarmMachines) ? window.alarmMachines : [];
+      const active = list.find(
+        m => m && (m.runtime_status_code === "alarm" || m.alarm_active === true)
+      );
+      if (!active) return ALERT_TEXT_JA;
+
+      const machineLabel = extractMachineLabel(active);
+      if (machineLabel) return `${machineLabel}がアラームです。`;
+      return ALERT_TEXT_JA;
+    };
+
+    const speakJaAlert = (text, repeat = 1) => {
+      if (!window.speechSynthesis) return false;
+      try {
+        const phrase = text || ALERT_TEXT_JA;
+        // Hủy queue cũ để tránh chồng lời khi alarm liên tiếp.
+        window.speechSynthesis.cancel();
+        for (let i = 0; i < Math.max(1, repeat); i++) {
+          const u = new SpeechSynthesisUtterance(phrase);
+          u.lang = "ja-JP";
+          u.rate = 1.0;
+          u.pitch = 1.0;
+          u.volume = 1.0;
+          if (preferredJaVoice) u.voice = preferredJaVoice;
+          window.speechSynthesis.speak(u);
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const sirenTone = (fromFreq = 720, toFreq = 1280, duration = 0.42, volume = 0.32) => {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc.frequency.value = fromFreq;
+      filter.type = "bandpass";
+      filter.frequency.value = 1100;
+      filter.Q.value = 1.1;
+      gain.gain.value = 0.0001;
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+      osc.frequency.linearRampToValueAtTime(toFreq, now + duration);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    };
+
+    const stopAlarmSound = (cancelSpeech = true) => {
+      if (pulseTimer) {
+        clearInterval(pulseTimer);
+        pulseTimer = null;
+      }
+      if (soundTimer) {
+        clearTimeout(soundTimer);
+        soundTimer = null;
+      }
+      if (cancelSpeech) {
+        try {
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+        } catch (e) {}
+      }
+    };
+
+    const playAlarmSoundForFiveSeconds = () => {
+      unlockAudio();
+      stopAlarmSound(true);
+
+      // Ưu tiên phát giọng nói cảnh báo kiểu Nhật.
+      const spoken = speakJaAlert(getAlarmSpeechText(), SPEECH_REPEAT_COUNT);
+      if (spoken) {
+        // Không cắt giữa chừng để đảm bảo đọc đủ 3 lần.
+        soundTimer = setTimeout(() => stopAlarmSound(false), SPEECH_SAFE_STOP_MS);
+        return;
+      }
+
+      // Fallback siren khi speech không khả dụng.
+      let up = true;
+      pulseTimer = setInterval(() => {
+        if (!audioCtx) return;
+        if (up) {
+          sirenTone(760, 1320, 0.44, 0.34);
+        } else {
+          sirenTone(1320, 760, 0.44, 0.34);
+        }
+        up = !up;
+      }, 470);
+      soundTimer = setTimeout(() => stopAlarmSound(true), SOUND_DURATION_MS);
+    };
+
+    const readAlarmCount = () => {
+      let count = Number(window.alarmCount || 0);
+      const kpi = document.getElementById("kpi-alarm");
+      if (kpi) {
+        const n = Number(String(kpi.textContent || "").replace(/[^\d.-]/g, ""));
+        if (!Number.isNaN(n)) {
+          count = Math.max(count, n);
+        }
+      }
+      return Number.isFinite(count) ? count : 0;
+    };
+
+    let lastCount = readAlarmCount();
+
+    const checkAlarm = () => {
+      const current = readAlarmCount();
+      const isNewAlarm = current > 0 && (lastCount <= 0 || current > lastCount);
+      if (isNewAlarm) {
+        playAlarmSoundForFiveSeconds();
+      }
+      lastCount = current;
+    };
+
+    document.addEventListener("click", unlockAudio, { once: true });
+    document.addEventListener("keydown", unlockAudio, { once: true });
+    setInterval(checkAlarm, CHECK_INTERVAL_MS);
+  })();
+</script>
+
 {% endblock %}

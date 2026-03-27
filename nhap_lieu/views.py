@@ -155,6 +155,8 @@ def index(request):
 
                 if not any((dong1.strip(), dong2.strip(), dong3.strip(), dong4.strip(), dong5.strip())):
                     message = "Vui lòng nhập ít nhất một dòng dữ liệu!"
+                elif inout_mode == "2" and not dong3.strip():
+                    message = "Xuất kho bắt buộc nhập Số lot (Dòng 3)."
                 else:
                     qa_result = None
                     qa_result_id = (request.POST.get("qa_result_id") or "").strip()

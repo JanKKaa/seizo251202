@@ -32,21 +32,26 @@ SELECT_START_Y = int(os.getenv("SELECT_START_Y", "100"))
 SELECT_END_X = int(os.getenv("SELECT_END_X", "800"))
 SELECT_END_Y = int(os.getenv("SELECT_END_Y", "600"))
 
-APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "5"))
-PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "1"))
+APP_BOOT_WAIT = float(os.getenv("APP_BOOT_WAIT", "2.5"))
+PRE_SELECT_WAIT = float(os.getenv("PRE_SELECT_WAIT", "0.3"))
 CALLBACK_TIMEOUT = float(os.getenv("CALLBACK_TIMEOUT", "5"))
-CALLBACK_RETRIES = int(os.getenv("CALLBACK_RETRIES", "3"))
-OCR_READ_RETRIES = int(os.getenv("OCR_READ_RETRIES", "3"))
-OCR_RETRY_DELAY = float(os.getenv("OCR_RETRY_DELAY", "1.0"))
+CALLBACK_RETRIES = int(os.getenv("CALLBACK_RETRIES", "2"))
+CALLBACK_RETRY_BASE_DELAY = float(os.getenv("CALLBACK_RETRY_BASE_DELAY", "0.3"))
+OCR_READ_RETRIES = int(os.getenv("OCR_READ_RETRIES", "2"))
+OCR_RETRY_DELAY = float(os.getenv("OCR_RETRY_DELAY", "0.25"))
 CALLBACK_CONNECT_TIMEOUT = float(os.getenv("CALLBACK_CONNECT_TIMEOUT", "5"))
 CALLBACK_READ_TIMEOUT = float(os.getenv("CALLBACK_READ_TIMEOUT", "20"))
 CALLBACK_VERIFY_SSL = os.getenv("CALLBACK_VERIFY_SSL", "0").strip() in {"1", "true", "True", "yes", "YES"}
 PROCESS_KILL_NAME = os.getenv("INPUT_PROCESS_NAME", os.path.basename(PATH_EXE))
-FOCUS_RETRIES = int(os.getenv("FOCUS_RETRIES", "8"))
-FOCUS_RETRY_DELAY = float(os.getenv("FOCUS_RETRY_DELAY", "0.5"))
+FOCUS_RETRIES = int(os.getenv("FOCUS_RETRIES", "3"))
+FOCUS_RETRY_DELAY = float(os.getenv("FOCUS_RETRY_DELAY", "0.12"))
 AUTO_MAXIMIZE_WINDOW = os.getenv("AUTO_MAXIMIZE_WINDOW", "1").strip() in {"1", "true", "True", "yes", "YES"}
-FOCUS_PREP_ESC_COUNT = int(os.getenv("FOCUS_PREP_ESC_COUNT", "2"))
+FOCUS_PREP_ESC_COUNT = int(os.getenv("FOCUS_PREP_ESC_COUNT", "1"))
 FOCUS_PREP_USE_SHOW_DESKTOP = os.getenv("FOCUS_PREP_USE_SHOW_DESKTOP", "1").strip() in {"1", "true", "True", "yes", "YES"}
+COPY_MOUSE_DOWN_WAIT = float(os.getenv("COPY_MOUSE_DOWN_WAIT", "0.08"))
+COPY_DRAG_DURATION = float(os.getenv("COPY_DRAG_DURATION", "0.22"))
+COPY_MOUSE_UP_WAIT = float(os.getenv("COPY_MOUSE_UP_WAIT", "0.08"))
+COPY_AFTER_COPY_WAIT = float(os.getenv("COPY_AFTER_COPY_WAIT", "0.12"))
 
 if not CALLBACK_VERIFY_SSL:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -193,13 +198,13 @@ def type_inout_mode_keys(mode_value: str):
 
 def copy_selected_text() -> str:
     pyautogui.mouseDown(SELECT_START_X, SELECT_START_Y)
-    time.sleep(0.2)
-    pyautogui.moveTo(SELECT_END_X, SELECT_END_Y, duration=0.5)
-    time.sleep(0.2)
+    time.sleep(max(0.0, COPY_MOUSE_DOWN_WAIT))
+    pyautogui.moveTo(SELECT_END_X, SELECT_END_Y, duration=max(0.0, COPY_DRAG_DURATION))
+    time.sleep(max(0.0, COPY_MOUSE_UP_WAIT))
     pyautogui.mouseUp()
-    time.sleep(0.3)
+    time.sleep(max(0.0, COPY_AFTER_COPY_WAIT))
     pyautogui.hotkey("ctrl", "c")
-    time.sleep(0.3)
+    time.sleep(max(0.0, COPY_AFTER_COPY_WAIT))
     return pyperclip.paste() or ""
 
 
@@ -249,7 +254,7 @@ def post_callback(payload: dict):
             except Exception:
                 pass
 
-        time.sleep(1 + i)
+        time.sleep(max(0.0, CALLBACK_RETRY_BASE_DELAY * (i + 1)))
 
     return False, last_error
 
@@ -259,7 +264,7 @@ def force_close_target_app(process=None):
     try:
         if process and process.poll() is None:
             process.terminate()
-            time.sleep(1)
+            time.sleep(0.3)
             if process.poll() is None:
                 process.kill()
     except Exception:
@@ -494,6 +499,7 @@ def send_input():
         kg_value = str(data.get("kg_value") or "").strip()
         material_code_value = str(data.get("material_code_value") or "").strip()
         mode_value = str(data.get("mode_value") or "").strip()
+        lot_number_value = str(data.get("lot_number") or "").strip()
         delay = float(data.get("delay", 0.1))
         job_id = str(data.get("job_id") or data.get("ma_job") or "").strip()
         ten_chuong_trinh = str(data.get("ten_chuong_trinh") or "").strip()
@@ -507,6 +513,10 @@ def send_input():
         if not os.path.exists(PATH_EXE):
             return jsonify({"message": f"Không tìm thấy file tại {PATH_EXE}"}), 500
 
+        normalized_mode = normalize_mode_value(mode_value)
+        if normalized_mode == "2" and not lot_number_value:
+            return jsonify({"message": "Xuất kho bắt buộc nhập Số lot (lot_number)"}), 400
+
         process = subprocess.Popen([PATH_EXE], cwd=WORKING_DIR)
         app_launched = True
         time.sleep(APP_BOOT_WAIT)
@@ -514,9 +524,8 @@ def send_input():
         focused = ensure_target_app_focus(process)
         if not focused:
             # Không click fallback để tránh chạm nhầm nút đóng app.
-            time.sleep(0.2)
+            time.sleep(0.05)
 
-        normalized_mode = normalize_mode_value(mode_value)
         has_mode_token = any(str(raw).strip() in {"INOUT_MODE_KEYS", "入/出庫"} for raw in quy_tac)
         # Fallback an toàn: nếu payload có mode nhưng template chưa chèn token,
         # tự gõ mode ngay đầu luồng để tránh sai nhánh 入庫/出庫.

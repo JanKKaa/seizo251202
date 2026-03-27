@@ -53,8 +53,10 @@
 <body>
     <!-- filepath: c:\seizo_web\seizo0\trang_chu\templates\baotri\index.html -->
     {% extends "trang_chu/base.html" %}
+    {% load static %}
     {% block title %}保守履歴一覧{% endblock %}
     {% block content %}
+    <script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
     <div class="container py-4">
         <h1 class="text-center text-primary mb-4" style="font-size:2.2rem;font-weight:bold;">金型メンテナンス</h1>
 
@@ -243,6 +245,31 @@
         </div>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.QAStageAudio) {
+            window.QAStageAudio.bindToggle();
+        }
+
+        document.querySelectorAll('form').forEach(function (formEl) {
+            formEl.addEventListener('submit', function () {
+                window.QAStageAudio?.play('submit_start');
+            });
+        });
+
+        document.querySelectorAll('a.btn-warning, a.btn-danger').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                window.QAStageAudio?.play('warning');
+            });
+        });
+
+        document.querySelectorAll('a.btn-primary.btn-lg, a.btn-info.btn-lg, a.btn-success.btn-lg').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                window.QAStageAudio?.play('mode_select');
+            });
+        });
+    });
+    </script>
     {% endblock %}
 </body>
 </html>

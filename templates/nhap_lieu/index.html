@@ -64,7 +64,7 @@
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <label class="apple-label mb-1">入出庫モード</label>
-                                        <select class="form-select apple-input" name="inout_mode">
+                                        <select class="form-select apple-input" name="inout_mode" id="inout-mode">
                                             <option value="1">入庫 (1)</option>
                                             <option value="2" selected>出庫 (2)</option>
                                         </select>
@@ -72,7 +72,10 @@
                                     {% for i in "12345" %}
                                     <div class="col-12">
                                         <label class="apple-label mb-1">行 {{ i }}</label>
-                                        <input type="text" class="form-control apple-input" name="dong{{ i }}" value="">
+                                        <input type="text" class="form-control apple-input" name="dong{{ i }}" id="dong{{ i }}" value="">
+                                        {% if i == "3" %}
+                                        <div class="invalid-feedback" id="dong3-error"></div>
+                                        {% endif %}
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -87,6 +90,7 @@
                             </button>
                             <div id="delay-message" class="text-info fw-bold" style="display:none;"></div>
                         </div>
+                        <div id="nhap-lieu-inline-error" class="alert alert-danger text-center d-none mb-0"></div>
                     </form>
                     {% if message %}
                     <div class="alert alert-info mt-3 text-center">{{ message }}</div>
@@ -185,6 +189,38 @@ function pollJobStatus(jobId, resultDiv, btn, delayMsg) {
 
 document.getElementById('nhap-lieu-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    const modeSelect = document.getElementById('inout-mode');
+    const dong3Input = document.getElementById('dong3');
+    const dong3Error = document.getElementById('dong3-error');
+    const inlineError = document.getElementById('nhap-lieu-inline-error');
+
+    if (dong3Input) {
+        dong3Input.classList.remove('is-invalid');
+    }
+    if (dong3Error) {
+        dong3Error.textContent = '';
+    }
+    if (inlineError) {
+        inlineError.classList.add('d-none');
+        inlineError.textContent = '';
+    }
+
+    if (modeSelect && modeSelect.value === "2" && (!dong3Input || !dong3Input.value.trim())) {
+        if (dong3Input) {
+            dong3Input.classList.add('is-invalid');
+            dong3Input.focus();
+            dong3Input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        if (dong3Error) {
+            dong3Error.textContent = "出庫ではロット番号（行 3）が必須です。";
+        }
+        if (inlineError) {
+            inlineError.textContent = "出庫ではロット番号（行 3）が必須です。";
+            inlineError.classList.remove('d-none');
+        }
+        return;
+    }
+
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
     // Lấy số giây chờ từ input

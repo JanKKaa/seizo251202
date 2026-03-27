@@ -360,6 +360,7 @@
                 <a href="{% url 'dashboard_qa' %}" class="qa-mini-link"><i class="fas fa-chart-line me-1"></i>分析</a>
                 <a href="{% url 'material_stock_ledger' %}" class="qa-mini-link"><i class="fas fa-warehouse me-1"></i>入庫台帳</a>
                 <a href="{% url 'material_out_stock_ledger' %}" class="qa-mini-link"><i class="fas fa-dolly-flatbed me-1"></i>出庫台帳</a>
+                <a href="{% url 'material_inventory_dashboard' %}" class="qa-mini-link"><i class="fas fa-boxes me-1"></i>在庫管理</a>
             </div>
         </div>
 
@@ -480,6 +481,7 @@
 
 <script defer src="https://unpkg.com/html5-qrcode"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <script>
 const startQrBtn = document.getElementById('start-qr-btn');
 const refocusQrBtn = document.getElementById('refocus-qr-btn');
@@ -574,6 +576,9 @@ openOutModeBtn?.addEventListener('click', () => showModePanel('out'));
 openInModeBtn?.addEventListener('click', () => showModePanel('in'));
 backModeBtn1?.addEventListener('click', () => showModePanel('none'));
 backModeBtn2?.addEventListener('click', () => showModePanel('none'));
+
+openOutModeBtn?.addEventListener('click', () => window.QAStageAudio?.play('mode_select'));
+openInModeBtn?.addEventListener('click', () => window.QAStageAudio?.play('mode_select'));
 
 function setGuideState(wrapEl, state, message) {
     if (!wrapEl) return;
@@ -764,6 +769,7 @@ function showMaterialSelectedMsg() {
 }
 
 startQrBtn.addEventListener('click', function() {
+    window.QAStageAudio?.play('scan_start');
     qrGuideWrapDevice.style.display = 'block';
     setGuideState(qrGuideWrapDevice, 'scanning', 'QRを枠内で固定してください');
     startQrBtn.style.display = 'none';
@@ -790,6 +796,7 @@ startQrBtn.addEventListener('click', function() {
                 }
             }
             if (found) {
+                window.QAStageAudio?.play('scan_ok');
                 setGuideState(qrGuideWrapDevice, 'locked', 'QRを確認しました');
                 setTimeout(() => {
                     html5QrCode.stop();
@@ -801,6 +808,7 @@ startQrBtn.addEventListener('click', function() {
                     showDeviceSelectedMsg();
                 }, 700);
             } else {
+                window.QAStageAudio?.play('error');
                 alert("QRコードがリストに一致しません: " + qrCodeMessage);
             }
         },
@@ -862,6 +870,7 @@ if (selectMaterial) {
 }
 
 startMaterialQrBtn.addEventListener('click', function() {
+    window.QAStageAudio?.play('scan_start');
     qrGuideWrapMaterial.style.display = 'block';
     setGuideState(qrGuideWrapMaterial, 'scanning', 'QRを枠内で固定してください');
     startMaterialQrBtn.style.display = 'none';
@@ -887,6 +896,7 @@ startMaterialQrBtn.addEventListener('click', function() {
                 }
             }
             if (found) {
+                window.QAStageAudio?.play('scan_ok');
                 setGuideState(qrGuideWrapMaterial, 'locked', 'QRを確認しました');
                 setTimeout(() => {
                     materialQrCode.stop();
@@ -898,6 +908,7 @@ startMaterialQrBtn.addEventListener('click', function() {
                     showMaterialSelectedMsg();
                 }, 700);
             } else {
+                window.QAStageAudio?.play('error');
                 alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
             }
         },
@@ -932,6 +943,7 @@ refocusMaterialQrBtn.addEventListener('click', function() {
                         }
                     }
                     if (found) {
+                        window.QAStageAudio?.play('scan_ok');
                         setGuideState(qrGuideWrapMaterial, 'locked', 'QRを確認しました');
                         setTimeout(() => {
                             materialQrCode.stop();
@@ -943,6 +955,7 @@ refocusMaterialQrBtn.addEventListener('click', function() {
                             showMaterialSelectedMsg();
                         }, 700);
                     } else {
+                        window.QAStageAudio?.play('error');
                         alert("QRコードが原材料リストに一致しません: " + qrCodeMessage);
                     }
                 },
@@ -950,6 +963,18 @@ refocusMaterialQrBtn.addEventListener('click', function() {
             );
             startCornerTracking(materialQrReader, qrGuideWrapMaterial, "material");
         });
+    }
+});
+
+document.querySelectorAll('#out-mode-panel form, #in-mode-panel form').forEach((formEl) => {
+    formEl.addEventListener('submit', function() {
+        window.QAStageAudio?.play('submit_start');
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
     }
 });
 </script>

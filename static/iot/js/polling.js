@@ -19,7 +19,8 @@ function fetchData() {
       // 🔥 Thêm dòng này ngay sau khi nhận data
       window.alarmMachines = [
         ...(data.machines_factory1 || []),
-        ...(data.machines_factory2 || [])
+        ...(data.machines_factory2 || []),
+        ...(data.machines_esp32 || [])
       ];
 
       // Gọi hàm applyData như cũ

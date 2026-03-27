@@ -1,4 +1,5 @@
 {% extends "trang_chu/base.html" %}
+{% load static %}
 {% block content %}
 <h3>ミス・問題の記録（複数行入力 & 編集）</h3>
 
@@ -62,22 +63,44 @@
         {% endfor %}
     </tbody>
 </table>
-{% endblock %}
-
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <script>
-document.getElementById('add-row-btn').onclick = function() {
-    const tbody = document.getElementById('mistake-table-body');
-    const totalForms = document.getElementById('id_form-TOTAL_FORMS');
-    const currentFormCount = parseInt(totalForms.value);
-    const emptyRow = tbody.querySelector('tr').cloneNode(true);
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.QAStageAudio) {
+        window.QAStageAudio.bindToggle();
+    }
 
-    emptyRow.querySelectorAll('input, textarea, select').forEach(function(input) {
-        input.value = '';
-        if (input.name) input.name = input.name.replace(/\d+/, currentFormCount);
-        if (input.id) input.id = input.id.replace(/\d+/, currentFormCount);
+    const addRowBtn = document.getElementById('add-row-btn');
+    if (addRowBtn) {
+        addRowBtn.onclick = function() {
+            const tbody = document.getElementById('mistake-table-body');
+            const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+            const currentFormCount = parseInt(totalForms.value);
+            const emptyRow = tbody.querySelector('tr').cloneNode(true);
+
+            emptyRow.querySelectorAll('input, textarea, select').forEach(function(input) {
+                input.value = '';
+                if (input.name) input.name = input.name.replace(/\d+/, currentFormCount);
+                if (input.id) input.id = input.id.replace(/\d+/, currentFormCount);
+            });
+
+            tbody.appendChild(emptyRow);
+            totalForms.value = currentFormCount + 1;
+            window.QAStageAudio?.play('mode_select');
+        };
+    }
+
+    document.querySelectorAll('form').forEach(function (formEl) {
+        formEl.addEventListener('submit', function () {
+            window.QAStageAudio?.play('submit_start');
+        });
     });
 
-    tbody.appendChild(emptyRow);
-    totalForms.value = currentFormCount + 1;
-};
+    document.querySelectorAll('a.btn-primary, a.btn-secondary').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            window.QAStageAudio?.play('mode_select');
+        });
+    });
+});
 </script>
+{% endblock %}

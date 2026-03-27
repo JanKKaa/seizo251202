@@ -1024,6 +1024,7 @@ def dashboard_json(request):
     data = {
         "machines_factory1": f1,
         "machines_factory2": f2,
+        "machines_esp32": esp32_cards_full,
         "total": len(runtime_list) + esp32_total,
         "production": sum(1 for m in runtime_list if m["runtime_status_code"] == "production") + esp32_production,
         "stop": sum(1 for m in runtime_list if m["runtime_status_code"] == "stop") + esp32_stop,

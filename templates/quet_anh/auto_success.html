@@ -141,4 +141,13 @@
     </div>
   </div>
 </div>
+<script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.QAStageAudio) {
+    window.QAStageAudio.bindToggle();
+    window.QAStageAudio.playSuccessWhenPossible();
+  }
+});
+</script>
 {% endblock %}

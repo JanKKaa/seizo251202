@@ -32,9 +32,14 @@
     </style>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">原材料入庫台帳</h2>
-        <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> インデックスへ戻る
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'material_inventory_dashboard' %}" class="btn btn-outline-primary">
+                <i class="fas fa-boxes"></i> 在庫管理
+            </a>
+            <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> インデックスへ戻る
+            </a>
+        </div>
     </div>
 
     {% if messages %}
@@ -137,11 +142,15 @@
                                 </td>
                                 <td>{% if row.supervisor_confirmed_at %}{{ row.supervisor_confirmed_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
                                 <td>
-                                    <a href="{% url 'material_stock_ledger_edit' row.id %}" class="btn btn-sm btn-warning">編集</a>
-                                    <form method="post" action="{% url 'material_stock_ledger_delete' row.id %}" style="display:inline;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この入庫台帳データを削除しますか？');">削除</button>
-                                    </form>
+                                    {% if can_inventory_adjust %}
+                                        <a href="{% url 'material_stock_ledger_edit' row.id %}" class="btn btn-sm btn-warning">編集</a>
+                                        <form method="post" action="{% url 'material_stock_ledger_delete' row.id %}" style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この入庫台帳データを削除しますか？');">削除</button>
+                                        </form>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border">閲覧のみ</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% empty %}
@@ -178,5 +187,3 @@
 
 </div>
 {% endblock %}
-
-
