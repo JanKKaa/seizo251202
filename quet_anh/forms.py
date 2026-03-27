@@ -57,6 +57,8 @@ class QAMaterialStockLedgerForm(forms.ModelForm):
             "weight_kg",
             "bag_sequence_no",
             "lot_number",
+            "hinmei_name",
+            "order_no",
             "workstation_management_no",
         ]
         widgets = {

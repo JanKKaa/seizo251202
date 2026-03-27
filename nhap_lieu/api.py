@@ -19,8 +19,25 @@ from urllib3.util.retry import Retry
 app = Flask(__name__)
 
 # ---- Runtime config (override via env) ----
-PATH_EXE = os.getenv("INPUT_EXE_PATH", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC\SK5030.EXE")
-WORKING_DIR = os.getenv("INPUT_WORKING_DIR", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC")
+# Backward-compatible:
+# - INPUT_EXE_PATH / INPUT_WORKING_DIR / INPUT_PROCESS_NAME (legacy, ưu tiên cho 出庫)
+# New split per mode:
+# - INPUT_EXE_PATH_OUT / INPUT_EXE_PATH_IN
+# - INPUT_WORKING_DIR_OUT / INPUT_WORKING_DIR_IN
+# - INPUT_PROCESS_NAME_OUT / INPUT_PROCESS_NAME_IN
+PATH_EXE_OUT = os.getenv(
+    "INPUT_EXE_PATH_OUT",
+    os.getenv("INPUT_EXE_PATH", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC\SK5030.EXE"),
+)
+PATH_EXE_IN = os.getenv(
+    "INPUT_EXE_PATH_IN",
+    r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC\SK7010.EXE",
+)
+WORKING_DIR_OUT = os.getenv(
+    "INPUT_WORKING_DIR_OUT",
+    os.getenv("INPUT_WORKING_DIR", r"\\Jimusyoserver\d\WINNC_V10\HAYASHITC"),
+)
+WORKING_DIR_IN = os.getenv("INPUT_WORKING_DIR_IN", WORKING_DIR_OUT)
 URL_DJANGO_CALLBACK = os.getenv(
     "DJANGO_CALLBACK_URL",
     "https://192.168.10.250/nhap_lieu/api/cap-nhat-ket-qua/",
@@ -42,7 +59,11 @@ OCR_RETRY_DELAY = float(os.getenv("OCR_RETRY_DELAY", "0.25"))
 CALLBACK_CONNECT_TIMEOUT = float(os.getenv("CALLBACK_CONNECT_TIMEOUT", "5"))
 CALLBACK_READ_TIMEOUT = float(os.getenv("CALLBACK_READ_TIMEOUT", "20"))
 CALLBACK_VERIFY_SSL = os.getenv("CALLBACK_VERIFY_SSL", "0").strip() in {"1", "true", "True", "yes", "YES"}
-PROCESS_KILL_NAME = os.getenv("INPUT_PROCESS_NAME", os.path.basename(PATH_EXE))
+PROCESS_KILL_NAME_OUT = os.getenv(
+    "INPUT_PROCESS_NAME_OUT",
+    os.getenv("INPUT_PROCESS_NAME", os.path.basename(PATH_EXE_OUT)),
+)
+PROCESS_KILL_NAME_IN = os.getenv("INPUT_PROCESS_NAME_IN", os.path.basename(PATH_EXE_IN))
 FOCUS_RETRIES = int(os.getenv("FOCUS_RETRIES", "3"))
 FOCUS_RETRY_DELAY = float(os.getenv("FOCUS_RETRY_DELAY", "0.12"))
 AUTO_MAXIMIZE_WINDOW = os.getenv("AUTO_MAXIMIZE_WINDOW", "1").strip() in {"1", "true", "True", "yes", "YES"}
@@ -98,6 +119,17 @@ def extract_invoice_number(full_text: str) -> str:
         return candidates[-1]
 
     return "---"
+
+
+def extract_hinmei_name(full_text: str) -> str:
+    text = _to_ascii_digits(full_text or "")
+    if not text:
+        return ""
+    # Ưu tiên mẫu: 品名: XXXX hoặc 品名 XXXX (lấy đến hết dòng)
+    m = re.search(r"品名\s*[:：]?\s*([^\r\n]+)", text)
+    if m:
+        return (m.group(1) or "").strip()
+    return ""
 
 
 def press_or_type(item: str):
@@ -158,6 +190,36 @@ def normalize_mode_value(raw: str) -> str:
     return ""
 
 
+def today_yymmdd() -> str:
+    return time.strftime("%y%m%d", time.localtime())
+
+
+def normalize_date_yymmdd(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    digits = re.sub(r"[^0-9]", "", value)
+    if re.fullmatch(r"[0-9]{6}", digits):
+        return digits
+    return ""
+
+
+def normalize_order_no(raw: str) -> str:
+    value = unicodedata.normalize("NFKC", (raw or "").strip())
+    value = value.replace(" ", "")
+    if re.fullmatch(r"[0-9]{4,12}-[1-3]", value):
+        return value
+    return ""
+
+
+def resolve_target_app(mode_value: str):
+    """Chọn app theo mode: 1=入庫(SK7010), 2=出庫(SK5030)."""
+    normalized = normalize_mode_value(mode_value)
+    if normalized == "1":
+        return PATH_EXE_IN, WORKING_DIR_IN, PROCESS_KILL_NAME_IN
+    return PATH_EXE_OUT, WORKING_DIR_OUT, PROCESS_KILL_NAME_OUT
+
+
 def type_kg_keys(kg_value: str):
     """Nhập kg bằng từng phím số thay vì paste clipboard."""
     normalized = normalize_kg_value(kg_value)
@@ -194,6 +256,34 @@ def type_inout_mode_keys(mode_value: str):
     if not normalized:
         raise ValueError("mode_value không hợp lệ cho token INOUT_MODE_KEYS (chỉ nhận 1 hoặc 2)")
     pyautogui.press(normalized)
+
+
+def type_date_yymmdd_keys(date_value: str):
+    """Nhập ngày theo dạng YYMMDD bằng phím cứng."""
+    normalized = normalize_date_yymmdd(date_value)
+    if not normalized:
+        raise ValueError("date_yymmdd_value không hợp lệ cho token DATE_YYMMDD_KEYS")
+    pyautogui.write(normalized, interval=0.03)
+
+
+def type_order_no_keys(order_no_value: str):
+    """
+    Nhập 注文No. theo thao tác thực tế của app đích:
+    - Gõ mã base (vd: 5044)
+    - Nhấn RIGHT 3 lần
+    - Gõ số thứ tự 1/2/3
+    """
+    normalized = normalize_order_no(order_no_value)
+    if not normalized:
+        raise ValueError("order_no_value không hợp lệ cho token ORDER_NO_KEYS")
+    m = re.fullmatch(r"([0-9]{4,12})-([1-3])", normalized)
+    if not m:
+        raise ValueError("order_no_value không đúng định dạng base-suffix cho token ORDER_NO_KEYS")
+
+    base_no, suffix_no = m.group(1), m.group(2)
+    pyautogui.write(base_no, interval=0.03)
+    pyautogui.press("right", presses=3, interval=0.03)
+    pyautogui.write(suffix_no, interval=0.03)
 
 
 def copy_selected_text() -> str:
@@ -259,7 +349,7 @@ def post_callback(payload: dict):
     return False, last_error
 
 
-def force_close_target_app(process=None):
+def force_close_target_app(process=None, process_name: str = ""):
     """Đóng app đích chắc chắn, kể cả khi subprocess handle không trỏ đúng process UI."""
     try:
         if process and process.poll() is None:
@@ -271,9 +361,12 @@ def force_close_target_app(process=None):
         pass
 
     # Fallback: kill theo tên tiến trình (ổn định hơn với app kiểu launcher).
+    target_process_name = (process_name or "").strip()
+    if not target_process_name:
+        return
     try:
         subprocess.run(
-            ["taskkill", "/F", "/IM", PROCESS_KILL_NAME],
+            ["taskkill", "/F", "/IM", target_process_name],
             capture_output=True,
             text=True,
             timeout=5,
@@ -424,8 +517,8 @@ def _prepare_focus_surface(use_show_desktop: bool = True):
             pass
 
 
-def ensure_target_app_focus(process=None) -> bool:
-    """Buộc focus về app hệ thống sau khi mở."""
+def ensure_target_app_focus(process=None, process_name: str = "", preserve_state: bool = False) -> bool:
+    """Buộc focus về app hệ thống; preserve_state=True thì không gửi ESC/Win+D."""
     pids = set()
     if process is not None:
         try:
@@ -434,14 +527,15 @@ def ensure_target_app_focus(process=None) -> bool:
         except Exception:
             pass
 
-    for pid in _find_pids_by_image_name(PROCESS_KILL_NAME):
+    for pid in _find_pids_by_image_name(process_name):
         pids.add(pid)
 
     if not pids:
         return False
 
-    # Dọn foreground trước khi bắt đầu ép focus.
-    _prepare_focus_surface(use_show_desktop=True)
+    # Dọn foreground trước khi bắt đầu ép focus (tránh dùng khi cần giữ nguyên màn hình hiện tại).
+    if not preserve_state:
+        _prepare_focus_surface(use_show_desktop=True)
 
     for _ in range(max(1, FOCUS_RETRIES)):
         for pid in list(pids):
@@ -450,7 +544,8 @@ def ensure_target_app_focus(process=None) -> bool:
                 if _get_foreground_pid() in pids:
                     return True
         # Nếu vẫn bị popup giữ foreground thì dọn lại rồi thử tiếp.
-        _prepare_focus_surface(use_show_desktop=False)
+        if not preserve_state:
+            _prepare_focus_surface(use_show_desktop=False)
         time.sleep(max(0.05, FOCUS_RETRY_DELAY))
 
     # Lần cuối: chấp nhận nếu foreground đã đúng PID.
@@ -482,8 +577,7 @@ def build_callback_payload(
     }
 
 
-@app.route("/send_input", methods=["POST"])
-def send_input():
+def _send_input_impl(typing_only: bool = False):
     if not JOB_LOCK.acquire(blocking=False):
         return jsonify({"message": "BUSY", "status": "Đang bận xử lý job khác"}), 409
 
@@ -492,6 +586,10 @@ def send_input():
     scan_started = False
     job_id = ""
     ten_chuong_trinh = ""
+    target_process_name = ""
+    typing_only = bool(typing_only)
+    error_occurred = False
+    mode_value = ""
     workstation_ip = request.host.split(":")[0]
     try:
         data = request.get_json(force=True) or {}
@@ -500,40 +598,59 @@ def send_input():
         material_code_value = str(data.get("material_code_value") or "").strip()
         mode_value = str(data.get("mode_value") or "").strip()
         lot_number_value = str(data.get("lot_number") or "").strip()
+        date_yymmdd_value = str(data.get("date_yymmdd_value") or "").strip()
+        order_no_value = str(data.get("order_no_value") or "").strip()
+        hinmei_check_only = str(data.get("hinmei_check_only") or "").strip().lower() in {"1", "true", "yes"}
         delay = float(data.get("delay", 0.1))
+        start_step = int(data.get("start_step") or 1)
         job_id = str(data.get("job_id") or data.get("ma_job") or "").strip()
         ten_chuong_trinh = str(data.get("ten_chuong_trinh") or "").strip()
 
         if not job_id:
+            error_occurred = True
             return jsonify({"message": "Thiếu job_id", "status": "error"}), 400
 
         if not isinstance(quy_tac, list) or not quy_tac:
+            error_occurred = True
             return jsonify({"message": "Không có dữ liệu để nhập"}), 400
-
-        if not os.path.exists(PATH_EXE):
-            return jsonify({"message": f"Không tìm thấy file tại {PATH_EXE}"}), 500
 
         normalized_mode = normalize_mode_value(mode_value)
         if normalized_mode == "2" and not lot_number_value:
+            error_occurred = True
             return jsonify({"message": "Xuất kho bắt buộc nhập Số lot (lot_number)"}), 400
+        normalized_date = normalize_date_yymmdd(date_yymmdd_value)
+        if normalized_mode == "1" and not normalized_date:
+            normalized_date = today_yymmdd()
+        normalized_order_no = normalize_order_no(order_no_value)
+        if normalized_mode == "1" and not normalized_order_no:
+            error_occurred = True
+            return jsonify({"message": "Nhập kho bắt buộc nhập 注文No. dạng 5044-1/2/3"}), 400
 
-        process = subprocess.Popen([PATH_EXE], cwd=WORKING_DIR)
-        app_launched = True
-        time.sleep(APP_BOOT_WAIT)
+        if not typing_only:
+            target_exe, target_working_dir, target_process_name = resolve_target_app(mode_value)
+            if not os.path.exists(target_exe):
+                error_occurred = True
+                return jsonify({"message": f"Không tìm thấy file tại {target_exe}"}), 500
 
-        focused = ensure_target_app_focus(process)
-        if not focused:
-            # Không click fallback để tránh chạm nhầm nút đóng app.
-            time.sleep(0.05)
+            process = subprocess.Popen([target_exe], cwd=target_working_dir)
+            app_launched = True
+            time.sleep(APP_BOOT_WAIT)
+            focused = ensure_target_app_focus(
+                process,
+                process_name=target_process_name,
+                preserve_state=False,
+            )
+            if not focused:
+                # Không click fallback để tránh chạm nhầm nút đóng app.
+                time.sleep(0.05)
 
-        has_mode_token = any(str(raw).strip() in {"INOUT_MODE_KEYS", "入/出庫"} for raw in quy_tac)
-        # Fallback an toàn: nếu payload có mode nhưng template chưa chèn token,
-        # tự gõ mode ngay đầu luồng để tránh sai nhánh 入庫/出庫.
-        if normalized_mode and not has_mode_token:
-            type_inout_mode_keys(normalized_mode)
-            time.sleep(delay)
+        # Đã tách app riêng cho 入庫/出庫, nên không cần gõ mode 1/2 trong app nữa.
+        # mode_value chỉ dùng để chọn app cần mở (SK7010/SK5030).
 
-        for raw in quy_tac:
+        # start_step is 1-based index for quy_tac
+        if start_step < 1:
+            start_step = 1
+        for raw in quy_tac[start_step - 1 :]:
             item = str(raw).strip()
             if not item:
                 continue
@@ -550,8 +667,31 @@ def send_input():
                 time.sleep(delay)
                 continue
             if item in {"INOUT_MODE_KEYS", "入/出庫"}:
-                type_inout_mode_keys(mode_value)
+                # Bỏ qua token mode để tránh nhập thừa 1/2 khi đã tách app theo luồng.
+                continue
+            if item in {"DATE_YYMMDD_KEYS", "YYMMDD_DATE_KEYS", "日付YYMMDD"}:
+                type_date_yymmdd_keys(normalized_date)
                 time.sleep(delay)
+                continue
+            if item in {"ORDER_NO_KEYS", "CHUMON_NO_KEYS", "注文NO_KEYS", "注文No._KEYS"}:
+                type_order_no_keys(normalized_order_no)
+                time.sleep(delay)
+                continue
+            if item in {"HINMEI_CHECK_KEYS", "HINMEI_KEYS", "品名"}:
+                hinmei_full_text = copy_selected_text().strip()
+                hinmei_text = extract_hinmei_name(hinmei_full_text)
+                if hinmei_check_only:
+                    return jsonify(
+                        {
+                            "message": "HINMEI_OK",
+                            "status": "hinmei_checked",
+                            "job_id": job_id,
+                            "hinmei_text": hinmei_text,
+                            "full_text": hinmei_full_text,
+                            "callback_ok": False,
+                            "callback_info": "hinmei_precheck",
+                        }
+                    )
                 continue
 
             press_or_type(item)
@@ -571,6 +711,7 @@ def send_input():
                 error=err_msg,
             )
             post_callback(payload_back)
+            error_occurred = True
             return jsonify(
                 {
                     "message": err_msg,
@@ -595,6 +736,7 @@ def send_input():
                 error=err_msg,
             )
             ok, callback_info = post_callback(payload_back)
+            error_occurred = True
             return jsonify(
                 {
                     "message": err_msg,
@@ -639,13 +781,59 @@ def send_input():
                 error=err_msg,
             )
             post_callback(payload_back)
+        error_occurred = True
         return jsonify({"message": f"Lỗi: {err_msg}", "status": "failed", "job_id": job_id}), 500
     finally:
+        if error_occurred:
+            # On any error, close workstation app to allow safe restart.
+            if not target_process_name and mode_value:
+                try:
+                    _, _, target_process_name = resolve_target_app(mode_value)
+                except Exception:
+                    target_process_name = ""
+            force_close_target_app(process, process_name=target_process_name)
         # Chỉ đóng app sau khi đã vào bước quét/copy.
         # Nếu lỗi xảy ra sớm trước bước này thì giữ app mở để tránh "tắt ngang".
-        if app_launched and scan_started:
-            force_close_target_app(process)
+        if app_launched and scan_started and not typing_only:
+            force_close_target_app(process, process_name=target_process_name)
+        # Với typing_only, vẫn đóng app khi đã hoàn tất quét/copy thành công.
+        if typing_only and scan_started and not error_occurred:
+            if not target_process_name and mode_value:
+                try:
+                    _, _, target_process_name = resolve_target_app(mode_value)
+                except Exception:
+                    target_process_name = ""
+            force_close_target_app(process, process_name=target_process_name)
         JOB_LOCK.release()
+
+
+@app.route("/send_input", methods=["POST"])
+def send_input():
+    return _send_input_impl(typing_only=False)
+
+
+@app.route("/send_input_typing_only", methods=["POST"])
+def send_input_typing_only():
+    """
+    Luồng nhập liệu tối giản: chỉ gõ phím theo quy tắc + quét/copy + callback.
+    Không mở app, không focus, không đóng app.
+    """
+    return _send_input_impl(typing_only=True)
+
+
+@app.route("/close_app", methods=["POST"])
+def close_app():
+    data = request.get_json(silent=True) or {}
+    mode_value = str(data.get("mode_value") or "").strip()
+    _, _, target_process_name = resolve_target_app(mode_value)
+    force_close_target_app(process=None, process_name=target_process_name)
+    return jsonify(
+        {
+            "status": "closed",
+            "mode_value": normalize_mode_value(mode_value) or mode_value,
+            "process_name": target_process_name,
+        }
+    )
 
 
 if __name__ == "__main__":

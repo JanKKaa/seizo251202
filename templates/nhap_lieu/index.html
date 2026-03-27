@@ -191,11 +191,15 @@ document.getElementById('nhap-lieu-form').addEventListener('submit', function(e)
     e.preventDefault();
     const modeSelect = document.getElementById('inout-mode');
     const dong3Input = document.getElementById('dong3');
+    const dong5Input = document.getElementById('dong5');
     const dong3Error = document.getElementById('dong3-error');
     const inlineError = document.getElementById('nhap-lieu-inline-error');
 
     if (dong3Input) {
         dong3Input.classList.remove('is-invalid');
+    }
+    if (dong5Input) {
+        dong5Input.classList.remove('is-invalid');
     }
     if (dong3Error) {
         dong3Error.textContent = '';
@@ -216,6 +220,18 @@ document.getElementById('nhap-lieu-form').addEventListener('submit', function(e)
         }
         if (inlineError) {
             inlineError.textContent = "出庫ではロット番号（行 3）が必須です。";
+            inlineError.classList.remove('d-none');
+        }
+        return;
+    }
+    if (modeSelect && modeSelect.value === "1" && (!dong5Input || !dong5Input.value.trim())) {
+        if (dong5Input) {
+            dong5Input.classList.add('is-invalid');
+            dong5Input.focus();
+            dong5Input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        if (inlineError) {
+            inlineError.textContent = "入庫では注文No.（行 5）が必須です。例: 5044-1";
             inlineError.classList.remove('d-none');
         }
         return;

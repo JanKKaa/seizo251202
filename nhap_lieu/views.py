@@ -152,11 +152,15 @@ def index(request):
                 inout_mode = (request.POST.get("inout_mode") or "2").strip()
                 if inout_mode not in {"1", "2"}:
                     inout_mode = "2"
+                if inout_mode == "1" and not dong4.strip():
+                    dong4 = timezone.localdate().strftime("%y%m%d")
 
                 if not any((dong1.strip(), dong2.strip(), dong3.strip(), dong4.strip(), dong5.strip())):
                     message = "Vui lòng nhập ít nhất một dòng dữ liệu!"
                 elif inout_mode == "2" and not dong3.strip():
                     message = "Xuất kho bắt buộc nhập Số lot (Dòng 3)."
+                elif inout_mode == "1" and not dong5.strip():
+                    message = "Nhập kho bắt buộc nhập 注文No. (Dòng 5), ví dụ: 5044-1."
                 else:
                     qa_result = None
                     qa_result_id = (request.POST.get("qa_result_id") or "").strip()
@@ -186,6 +190,8 @@ def index(request):
                         "kg_value": dong2.strip(),
                         "material_code_value": dong1.strip(),
                         "mode_value": inout_mode,
+                        "date_yymmdd_value": (dong4.strip() if inout_mode == "1" else ""),
+                        "order_no_value": (dong5.strip() if inout_mode == "1" else ""),
                         "delay": float(request.POST.get("delay", 0.1)),
                     }
                     if qa_result:

@@ -98,6 +98,8 @@ class QAMaterialStockLedger(models.Model):
     weight_kg = models.DecimalField("重量(kg)", max_digits=10, decimal_places=2, default=0)
     bag_sequence_no = models.CharField("袋順番号", max_length=50, blank=True, default="")
     lot_number = models.CharField("ロット番号", max_length=120, db_index=True, blank=True, default="")
+    hinmei_name = models.CharField("品名", max_length=255, blank=True, default="")
+    order_no = models.CharField("注文No.", max_length=120, db_index=True, blank=True, default="")
     workstation_management_no = models.CharField("端末管理番号", max_length=120, blank=True, default="")
     supervisor_confirmed = models.BooleanField("上長確認", default=False)
     supervisor_name = models.CharField("上長名", max_length=120, blank=True, default="")

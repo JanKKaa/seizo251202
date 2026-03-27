@@ -323,28 +323,6 @@ setTimeout(function() {
       }
     };
 
-    const sirenTone = (fromFreq = 720, toFreq = 1280, duration = 0.42, volume = 0.32) => {
-      if (!audioCtx) return;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
-      osc.type = "sawtooth";
-      osc.frequency.value = fromFreq;
-      filter.type = "bandpass";
-      filter.frequency.value = 1100;
-      filter.Q.value = 1.1;
-      gain.gain.value = 0.0001;
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      const now = audioCtx.currentTime;
-      osc.frequency.linearRampToValueAtTime(toFreq, now + duration);
-      gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      osc.start(now);
-      osc.stop(now + duration + 0.02);
-    };
 
     const stopAlarmSound = (cancelSpeech = true) => {
       if (pulseTimer) {
@@ -374,18 +352,8 @@ setTimeout(function() {
         return;
       }
 
-      // Fallback siren khi speech không khả dụng.
-      let up = true;
-      pulseTimer = setInterval(() => {
-        if (!audioCtx) return;
-        if (up) {
-          sirenTone(760, 1320, 0.44, 0.34);
-        } else {
-          sirenTone(1320, 760, 0.44, 0.34);
-        }
-        up = !up;
-      }, 470);
-      soundTimer = setTimeout(() => stopAlarmSound(true), SOUND_DURATION_MS);
+      // Không phát âm thanh khác ngoài đọc giọng nói.
+      return;
     };
 
     const readAlarmCount = () => {

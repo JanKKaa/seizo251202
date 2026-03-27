@@ -54,6 +54,21 @@ from nhap_lieu.models import ChuongTrinhNhapLieu, MayTinh, KetQuaNhapLieu
 logger = logging.getLogger(__name__)
 
 
+def _run_db_with_retry(func, *, retries=5, base_delay=0.2):
+    """
+    Retry DB writes when SQLite reports 'database is locked'.
+    """
+    for attempt in range(retries):
+        try:
+            return func()
+        except OperationalError as exc:
+            if "database is locked" not in str(exc):
+                raise
+            if attempt >= retries - 1:
+                raise
+            pytime.sleep(base_delay * (attempt + 1))
+
+
 def _display_login_name(user):
     if not user:
         return ""
@@ -148,8 +163,9 @@ def _is_valid_ipv4(ip):
     return bool(re.match(pattern, ip))
 
 
-def _post_to_workstation_with_retry(ip, payload):
-    url = f"http://{ip}:5000/send_input"
+def _post_to_workstation_with_retry(ip, payload, endpoint="send_input"):
+    endpoint_name = (endpoint or "send_input").strip().strip("/")
+    url = f"http://{ip}:5000/{endpoint_name}"
     connect_timeout = float(getattr(settings, "NHAP_LIEU_CONNECT_TIMEOUT_SECONDS", 5))
     request_timeout = float(getattr(settings, "NHAP_LIEU_REQUEST_TIMEOUT_SECONDS", 120))
     busy_retry_count = int(getattr(settings, "NHAP_LIEU_BUSY_RETRY_COUNT", 30))
@@ -194,6 +210,27 @@ def _post_to_workstation_with_retry(ip, payload):
     return response
 
 
+def _close_workstation_app(ip, mode_value: str = "1"):
+    """
+    Yêu cầu máy trạm đóng app nhập/xuất kho theo mode.
+    Trả về (ok, message).
+    """
+    url = f"http://{ip}:5000/close_app"
+    connect_timeout = float(getattr(settings, "NHAP_LIEU_CONNECT_TIMEOUT_SECONDS", 5))
+    request_timeout = float(getattr(settings, "NHAP_LIEU_REQUEST_TIMEOUT_SECONDS", 120))
+    try:
+        response = requests.post(
+            url,
+            json={"mode_value": str(mode_value or "").strip()},
+            timeout=(connect_timeout, request_timeout),
+        )
+        if response.status_code == 200:
+            return True, "closed"
+        return False, f"HTTP {response.status_code}"
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _get_master_by_material_code(material_code: str):
     code = (material_code or "").strip()
     if not code:
@@ -222,60 +259,106 @@ def _calculate_bag_count_by_material_code(material_code: str, weight_kg):
     return _calculate_bag_count(weight_kg, master.bag_weight_kg)
 
 
-def _finalize_success_phien(phien, *, data_ocr: str, full_text: str = "", done_message: str = "自動入力完了"):
+def _normalize_order_base_no(raw: str) -> str:
+    value = unicodedata.normalize("NFKC", (raw or "").strip())
+    digits = re.sub(r"[^0-9]", "", value)
+    if re.fullmatch(r"[0-9]{4,12}", digits or ""):
+        return digits
+    return ""
+
+
+def _build_next_stock_in_order_no(order_base_no: str):
+    """
+    Trả về (order_no, suffix_no, error_message).
+    Ví dụ base=5044 -> 5044-1 / 5044-2 / 5044-3; vượt quá 3 lần thì báo lỗi.
+    """
+    base = _normalize_order_base_no(order_base_no)
+    if not base:
+        return "", 0, "注文番号（ベース）は4～12桁の数字で入力してください。"
+
+    existing = QAMaterialStockLedger.objects.filter(order_no__startswith=f"{base}-").values_list("order_no", flat=True)
+    max_suffix = 0
+    for order_no in existing:
+        m = re.fullmatch(rf"{re.escape(base)}-([1-3])", (order_no or "").strip())
+        if not m:
+            continue
+        max_suffix = max(max_suffix, int(m.group(1)))
+
+    if max_suffix >= 3:
+        return "", 0, f"注文No. {base} は既に3回入庫済みです（-1/-2/-3）。"
+
+    next_suffix = max_suffix + 1
+    return f"{base}-{next_suffix}", next_suffix, ""
+
+
+def _finalize_success_phien(
+    phien,
+    *,
+    data_ocr: str,
+    full_text: str = "",
+    done_message: str = "自動入力完了",
+    expected_prefix: str = "3",
+):
     code = (data_ocr or "").strip()
     if not code or code == "---":
         return False, "管理番号が取得できませんでした。再実行してください。", phien
-    if not re.fullmatch(r"3\d{4}", code):
-        return False, f"管理番号形式エラー: {code}（3で始まる5桁のみ有効）", phien
+    prefix = (expected_prefix or "").strip()
+    if prefix and not re.fullmatch(rf"{re.escape(prefix)}\d{{4}}", code):
+        return False, f"管理番号形式エラー: {code}（{prefix}で始まる5桁のみ有効）", phien
 
-    with transaction.atomic():
-        locked = (
-            PhienNhapLieu.objects.select_for_update()
-            .select_related("chuong_trinh", "may_tinh")
-            .get(pk=phien.pk)
-        )
-
-        if (
-            KetQuaNhapLieu.objects.filter(ma_nhap_lieu=code, trang_thai="Thành công")
-            .exclude(phien=locked)
-            .exists()
-        ):
-            locked.trang_thai = "failed"
-            locked.thong_bao = f"管理番号重複: {code}"
-            locked.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
-            return False, f"管理番号が重複しています: {code}", locked
-
-        existing_success = (
-            KetQuaNhapLieu.objects
-            .filter(phien=locked, trang_thai="Thành công")
-            .order_by("-id")
-            .first()
-        )
-        if existing_success and (existing_success.ma_nhap_lieu or "").strip() != code:
-            return False, "同一ジョブで管理番号が不一致です。処理を中断しました。", locked
-
-        locked.trang_thai = "done"
-        locked.ma_nhap_lieu = code
-        locked.full_text = full_text or locked.full_text or ""
-        locked.thong_bao = done_message
-        locked.save(update_fields=["trang_thai", "ma_nhap_lieu", "full_text", "thong_bao", "ngay_cap_nhat"])
-
-        if not existing_success:
-            KetQuaNhapLieu.objects.create(
-                chuong_trinh=locked.chuong_trinh,
-                may_tinh=locked.may_tinh,
-                phien=locked,
-                ip_may=locked.ip_may or "",
-                ma_nhap_lieu=code,
-                full_text=locked.full_text or "",
-                trang_thai="Thành công",
-                ghi_chu="画像検査フローで確定保存",
+    def _do_finalize():
+        with transaction.atomic():
+            locked = (
+                PhienNhapLieu.objects.select_for_update()
+                .select_related("chuong_trinh", "may_tinh")
+                .get(pk=phien.pk)
             )
-        elif full_text and (existing_success.full_text or "") != full_text:
-            existing_success.full_text = full_text
-            existing_success.save(update_fields=["full_text", "ngay_cap_nhat"])
 
+            if (
+                KetQuaNhapLieu.objects.filter(ma_nhap_lieu=code, trang_thai="Thành công")
+                .exclude(phien=locked)
+                .exists()
+            ):
+                locked.trang_thai = "failed"
+                locked.thong_bao = f"管理番号重複: {code}"
+                locked.save(update_fields=["trang_thai", "thong_bao", "ngay_cap_nhat"])
+                return False, f"管理番号が重複しています: {code}", locked
+
+            existing_success = (
+                KetQuaNhapLieu.objects
+                .filter(phien=locked, trang_thai="Thành công")
+                .order_by("-id")
+                .first()
+            )
+            if existing_success and (existing_success.ma_nhap_lieu or "").strip() != code:
+                return False, "同一ジョブで管理番号が不一致です。処理を中断しました。", locked
+
+            locked.trang_thai = "done"
+            locked.ma_nhap_lieu = code
+            locked.full_text = full_text or locked.full_text or ""
+            locked.thong_bao = done_message
+            locked.save(update_fields=["trang_thai", "ma_nhap_lieu", "full_text", "thong_bao", "ngay_cap_nhat"])
+
+            if not existing_success:
+                KetQuaNhapLieu.objects.create(
+                    chuong_trinh=locked.chuong_trinh,
+                    may_tinh=locked.may_tinh,
+                    phien=locked,
+                    ip_may=locked.ip_may or "",
+                    ma_nhap_lieu=code,
+                    full_text=locked.full_text or "",
+                    trang_thai="Thành công",
+                    ghi_chu="画像検査フローで確定保存",
+                )
+            elif full_text and (existing_success.full_text or "") != full_text:
+                existing_success.full_text = full_text
+                existing_success.save(update_fields=["full_text", "ngay_cap_nhat"])
+
+            return True, done_message, locked
+
+    ok, msg, locked = _run_db_with_retry(_do_finalize)
+    if not ok:
+        return False, msg, locked
     return True, done_message, locked
 
 
@@ -344,15 +427,17 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         "qa_result_id": qa_result.id,
     }
 
-    phien = PhienNhapLieu.objects.create(
-        ma_job=ma_job,
-        chuong_trinh=chuong_trinh,
-        may_tinh=may_tinh,
-        qa_result=qa_result,
-        ip_may=may_tinh.ip,
-        payload_json=json.dumps(payload, ensure_ascii=False),
-        trang_thai="sending",
-        thong_bao="画像検査から自動送信",
+    phien = _run_db_with_retry(
+        lambda: PhienNhapLieu.objects.create(
+            ma_job=ma_job,
+            chuong_trinh=chuong_trinh,
+            may_tinh=may_tinh,
+            qa_result=qa_result,
+            ip_may=may_tinh.ip,
+            payload_json=json.dumps(payload, ensure_ascii=False),
+            trang_thai="sending",
+            thong_bao="画像検査から自動送信",
+        )
     )
 
     try:
@@ -378,6 +463,7 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
                 data_ocr=data_ocr,
                 full_text=full_text,
                 done_message=done_msg,
+                expected_prefix="3",
             )
             if not ok:
                 return False, finalize_msg or "確定保存に失敗しました。", updated_phien
@@ -407,14 +493,22 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         return False, f"自動入力送信エラー: {exc}", phien
 
 
-def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decimal, lot_number: str = ""):
+def _normalize_hinmei_text(value: str) -> str:
+    text = unicodedata.normalize("NFKC", (value or "").strip()).lower()
+    return re.sub(r"\s+", "", text)
+
+
+def _stock_in_hinmei_precheck(*, material_code: str, input_weight: Decimal, lot_number: str = "", order_no: str = ""):
     """
-    入庫フロー向けの自動入力送信（mode=1）。
-    Trả về (ok, message, phien_or_none, ma_nhap_lieu).
+    入庫フローの品名確認ステップ（token: HINMEI_CHECK_KEYS/品名）。
+    Trả về (ok, message, hinmei_text).
     """
     material_code = (material_code or "").strip()
+    order_no = (order_no or "").strip()
     if not material_code:
-        return False, "材料コードが未設定のため自動入力を実行できません。", None, ""
+        return False, "材料コードが未設定のため品名確認を実行できません。", ""
+    if not order_no:
+        return False, "注文No.が未入力のため品名確認を実行できません。", ""
 
     auto_program_name = (
         getattr(
@@ -424,6 +518,100 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
         )
         or "5209-01"
     ).strip()
+    chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
+    if not chuong_trinh:
+        return False, f"入力プログラム '{auto_program_name}' が見つかりません。", ""
+
+    may_tinh = MayTinh.objects.filter(ten_may="server").first()
+    if not may_tinh:
+        return False, "固定送信先 server が見つかりません。", ""
+    if may_tinh.trang_thai != "active":
+        return False, "固定送信先 server が非アクティブです。", ""
+    if not _is_valid_ipv4(may_tinh.ip):
+        return False, "固定送信先 server のIPが無効です。", ""
+
+    try:
+        quy_tac = json.loads(chuong_trinh.quy_tac or "[]")
+    except Exception:
+        quy_tac = []
+
+    stock_in_date_yymmdd = timezone.localdate().strftime("%y%m%d")
+    dong_map = {
+        "Dòng 1": material_code,
+        "Dòng 2": str(input_weight or ""),
+        "Dòng 3": lot_number or "",
+        "Dòng 4": stock_in_date_yymmdd,
+        "Dòng 5": order_no,
+    }
+    quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
+
+    token_names = {"HINMEI_CHECK_KEYS", "HINMEI_KEYS", "品名"}
+    token_idx = next((idx for idx, item in enumerate(quy_tac_gui) if str(item).strip() in token_names), -1)
+    if token_idx < 0:
+        return False, "テンプレートに品名確認トークン（HINMEI_CHECK_KEYS / 品名）がありません。", ""
+
+    pre_rules = quy_tac_gui[: token_idx + 1]
+
+    ma_job = f"job_{uuid.uuid4().hex[:16]}"
+    payload = {
+        "job_id": ma_job,
+        "ten_chuong_trinh": chuong_trinh.ten_chuong_trinh,
+        "quy_tac": pre_rules,
+        "kg_value": str(input_weight or "").strip(),
+        "material_code_value": material_code,
+        "mode_value": "1",
+        "date_yymmdd_value": stock_in_date_yymmdd,
+        "order_no_value": order_no,
+        "hinmei_check_only": True,
+        "delay": 0.1,
+    }
+
+    try:
+        response = _post_to_workstation_with_retry(may_tinh.ip, payload)
+        if response.status_code != 200:
+            return False, f"品名確認送信失敗: HTTP {response.status_code}", ""
+        data = response.json()
+        if (data.get("status") or "") != "hinmei_checked":
+            return False, "端末側で品名確認結果を取得できませんでした。", ""
+        hinmei_text = (data.get("hinmei_text") or "").strip()
+        return True, "品名確認OK", hinmei_text
+    except Exception as exc:
+        return False, f"品名確認エラー: {exc}", ""
+
+
+def _auto_send_stock_in_to_nhap_lieu(
+    *,
+    material_code: str,
+    input_weight: Decimal,
+    lot_number: str = "",
+    order_no: str = "",
+    quy_tac_override=None,
+    skip_open_app: bool = False,
+    program_name_override: str = "",
+    start_step: int = 1,
+):
+    """
+    入庫フロー向けの自動入力送信（mode=1）。
+    Trả về (ok, message, phien_or_none, ma_nhap_lieu).
+    """
+    material_code = (material_code or "").strip()
+    if not material_code:
+        return False, "材料コードが未設定のため自動入力を実行できません。", None, ""
+    order_no = (order_no or "").strip()
+    if not order_no:
+        return False, "注文No.が未入力のため自動入力を実行できません。", None, ""
+
+    if (program_name_override or "").strip():
+        auto_program_name = (program_name_override or "").strip()
+    else:
+        auto_program_name = (
+            getattr(
+                settings,
+                "NHAP_LIEU_NHAP_KHO_PROGRAM_NAME",
+                getattr(settings, "NHAP_LIEU_XUAT_KHO_PROGRAM_NAME", "5209-01"),
+            )
+            or "5209-01"
+        ).strip()
     chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
     if not chuong_trinh:
         return False, f"入力プログラム '{auto_program_name}' が見つかりません。", None, ""
@@ -436,17 +624,23 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
     if not _is_valid_ipv4(may_tinh.ip):
         return False, "固定送信先 server のIPが無効です。", None, ""
 
-    try:
-        quy_tac = json.loads(chuong_trinh.quy_tac or "[]")
-    except Exception:
-        quy_tac = []
+    stock_in_date_yymmdd = timezone.localdate().strftime("%y%m%d")
+    if quy_tac_override is not None:
+        quy_tac_gui = [str(item).strip() for item in (quy_tac_override or []) if str(item).strip()]
+    else:
+        try:
+            quy_tac = json.loads(chuong_trinh.quy_tac or "[]")
+        except Exception:
+            quy_tac = []
 
-    dong_map = {
-        "Dòng 1": material_code,
-        "Dòng 2": str(input_weight or ""),
-        "Dòng 3": lot_number or "",
-    }
-    quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
+        dong_map = {
+            "Dòng 1": material_code,
+            "Dòng 2": str(input_weight or ""),
+            "Dòng 3": lot_number or "",
+            "Dòng 4": stock_in_date_yymmdd,
+            "Dòng 5": order_no,
+        }
+        quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
 
     ma_job = f"job_{uuid.uuid4().hex[:16]}"
     payload = {
@@ -456,22 +650,29 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
         "kg_value": str(input_weight or "").strip(),
         "material_code_value": material_code,
         "mode_value": "1",  # 入庫
+        "date_yymmdd_value": stock_in_date_yymmdd,
+        "order_no_value": order_no,
+        "skip_open_app": bool(skip_open_app),
+        "start_step": int(start_step or 1),
         "delay": 0.1,
     }
 
-    phien = PhienNhapLieu.objects.create(
-        ma_job=ma_job,
-        chuong_trinh=chuong_trinh,
-        may_tinh=may_tinh,
-        qa_result=None,
-        ip_may=may_tinh.ip,
-        payload_json=json.dumps(payload, ensure_ascii=False),
-        trang_thai="sending",
-        thong_bao="入庫フローから自動送信",
+    phien = _run_db_with_retry(
+        lambda: PhienNhapLieu.objects.create(
+            ma_job=ma_job,
+            chuong_trinh=chuong_trinh,
+            may_tinh=may_tinh,
+            qa_result=None,
+            ip_may=may_tinh.ip,
+            payload_json=json.dumps(payload, ensure_ascii=False),
+            trang_thai="sending",
+            thong_bao="入庫フローから自動送信",
+        )
     )
 
     try:
-        response = _post_to_workstation_with_retry(may_tinh.ip, payload)
+        endpoint = "send_input_typing_only" if skip_open_app else "send_input"
+        response = _post_to_workstation_with_retry(may_tinh.ip, payload, endpoint=endpoint)
         if response.status_code != 200:
             phien.trang_thai = "failed"
             phien.thong_bao = f"送信失敗 HTTP {response.status_code}"
@@ -490,6 +691,7 @@ def _auto_send_stock_in_to_nhap_lieu(*, material_code: str, input_weight: Decima
                 data_ocr=data_ocr,
                 full_text=full_text,
                 done_message=done_msg,
+                expected_prefix="2",
             )
             if not ok:
                 return False, finalize_msg or "確定保存に失敗しました。", updated_phien, ""
@@ -874,6 +1076,7 @@ def index_qa(request):
 def stock_in_start(request):
     material_name = (request.POST.get("material_name") or request.GET.get("material_name") or "").strip()
     material_code = (request.POST.get("material_code") or request.GET.get("material_code") or "").strip()
+    order_base_no_input = (request.POST.get("order_base_no") or request.GET.get("order_base_no") or "").strip()
 
     material_list = _build_material_list_for_stock_in()
     material_map = {
@@ -897,9 +1100,17 @@ def stock_in_start(request):
         material_code = (material_list[0].get("material_code") or "").strip()
 
     if request.method == "POST":
+        action = (request.POST.get("action") or "").strip().lower()
+        if action == "cancel":
+            may_tinh = MayTinh.objects.filter(ten_may="server").first()
+            if may_tinh and _is_valid_ipv4(may_tinh.ip):
+                _close_workstation_app(may_tinh.ip, mode_value="1")
+            return redirect("index_qa")
+
         input_weight_raw = (request.POST.get("input_weight") or "").strip()
         lot_color = (request.POST.get("lot_color") or "").strip()
         lot_number = (request.POST.get("lot_number") or "").strip()
+        order_base_no = _normalize_order_base_no(order_base_no_input)
 
         # Ưu tiên map theo mã, fallback theo tên để không bị kẹt luồng nhập kho
         matched = material_map.get((material_name, material_code))
@@ -929,6 +1140,7 @@ def stock_in_start(request):
                 {
                     "material_name": material_name,
                     "material_code": material_code,
+                    "order_base_no": order_base_no_input,
                     "material_list": material_list,
                 },
             )
@@ -943,6 +1155,7 @@ def stock_in_start(request):
                 {
                     "material_name": material_name,
                     "material_code": material_code,
+                    "order_base_no": order_base_no_input,
                     "material_list": material_list,
                 },
             )
@@ -955,7 +1168,36 @@ def stock_in_start(request):
                 {
                     "material_name": material_name,
                     "material_code": material_code,
+                    "order_base_no": order_base_no_input,
                     "material_list": material_list,
+                },
+            )
+
+        if not order_base_no:
+            messages.error(request, "注文No.ベース（例: 5044）を入力してください。")
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "order_base_no": order_base_no_input,
+                    "material_list": material_list,
+                },
+            )
+
+        order_no, _, order_err = _build_next_stock_in_order_no(order_base_no)
+        if order_err:
+            messages.error(request, order_err)
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "order_base_no": order_base_no_input,
+                    "material_list": material_list,
+                    "block_order_limit": True,
                 },
             )
 
@@ -972,49 +1214,165 @@ def stock_in_start(request):
                 {
                     "material_name": material_name,
                     "material_code": material_code,
+                    "order_base_no": order_base_no_input,
                     "material_list": material_list,
                 },
             )
 
-        ok, auto_msg, phien, ma_nhap_lieu = _auto_send_stock_in_to_nhap_lieu(
+        stage = (request.POST.get("stage") or "precheck").strip().lower()
+
+        if stage == "confirm":
+            pending = request.session.get("stock_in_hinmei_ok") or {}
+            if not pending:
+                messages.error(request, "品名確認が未完了です。先に品名確認を実行してください。")
+                return render(
+                    request,
+                    "quet_anh/stock_in_start.html",
+                    {
+                        "material_name": material_name,
+                        "material_code": material_code,
+                        "order_base_no": order_base_no_input,
+                        "material_list": material_list,
+                    },
+                )
+            pending_order_no = (pending.get("order_no") or "").strip()
+            if pending_order_no and pending_order_no != order_no:
+                messages.error(request, "注文No.が変更されています。再度品名確認を実行してください。")
+                request.session.pop("stock_in_hinmei_ok", None)
+                return render(
+                    request,
+                    "quet_anh/stock_in_start.html",
+                    {
+                        "material_name": material_name,
+                        "material_code": material_code,
+                        "order_base_no": order_base_no_input,
+                        "material_list": material_list,
+                    },
+                )
+            ok, auto_msg, phien, ma_nhap_lieu = _auto_send_stock_in_to_nhap_lieu(
+                material_code=material_code,
+                input_weight=input_weight,
+                lot_number=lot_number,
+                order_no=order_no,
+                skip_open_app=True,
+                program_name_override="nhapkho",
+                start_step=11,
+                quy_tac_override=None,
+            )
+            if not ok:
+                may_tinh = MayTinh.objects.filter(ten_may="server").first()
+                if may_tinh and _is_valid_ipv4(may_tinh.ip):
+                    _close_workstation_app(may_tinh.ip, mode_value="1")
+                messages.error(request, auto_msg)
+                return render(
+                    request,
+                    "quet_anh/stock_in_start.html",
+                    {
+                        "material_name": material_name,
+                        "material_code": material_code,
+                        "order_base_no": order_base_no_input,
+                        "material_list": material_list,
+                        "hinmei_text": pending.get("hinmei_text") or "",
+                        "order_no_preview": order_no,
+                        "hinmei_ok": True,
+                    },
+                )
+
+            request.session.pop("stock_in_hinmei_ok", None)
+            bag_sequence_no = _calculate_bag_count_by_material_code(material_code, input_weight) or "1"
+            QAMaterialStockLedger.objects.create(
+                auto_input_ledger=(
+                    QAAutoInputLedger.objects.filter(phien_nhap_lieu=phien).first() if phien else None
+                ),
+                qa_result=None,
+                material_name=material_name or "",
+                material_code=material_code or "",
+                stock_in_date=timezone.localdate(),
+                lot_color=lot_color,
+                weight_kg=input_weight,
+                bag_sequence_no=bag_sequence_no,
+                lot_number=lot_number,
+                hinmei_name=(pending.get("hinmei_text") or ""),
+                order_no=order_no,
+                workstation_management_no=ma_nhap_lieu or "",
+            )
+            return render(
+                request,
+                "quet_anh/auto_success.html",
+                {
+                    "flow_name": "入庫処理",
+                    "registration_code": (ma_nhap_lieu or "").strip(),
+                    "detail_message": "入庫データの保存と自動入力が完了しました。",
+                },
+            )
+
+        pre_ok, pre_msg, hinmei_text = _stock_in_hinmei_precheck(
             material_code=material_code,
             input_weight=input_weight,
             lot_number=lot_number,
+            order_no=order_no,
         )
-        if not ok:
-            messages.error(request, auto_msg)
+        if not pre_ok:
+            messages.error(request, pre_msg)
             return render(
                 request,
                 "quet_anh/stock_in_start.html",
                 {
                     "material_name": material_name,
                     "material_code": material_code,
+                    "order_base_no": order_base_no_input,
                     "material_list": material_list,
                 },
             )
 
-        bag_sequence_no = _calculate_bag_count_by_material_code(material_code, input_weight) or "1"
-        QAMaterialStockLedger.objects.create(
-            auto_input_ledger=(
-                QAAutoInputLedger.objects.filter(phien_nhap_lieu=phien).first() if phien else None
-            ),
-            qa_result=None,
-            material_name=material_name or "",
-            material_code=material_code or "",
-            stock_in_date=timezone.localdate(),
-            lot_color=lot_color,
-            weight_kg=input_weight,
-            bag_sequence_no=bag_sequence_no,
-            lot_number=lot_number,
-            workstation_management_no=ma_nhap_lieu or "",
+        expected_norm = _normalize_hinmei_text(material_name)
+        hinmei_norm = _normalize_hinmei_text(hinmei_text)
+        is_hinmei_match = bool(expected_norm and hinmei_norm and (expected_norm in hinmei_norm or hinmei_norm in expected_norm))
+        if not is_hinmei_match:
+            may_tinh = MayTinh.objects.filter(ten_may="server").first()
+            if may_tinh and _is_valid_ipv4(may_tinh.ip):
+                _close_workstation_app(may_tinh.ip, mode_value="1")
+            messages.error(
+                request,
+                f"品名不一致: 期待[{material_name}] / 端末[{hinmei_text or '未取得'}]。内容確認後に再実行してください。",
+            )
+            return render(
+                request,
+                "quet_anh/stock_in_start.html",
+                {
+                    "material_name": material_name,
+                    "material_code": material_code,
+                    "order_base_no": order_base_no_input,
+                    "material_list": material_list,
+                    "hinmei_text": hinmei_text,
+                    "order_no_preview": order_no,
+                    "block_after_mismatch": True,
+                    "expected_hinmei": material_name,
+                    "actual_hinmei": hinmei_text or "未取得",
+                },
+            )
+
+        request.session["stock_in_hinmei_ok"] = {
+            "material_code": material_code,
+            "order_no": order_no,
+            "hinmei_text": hinmei_text,
+            "checked_at": timezone.localtime().isoformat(),
+        }
+        messages.success(
+            request,
+            f"品名確認OK: {hinmei_text or '-'} / 注文No. {order_no}。",
         )
         return render(
             request,
-            "quet_anh/auto_success.html",
+            "quet_anh/stock_in_start.html",
             {
-                "flow_name": "入庫処理",
-                "registration_code": (ma_nhap_lieu or "").strip(),
-                "detail_message": "入庫データの保存と自動入力が完了しました。",
+                "material_name": material_name,
+                "material_code": material_code,
+                "order_base_no": order_base_no_input,
+                "material_list": material_list,
+                "hinmei_text": hinmei_text,
+                "order_no_preview": order_no,
+                "hinmei_ok": True,
             },
         )
 
@@ -1024,6 +1382,7 @@ def stock_in_start(request):
         {
             "material_name": material_name,
             "material_code": material_code,
+            "order_base_no": order_base_no_input,
             "material_list": material_list,
         },
     )
@@ -1638,7 +1997,9 @@ def material_stock_ledger(request):
         qs = qs.filter(
             Q(material_name__icontains=keyword)
             | Q(material_code__icontains=keyword)
+            | Q(hinmei_name__icontains=keyword)
             | Q(lot_number__icontains=keyword)
+            | Q(order_no__icontains=keyword)
             | Q(workstation_management_no__icontains=keyword)
             | Q(supervisor_name__icontains=keyword)
         )
@@ -1740,20 +2101,29 @@ def material_inventory_dashboard(request):
             last_out_date=Max("stock_out_date"),
         )
     )
-    master_rows = QAMaterialMaster.objects.values(
-        "material_code", "material_name", "bag_weight_kg", "is_active"
+    master_rows = list(
+        QAMaterialMaster.objects.values(
+            "material_code", "material_name", "bag_weight_kg", "is_active"
+        )
     )
 
     by_code = {}
+    active_codes = {
+        (row.get("material_code") or "").strip()
+        for row in master_rows
+        if (row.get("material_code") or "").strip() and row.get("is_active")
+    }
 
-    def _ensure_row(code, name=""):
+    def _ensure_row(code, name="", *, bag_weight=None, is_active=True):
         key = (code or "").strip()
+        if not key:
+            return None
         if key not in by_code:
             by_code[key] = {
                 "material_code": key,
                 "material_name": (name or "").strip(),
-                "bag_weight_kg": None,
-                "is_active": True,
+                "bag_weight_kg": bag_weight,
+                "is_active": bool(is_active),
                 "total_in_kg": Decimal("0"),
                 "total_out_kg": Decimal("0"),
                 "total_in_bags": 0,
@@ -1761,18 +2131,46 @@ def material_inventory_dashboard(request):
                 "last_in_date": None,
                 "last_out_date": None,
             }
-        elif name and not by_code[key]["material_name"]:
-            by_code[key]["material_name"] = (name or "").strip()
+        else:
+            if name and not by_code[key]["material_name"]:
+                by_code[key]["material_name"] = (name or "").strip()
+            if bag_weight is not None:
+                by_code[key]["bag_weight_kg"] = bag_weight
+            by_code[key]["is_active"] = bool(is_active)
         return by_code[key]
 
+    if active_codes:
+        for row in master_rows:
+            code = (row.get("material_code") or "").strip()
+            if code in active_codes:
+                _ensure_row(
+                    code,
+                    row.get("material_name"),
+                    bag_weight=row.get("bag_weight_kg"),
+                    is_active=row.get("is_active"),
+                )
+    else:
+        # Fallback: if master empty, allow any codes from ledgers.
+        active_codes = set()
+
     for row in in_rows:
-        r = _ensure_row(row.get("material_code"), row.get("material_name"))
+        code = (row.get("material_code") or "").strip()
+        if active_codes and code not in active_codes:
+            continue
+        r = _ensure_row(code, row.get("material_name"))
+        if not r:
+            continue
         r["total_in_kg"] = row.get("total_in_kg") or Decimal("0")
         r["total_in_bags"] = int(row.get("total_in_bags") or 0)
         r["last_in_date"] = row.get("last_in_date")
 
     for row in out_rows:
-        r = _ensure_row(row.get("material_code"), row.get("material_name"))
+        code = (row.get("material_code") or "").strip()
+        if active_codes and code not in active_codes:
+            continue
+        r = _ensure_row(code, row.get("material_name"))
+        if not r:
+            continue
         r["total_out_kg"] = row.get("total_out_kg") or Decimal("0")
         r["total_out_bags"] = int(row.get("total_out_bags") or 0)
         r["last_out_date"] = row.get("last_out_date")

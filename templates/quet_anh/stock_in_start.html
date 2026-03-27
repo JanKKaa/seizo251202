@@ -42,7 +42,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">重量 (kg)</label>
-                    <input type="number" class="form-control" id="input_weight" name="input_weight" step="0.01" min="0.01" required placeholder="例: 25.00">
+                    <input type="number" class="form-control" id="input_weight" name="input_weight" step="0.01" min="0.01" required placeholder="例: 25.00" value="{{ request.POST.input_weight|default:'' }}">
                     <div class="mt-2 d-flex gap-2 flex-wrap">
                         <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="20">20kg</button>
                         <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="25">25kg</button>
@@ -51,15 +51,31 @@
                 <div class="col-md-3">
                     <label class="form-label fw-bold">ロット識別色</label>
                     <select class="form-select" name="lot_color" required>
-                        <option value="green">🟢 緑</option>
-                        <option value="black">⚫ 黒</option>
-                        <option value="blue">🔵 青</option>
-                        <option value="red">🔴 赤</option>
+                        <option value="green" {% if request.POST.lot_color|default:'green' == 'green' %}selected{% endif %}>🟢 緑</option>
+                        <option value="black" {% if request.POST.lot_color == 'black' %}selected{% endif %}>⚫ 黒</option>
+                        <option value="blue" {% if request.POST.lot_color == 'blue' %}selected{% endif %}>🔵 青</option>
+                        <option value="red" {% if request.POST.lot_color == 'red' %}selected{% endif %}>🔴 赤</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">ロット番号</label>
-                    <input type="text" class="form-control" name="lot_number" placeholder="ロット番号">
+                    <input type="text" class="form-control" name="lot_number" placeholder="ロット番号" value="{{ request.POST.lot_number|default:'' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">注文No.（ベース）</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="order_base_no"
+                        name="order_base_no"
+                        value="{{ order_base_no|default:'' }}"
+                        inputmode="numeric"
+                        pattern="[0-9]{4,12}"
+                        maxlength="12"
+                        placeholder="例: 5044"
+                        required
+                    >
+                    <div class="form-text">システムが自動で「-1/-2/-3」を付番します（例: 5044-1）。</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">袋数（自動計算）</label>
@@ -68,11 +84,35 @@
                 </div>
             </div>
 
+            {% if block_order_limit %}
+            <div class="alert alert-danger mt-3 mb-0">
+                <strong>注文No.</strong> は既に3回入庫済みです。これ以上は入力できません。
+            </div>
+            {% endif %}
+
+            {% if hinmei_text or order_no_preview %}
+            <div class="alert {% if hinmei_ok %}alert-success{% else %}alert-info{% endif %} mt-3 mb-0">
+                <div><strong>品名確認結果:</strong> {{ hinmei_text|default:"-" }}</div>
+                <div><strong>注文No.:</strong> {{ order_no_preview|default:"-" }}</div>
+            </div>
+            {% endif %}
+
             <div class="mt-4 d-flex justify-content-end gap-2">
-                <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary rounded-pill px-4">キャンセル</a>
-                <button type="submit" id="stock-in-submit-btn" class="btn btn-success rounded-pill px-4">
-                    <i class="fas fa-play"></i> 入庫処理開始
-                </button>
+                {% if block_after_mismatch %}
+                    <a href="{% url 'index_qa' %}" class="btn btn-danger rounded-pill px-5 py-2 fw-bold">戻る（トップへ）</a>
+                {% elif block_order_limit %}
+                    <a href="{% url 'index_qa' %}" class="btn btn-secondary rounded-pill px-5 py-2 fw-bold">戻る</a>
+                {% elif hinmei_ok %}
+                    <button type="submit" name="stage" value="confirm" id="stock-in-confirm-btn" class="btn btn-success rounded-pill px-5 py-2 fw-bold">
+                        入庫処理開始（確認済み）
+                    </button>
+                    <button type="submit" name="action" value="cancel" class="btn btn-outline-secondary rounded-pill px-4">キャンセル</button>
+                {% else %}
+                    <button type="submit" name="action" value="cancel" class="btn btn-outline-secondary rounded-pill px-4">キャンセル</button>
+                    <button type="submit" name="stage" value="precheck" id="stock-in-submit-btn" class="btn btn-primary rounded-pill px-4">
+                        <i class="fas fa-search"></i> 品名確認
+                    </button>
+                {% endif %}
             </div>
         </div>
     </form>
@@ -124,6 +164,19 @@
     color: #1f2937;
     line-height: 1.5;
 }
+.hinmei-error-modal .modal-content {
+    border: 2px solid #dc3545;
+    box-shadow: 0 16px 40px rgba(220, 53, 69, 0.35);
+}
+.hinmei-error-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #b02a37;
+}
+.hinmei-error-body {
+    font-size: 1.06rem;
+    line-height: 1.65;
+}
 </style>
 
 <div id="stockin-loading-overlay" aria-hidden="true">
@@ -137,9 +190,32 @@
     </div>
 </div>
 
+{% if block_after_mismatch %}
+<div class="modal fade hinmei-error-modal" id="hinmeiErrorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title hinmei-error-title text-white mb-0">重大エラー: 品名不一致</h5>
+            </div>
+            <div class="modal-body hinmei-error-body">
+                <p class="mb-2"><strong>入庫処理を中止しました。</strong></p>
+                <p class="mb-2">期待品名: <strong>{{ expected_hinmei|default:material_name|default:"-" }}</strong></p>
+                <p class="mb-0">端末品名: <strong>{{ actual_hinmei|default:hinmei_text|default:"未取得" }}</strong></p>
+                <hr>
+                <p class="mb-0 text-danger fw-bold">原料取り違え防止のため、この画面では続行できません。トップ画面に戻って最初からやり直してください。</p>
+            </div>
+            <div class="modal-footer">
+                <a href="{% url 'index_qa' %}" class="btn btn-danger btn-lg px-5 fw-bold">戻る</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
 <script>
 (() => {
+    const blockAfterMismatch = {{ block_after_mismatch|yesno:"true,false" }};
     const materialSelect = document.getElementById("material_name");
     const materialCodeInput = document.getElementById("material_code");
     const weightInput = document.getElementById("input_weight");
@@ -194,6 +270,27 @@
 
     if (window.QAStageAudio) {
         window.QAStageAudio.bindToggle();
+    }
+
+    const hinmeiOk = {{ hinmei_ok|yesno:"true,false" }};
+    const blockOrderLimit = {{ block_order_limit|yesno:"true,false" }};
+    if (blockAfterMismatch || blockOrderLimit) {
+        form?.addEventListener("submit", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
+        form?.querySelectorAll("input, select, textarea, button[type='submit']").forEach((el) => {
+            el.setAttribute("disabled", "disabled");
+        });
+        if (blockAfterMismatch && window.bootstrap && typeof window.bootstrap.Modal === "function") {
+            const modalEl = document.getElementById("hinmeiErrorModal");
+            if (modalEl) {
+                const modal = new window.bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false });
+                modal.show();
+            }
+        } else if (blockAfterMismatch) {
+            window.alert("重大エラー: 品名不一致。トップ画面に戻って最初からやり直してください。");
+        }
     }
 })();
 </script>
