@@ -57,7 +57,7 @@
         <div class="card-body">
             <form method="get" class="row g-2 mb-3">
                 <div class="col-md-4">
-                    <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名、コード、ロット、管理番号">
+                    <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名、コード、製品コード、ロット、管理番号">
                 </div>
                 <div class="col-md-3">
                     <input type="date" class="form-control" name="date" value="{{ date }}">
@@ -86,6 +86,7 @@
                             <th>重量(kg)</th>
                             <th>袋数</th>
                             <th>ロット番号</th>
+                            <th>製品コード</th>
                             <th>システムNo.</th>
                             <th>作業者</th>
                             <th>上長確認</th>
@@ -119,6 +120,7 @@
                                 <td class="text-end">{{ row.weight_kg }}</td>
                                 <td>{{ row.bag_sequence_no }}</td>
                                 <td>{{ row.lot_number }}</td>
+                                <td>{{ row.product_code }}</td>
                                 <td>{{ row.workstation_management_no }}</td>
                                 <td>{{ row.qa_result.operator_name|default:"-" }}</td>
                                 <td>
@@ -155,7 +157,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="13" class="text-center text-muted">データがありません。</td>
+                                <td colspan="14" class="text-center text-muted">データがありません。</td>
                             </tr>
                         {% endfor %}
                     </tbody>

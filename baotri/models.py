@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 
 class MaintenanceTask(models.Model):
     name = models.CharField(max_length=255, verbose_name="製品名")
+    product_code = models.CharField(max_length=50, verbose_name="製品コード", blank=True, null=True, default="")
     code = models.CharField(max_length=50, verbose_name="コード")
     machine_count = models.IntegerField(verbose_name="機械番号")
     quantity = models.CharField(max_length=50, verbose_name="取数", blank=True, null=True, default="未定義")
@@ -84,5 +85,6 @@ class MaintenanceMistake(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.task_code.code} - {self.description[:20]}"
+        product_name = self.product.name if self.product else "未設定"
+        return f"{product_name} - {self.description[:20]}"
 

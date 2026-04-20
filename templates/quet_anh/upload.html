@@ -223,7 +223,13 @@
         </a>
     </div>
 
-    <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_image' %}">
+    <form
+        id="upload-form"
+        method="post"
+        enctype="multipart/form-data"
+        action="{% url 'upload_image' %}"
+        data-auto-input-on="{% if device and device.outstock_auto_input_enabled %}1{% else %}0{% endif %}"
+    >
         {% csrf_token %}
         <div class="row justify-content-center">
             <div class="col-lg-5 mb-4">
@@ -318,7 +324,8 @@
                                     <div class="col-md-6"><strong>機械No.:</strong> {{ device.name }}</div>
                                     <div class="col-md-6"><strong>材料名：</strong> {{ device.material }}</div>
                                     <div class="col-md-6"><strong>材料コード：</strong> {{ device.material_code }}</div>
-                                    <div class="col-md-6"><strong>製品名：</strong> {{ device.product }}</div>
+                                    <div class="col-md-6"><strong>製品名：</strong> {{ device.product_name }}</div>
+                                    <div class="col-md-6"><strong>製品コード：</strong> {{ device.product_management_code }}</div>
                                     <div class="col-md-6"><strong>混合率：</strong> {{ device.ratio }}</div>
                                 </div>
                             </div>
@@ -339,12 +346,29 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="lot_number"><strong>ロット番号（必須）：</strong></label>
-                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力" required>
+                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力" required value="{{ request.POST.lot_number|default:'' }}">
                                 <div class="invalid-feedback" id="lot-number-error"></div>
                             </div>
                             <div class="col-md-6">
+                                <label for="product_code"><strong>製品コード{% if device and device.outstock_auto_input_enabled %}（必須）{% else %}（自動入力ON時のみ必須）{% endif %}：</strong></label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="product_code"
+                                    name="product_code"
+                                    placeholder="保全マスターから自動取得"
+                                    {% if device and device.outstock_auto_input_enabled %}required{% endif %}
+                                    readonly
+                                    value="{{ device.product_management_code|default:'' }}"
+                                >
+                                <div class="invalid-feedback" id="product-code-error"></div>
+                                <div class="form-text">
+                                    保全マスターに登録された製品コードを自動反映します。自動入力OFF時は未設定でも送信できます。
+                                </div>
+                            </div>
+                            <div class="col-md-6">
                                 <label for="input_weight"><strong>投入した材料の重さ (kg)：</strong></label>
-                                <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="none" readonly>
+                                <input type="text" class="form-control" id="input_weight" name="input_weight" placeholder="例: 12.50" required autocomplete="off" inputmode="none" readonly value="{{ request.POST.input_weight|default:'' }}">
                                 <div class="invalid-feedback" id="input-weight-error"></div>
                                 <div class="quick-kg-inline mt-2 mb-1">
                                     <button type="button" class="btn btn-outline-success quick-kg-btn" data-kg="20">20kg</button>
@@ -362,10 +386,10 @@
                                 <label for="lot_color"><strong>ロット識別色（必須）：</strong></label>
                                 <select class="form-control" id="lot_color" name="lot_color" required>
                                     <option value="">選択してください</option>
-                                    <option value="green">🟢 緑</option>
-                                    <option value="black">⚫ 黒</option>
-                                    <option value="blue">🔵 青</option>
-                                    <option value="red">🔴 赤</option>
+                                    <option value="green" {% if request.POST.lot_color == "green" %}selected{% endif %}>🟢 緑</option>
+                                    <option value="black" {% if request.POST.lot_color == "black" %}selected{% endif %}>⚫ 黒</option>
+                                    <option value="blue" {% if request.POST.lot_color == "blue" %}selected{% endif %}>🔵 青</option>
+                                    <option value="red" {% if request.POST.lot_color == "red" %}selected{% endif %}>🔴 赤</option>
                                 </select>
                                 <div class="invalid-feedback" id="lot-color-error"></div>
                             </div>
@@ -571,11 +595,14 @@
 </div>
 <script>
 document.getElementById('upload-form').addEventListener('submit', function(e) {
+    const uploadForm = document.getElementById('upload-form');
+    const autoInputOn = (uploadForm?.dataset?.autoInputOn || '0') === '1';
     const inputWeight = document.getElementById('input_weight');
     const capturedImage = document.getElementById('captured_image');
     const expectedTextInput = document.getElementById('expected_text');
     const lotColor = document.getElementById('lot_color');
     const lotNumber = document.getElementById('lot_number');
+    const productCode = document.getElementById('product_code');
     const submitInlineError = document.getElementById('submit-inline-error');
 
     function clearFieldError(el, errorId) {
@@ -607,6 +634,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
     clearFieldError(inputWeight, 'input-weight-error');
     clearFieldError(lotColor, 'lot-color-error');
     clearFieldError(lotNumber, 'lot-number-error');
+    clearFieldError(productCode, 'product-code-error');
     clearInlineError();
 
     // Kiểm tra số kg
@@ -651,11 +679,19 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
         e.preventDefault();
         return false;
     }
+    if (autoInputOn && (!productCode.value || !productCode.value.trim())) {
+        window.QAStageAudio?.play('warning');
+        setFieldError(productCode, 'product-code-error', "製品コードを入力してください。");
+        productCode.focus();
+        productCode.scrollIntoView({ behavior: "smooth", block: "center" });
+        e.preventDefault();
+        return false;
+    }
     window.QAStageAudio?.play('submit_start');
     document.getElementById('loading-overlay').style.display = 'block';
 });
 
-['input_weight', 'lot_color', 'lot_number'].forEach((id) => {
+['input_weight', 'lot_color', 'lot_number', 'product_code'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('input', () => {
@@ -877,6 +913,8 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
 
         const lotNumberEl = document.getElementById('lot_number');
         if (lotNumberEl) lotNumberEl.value = "";
+        const productCodeEl = document.getElementById('product_code');
+        if (productCodeEl) productCodeEl.value = "{{ device.product_management_code|default:''|escapejs }}";
 
         const kgModalDisplay = document.getElementById('kg-modal-display');
         if (kgModalDisplay) kgModalDisplay.value = "";

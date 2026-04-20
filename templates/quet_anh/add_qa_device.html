@@ -53,8 +53,28 @@
                             <td>{{ form.product }}</td>
                         </tr>
                         <tr>
+                            <th class="small text-right align-middle">製品マスター（保全）</th>
+                            <td>
+                                {{ form.maintenance_task }}
+                                <div class="small text-muted mt-1">
+                                    選択した場合、製品名は保全マスター（baotri）から自動連携します。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
                             <th class="small text-right align-middle">混合率</th>
                             <td>{{ form.ratio }}</td>
+                        </tr>
+                        <tr>
+                            <th class="small text-right align-middle">出庫自動入力</th>
+                            <td>
+                                <div class="form-check form-switch">
+                                    {{ form.outstock_auto_input_enabled }}
+                                    <label class="form-check-label ms-2" for="{{ form.outstock_auto_input_enabled.id_for_label }}">
+                                        この機械・原材料で自動入力を有効化（既定はOFF）
+                                    </label>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -87,7 +107,9 @@
                         <th class="small text-center font-weight-bold" style="width: 20%;">材料名</th>
                         <th class="small text-center font-weight-bold" style="width: 15%;">材料コード</th>
                         <th class="small text-center font-weight-bold" style="width: 20%;">製品名</th>
+                        <th class="small text-center font-weight-bold" style="width: 10%;">製品管理番号</th>
                         <th class="small text-center font-weight-bold" style="width: 10%;">混合率</th>
+                        <th class="small text-center font-weight-bold" style="width: 8%;">自動入力</th>
                         <th class="small text-center font-weight-bold" style="width: 10%;">操作</th>
                     </tr>
                 </thead>
@@ -98,8 +120,16 @@
                         <td class="small">{{ item.name }}</td>
                         <td class="small">{{ item.material }}</td>
                         <td class="small">{{ item.material_code }}</td>
-                        <td class="small">{{ item.product }}</td>
+                        <td class="small">{{ item.product_name }}</td>
+                        <td class="small text-center">{{ item.product_management_code }}</td>
                         <td class="small text-center">{{ item.ratio }}</td>
+                        <td class="small text-center">
+                            {% if item.outstock_auto_input_enabled %}
+                                <span class="badge bg-success">ON</span>
+                            {% else %}
+                                <span class="badge bg-secondary">OFF</span>
+                            {% endif %}
+                        </td>
                         <td class="small text-center">
                             <form method="post" action="{% url 'delete_qa_device' item.id %}" style="display:inline;">
                                 {% csrf_token %}
@@ -112,7 +142,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center text-muted">データがありません。</td>
+                        <td colspan="9" class="text-center text-muted">データがありません。</td>
                     </tr>
                     {% endfor %}
                 </tbody>

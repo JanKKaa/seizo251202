@@ -54,6 +54,16 @@ from nhap_lieu.models import ChuongTrinhNhapLieu, MayTinh, KetQuaNhapLieu
 logger = logging.getLogger(__name__)
 
 
+def _is_auto_outstock_target(qa_result):
+    """
+    Từng thiết bị + nguyên liệu tự quản lý cờ ON/OFF tự động nhập liệu.
+    Mặc định OFF để vận hành song song an toàn.
+    """
+    if not qa_result or not qa_result.device:
+        return False
+    return bool(getattr(qa_result.device, "outstock_auto_input_enabled", False))
+
+
 def _run_db_with_retry(func, *, retries=5, base_delay=0.2):
     """
     Retry DB writes when SQLite reports 'database is locked'.
@@ -114,6 +124,9 @@ def _upsert_out_stock_from_qa_result(qa_result):
     material_code = device.material_code if device else ""
     bag_count = _calculate_bag_count_by_material_code(material_code, qa_result.input_weight if qa_result else None)
     out_date = timezone.localtime(qa_result.created_at).date()
+    product_code = (qa_result.product_code or "").strip()
+    if not product_code and device:
+        product_code = (device.product_management_code or "").strip()
 
     row, _ = QAMaterialOutStockLedger.objects.get_or_create(
         qa_result=qa_result,
@@ -125,6 +138,7 @@ def _upsert_out_stock_from_qa_result(qa_result):
             "weight_kg": qa_result.input_weight or Decimal("0"),
             "bag_sequence_no": bag_count,
             "lot_number": qa_result.lot_number or "",
+            "product_code": product_code,
             "workstation_management_no": "",
         },
     )
@@ -144,6 +158,9 @@ def _upsert_out_stock_from_qa_result(qa_result):
         changed = True
     if qa_result.lot_number and row.lot_number != qa_result.lot_number:
         row.lot_number = qa_result.lot_number
+        changed = True
+    if product_code and row.product_code != product_code:
+        row.product_code = product_code
         changed = True
     if (row.weight_kg is None or row.weight_kg == 0) and qa_result.input_weight is not None:
         row.weight_kg = qa_result.input_weight
@@ -373,6 +390,10 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
     material_code = (qa_result.device.material_code or "").strip()
     lot_color = (qa_result.lot_color or "").strip()
     lot_number = (qa_result.lot_number or "").strip()
+    product_code = (
+        (qa_result.product_code or "").strip()
+        or ((qa_result.device.product_management_code or "").strip() if qa_result.device else "")
+    )
     if not material_code:
         return False, "材料コードが未設定のため自動入力を実行できません。", None
     if lot_color not in {
@@ -384,6 +405,8 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         return False, "ロット識別色が未入力のため自動入力を実行できません。", None
     if not lot_number:
         return False, "ロット番号が未入力のため自動入力を実行できません。", None
+    if not product_code:
+        return False, "製品コードが未入力のため自動入力を実行できません。", None
 
     auto_program_name = (getattr(settings, "NHAP_LIEU_XUAT_KHO_PROGRAM_NAME", "5209-02") or "5209-02").strip()
     chuong_trinh = ChuongTrinhNhapLieu.objects.filter(ten_chuong_trinh=auto_program_name).first()
@@ -410,6 +433,7 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         "Dòng 3": lot_number,
         "Dòng 4": qa_result.machine_number or "",
         "Dòng 5": expected_text or "",
+        "Dòng 6": product_code,
     }
     quy_tac_gui = [dong_map.get(item, item) for item in quy_tac]
 
@@ -423,6 +447,7 @@ def _auto_send_to_nhap_lieu(qa_result, expected_text="", mode_value="2"):
         "mode_value": str(mode_value or "2"),
         "lot_color": lot_color,
         "lot_number": lot_number,
+        "product_code_value": product_code,
         "delay": 0.1,
         "qa_result_id": qa_result.id,
     }
@@ -792,6 +817,9 @@ def upload_image(request):
         input_weight = request.POST.get('input_weight')
         lot_color = request.POST.get('lot_color', '').strip()
         lot_number = request.POST.get('lot_number', '').strip()
+        auto_input_for_device = bool(getattr(device, "outstock_auto_input_enabled", False))
+        # 製品コードは保全マスター（baotri）から自動取得する
+        product_code = (device.product_management_code or "").strip() if device else ""
 
         # ==== BẮT BUỘC: kiểm tra các trường quan trọng ===
         if not captured_image:
@@ -845,6 +873,17 @@ def upload_image(request):
             })
         if not lot_number:
             messages.error(request, "ロット番号を入力してください。")
+            device_list = QADeviceInfo.objects.all()
+            return render(request, 'quet_anh/upload.html', {
+                'form': QAResultForm(request.POST),
+                'message': message,
+                'expected_text': expected_text,
+                'device_list': device_list,
+                'device_id': device_id,
+                'device': device,
+            })
+        if auto_input_for_device and not product_code:
+            messages.error(request, "保全マスターに製品コードが未登録です。先に保全側で製品コードを設定してください。")
             device_list = QADeviceInfo.objects.all()
             return render(request, 'quet_anh/upload.html', {
                 'form': QAResultForm(request.POST),
@@ -953,7 +992,7 @@ def upload_image(request):
                     f"作業者: {qa_result.operator_name}\n"
                     f"デバイス名: {device.name if device else ''}\n"
                     f"材料名: {device.material if device else ''}\n"
-                    f"製品名: {device.product if device else ''}\n"
+                    f"製品名: {device.product_name if device else ''}\n"
                     f"混合率: {device.ratio if device else ''}\n"
                     f"QRコード内容: {expected_text}\n"
                     f"OCR読み取り内容: {paddle_text}\n"
@@ -994,16 +1033,24 @@ def upload_image(request):
             qa_result.input_weight = input_weight  # Đảm bảo model có trường này
             qa_result.lot_color = lot_color
             qa_result.lot_number = lot_number
+            qa_result.product_code = product_code
             qa_result.save()
 
             # Tự động gọi app nhập liệu nếu ảnh khớp (xuất nguyên liệu)
             registration_code = ""
             flow_detail_message = "出庫データの保存と自動入力が完了しました。"
             if qa_result.result == "一致":
+                auto_input_for_device = bool(getattr(qa_result.device, "outstock_auto_input_enabled", False))
                 material_code = (qa_result.device.material_code or "").strip() if qa_result.device else ""
-                if not material_code:
+                if auto_input_for_device and not material_code:
                     messages.warning(request, "材料コード未設定のため、自動入力はスキップしました。画像検査結果のみ保存します。")
-                    flow_detail_message = "画像検査結果の保存は完了しました（自動入力はスキップ）。"
+                    return redirect("qa_history")
+                elif not _is_auto_outstock_target(qa_result):
+                    messages.success(
+                        request,
+                        f"この機械・原材料は自動入力OFFです（{qa_result.device.material or '-'} / {material_code}）。画像検査結果のみ保存しました。",
+                    )
+                    return redirect("qa_history")
                 else:
                     auto_ok, auto_msg, auto_phien = _auto_send_to_nhap_lieu(
                         qa_result,
@@ -1225,6 +1272,20 @@ def stock_in_start(request):
             pending = request.session.get("stock_in_hinmei_ok") or {}
             if not pending:
                 messages.error(request, "品名確認が未完了です。先に品名確認を実行してください。")
+                return render(
+                    request,
+                    "quet_anh/stock_in_start.html",
+                    {
+                        "material_name": material_name,
+                        "material_code": material_code,
+                        "order_base_no": order_base_no_input,
+                        "material_list": material_list,
+                    },
+                )
+            pending_material_code = (pending.get("material_code") or "").strip()
+            if pending_material_code and pending_material_code != (material_code or "").strip():
+                messages.error(request, "原材料コードが変更されています。再度品名確認を実行してください。")
+                request.session.pop("stock_in_hinmei_ok", None)
                 return render(
                     request,
                     "quet_anh/stock_in_start.html",
@@ -1521,11 +1582,16 @@ def cleanup_qa_history_images(request):
 
 @login_required
 def add_qa_device(request):
+    if not request.user.is_superuser:
+        return render(request, 'quet_anh/403.html', status=403)
     success_message = None
     if request.method == 'POST':
         form = QADeviceInfoForm(request.POST)
         if form.is_valid():
             item = form.save(commit=False)
+            task = form.cleaned_data.get("maintenance_task")
+            if task:
+                item.product = (task.name or "").strip()
             master = form.cleaned_data.get("material_master")
             if master:
                 item.material = master.material_name
@@ -1555,6 +1621,9 @@ def edit_qa_device(request, pk):
         form = QADeviceInfoForm(request.POST, instance=item)
         if form.is_valid():
             obj = form.save(commit=False)
+            task = form.cleaned_data.get("maintenance_task")
+            if task:
+                obj.product = (task.name or "").strip()
             master = form.cleaned_data.get("material_master")
             if master:
                 obj.material = master.material_name
@@ -1582,9 +1651,16 @@ def delete_qa_device(request, pk):
     messages.success(request, 'デバイスが正常に削除されました。')
     return redirect('qa_device_list')
 
+@login_required
 def qa_device_list(request):
     device_list = QADeviceInfo.objects.all()
-    return render(request, 'quet_anh/qa_device_list.html', {'device_list': device_list})
+    return render(
+        request,
+        'quet_anh/qa_device_list.html',
+        {
+            'device_list': device_list,
+        },
+    )
 
 
 @login_required
@@ -1733,8 +1809,8 @@ def dashboard_qa(request):
             product_name = "不明"
             if scan.device and scan.device.material:
                 material_name_raw = scan.device.material
-            if scan.device and scan.device.product:
-                product_name = scan.device.product
+            if scan.device and scan.device.product_name:
+                product_name = scan.device.product_name
             material_name = _material_key(material_name_raw)
             mkey = material_name
             mrow = material_stats.setdefault(
@@ -1911,6 +1987,10 @@ def _sync_material_out_stock_rows(limit=300):
         weight_kg = qa_result.input_weight if qa_result and qa_result.input_weight is not None else ledger.qa_input_weight
         bag_count = _calculate_bag_count_by_material_code(material_code, weight_kg)
         mgmt_no = ledger.ma_nhap_lieu or ledger.job_id or ""
+        product_code = (
+            ((qa_result.product_code or "").strip() if qa_result else "")
+            or ((device.product_management_code or "").strip() if device else "")
+        )
 
         row = None
         if qa_result:
@@ -1949,6 +2029,7 @@ def _sync_material_out_stock_rows(limit=300):
                     "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
                     "bag_sequence_no": bag_count,
                     "lot_number": (qa_result.lot_number if qa_result else ""),
+                    "product_code": product_code,
                     "workstation_management_no": mgmt_no,
                 },
             )
@@ -1980,6 +2061,9 @@ def _sync_material_out_stock_rows(limit=300):
             changed = True
         if qa_result and qa_result.lot_number and row.lot_number != qa_result.lot_number:
             row.lot_number = qa_result.lot_number
+            changed = True
+        if product_code and row.product_code != product_code:
+            row.product_code = product_code
             changed = True
 
         if changed:
@@ -2045,6 +2129,7 @@ def material_out_stock_ledger(request):
             Q(material_name__icontains=keyword)
             | Q(material_code__icontains=keyword)
             | Q(lot_number__icontains=keyword)
+            | Q(product_code__icontains=keyword)
             | Q(workstation_management_no__icontains=keyword)
             | Q(supervisor_name__icontains=keyword)
         )
@@ -2450,7 +2535,7 @@ def latest_vision_events(request):
             operator = res.user.get_full_name() or res.user.username
 
         events.append({
-            "title": res.device.product if res.device and res.device.product else (res.device.name if res.device else "未設定"),
+            "title": res.device.product_name if res.device and res.device.product_name else (res.device.name if res.device else "未設定"),
             "result": res.result,
             "operator": operator,
             "device_name": res.device.name if res.device else "",
@@ -2514,7 +2599,7 @@ def sync_auto_input_ledger(limit=200):
             ledger.qa_machine_number = qa_result.machine_number or ""
             ledger.qa_device_name = qa_result.device.name if qa_result.device else ""
             ledger.qa_material = qa_result.device.material if qa_result.device else ""
-            ledger.qa_product = qa_result.device.product if qa_result.device else ""
+            ledger.qa_product = qa_result.device.product_name if qa_result.device else ""
             ledger.qa_ratio = qa_result.device.ratio if qa_result.device else ""
             ledger.qa_operator_name = qa_result.operator_name or ""
             ledger.qa_result_status = qa_result.result or ""

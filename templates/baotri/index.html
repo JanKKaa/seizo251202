@@ -131,6 +131,9 @@
                     <div class="card-body text-center">
                         {% if selected_task %}
                         <p><strong>製品名:</strong> {{ selected_task.name }}</p>
+                        {% if selected_task.product_code %}
+                        <p><strong>製品コード:</strong> {{ selected_task.product_code }}</p>
+                        {% endif %}
                         <p><strong>金型番号:</strong> {{ selected_task.code }}</p>
                         <a href="{% url 'task_code' %}?task_id={{ selected_task.id }}" class="btn btn-warning btn-lg mt-3">
                             <i class="fas fa-play"></i> スタート
@@ -157,6 +160,9 @@
                     </div>
                     <div class="card-body">
                         <p><strong>製品名:</strong> {{ selected_task.name }}</p>
+                        {% if selected_task.product_code %}
+                        <p><strong>製品コード:</strong> {{ selected_task.product_code }}</p>
+                        {% endif %}
                         <p><strong>金型No.:</strong> {{ selected_task.code }}</p>
                         <p><strong>機械番号:</strong> {{ selected_task.machine_count }}</p>
                         <p><strong>取数:</strong> {{ selected_task.quantity }}</p>
@@ -213,6 +219,10 @@
                             <div class="mb-3">
                                 <label for="task_name" class="form-label">製品名</label>
                                 <input type="text" class="form-control" id="task_name" name="name" value="{{ selected_task.name }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="task_product_code" class="form-label">製品コード</label>
+                                <input type="text" class="form-control" id="task_product_code" name="product_code" value="{{ selected_task.product_code|default:'' }}">
                             </div>
                             <div class="mb-3">
                                 <label for="task_code" class="form-label">金型No.</label>

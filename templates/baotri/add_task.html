@@ -31,6 +31,10 @@
                             <td>{{ form.name }}</td>
                         </tr>
                         <tr>
+                            <th class="small text-right align-middle">製品コード</th>
+                            <td>{{ form.product_code }}</td>
+                        </tr>
+                        <tr>
                             <th class="small text-right align-middle">金型No.</th>
                             <td>{{ form.code }}</td>
                         </tr>
@@ -81,6 +85,7 @@
                     <tr>
                         <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
                         <th class="small text-center font-weight-bold" style="width: 20%;">項目</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">製品コード</th>
                         <th class="small text-center font-weight-bold" style="width: 15%;">金型No.</th>
                         <th class="small text-center font-weight-bold" style="width: 15%;">作成者</th>
                         <th class="small text-center font-weight-bold" style="width: 10%;">作業</th>
@@ -91,6 +96,7 @@
                     <tr>
                         <td class="small text-center">{{ forloop.counter }}</td>
                         <td class="small">{{ task.name }}</td>
+                        <td class="small text-center">{{ task.product_code }}</td>
                         <td class="small text-center">{{ task.code }}</td>
                         <td class="small">
                             {% if task.creator %}

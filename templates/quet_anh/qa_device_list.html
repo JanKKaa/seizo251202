@@ -14,11 +14,13 @@
 
 <div class="container mt-4">
     <h2 class="mb-4">機械一覧</h2>
+    {% if request.user.is_superuser %}
     <div class="mb-3">
         <a href="{% url 'add_qa_device' %}" class="btn btn-success">
             <i class="fas fa-plus"></i> 新しい機械を追加
         </a>
     </div>
+    {% endif %}
     <div class="card shadow mb-4">
         <div class="card-body">
             <div class="table-responsive">
@@ -30,7 +32,9 @@
                             <th class="text-center">材料名</th>
                             <th class="text-center">材料コード</th>
                             <th class="text-center">製品名</th>
+                            <th class="text-center">製品管理番号</th>
                             <th class="text-center">混合率</th>
+                            <th class="text-center">出庫自動入力</th>
                             <th class="text-center">画像とQR比較一致率(%)</th>
                             <th class="text-center">操作</th>
                         </tr>
@@ -42,22 +46,34 @@
                             <td>{{ item.name }}</td>
                             <td>{{ item.material }}</td>
                             <td>{{ item.material_code }}</td>
-                            <td>{{ item.product }}</td>
+                            <td>{{ item.product_name }}</td>
+                            <td class="text-center">{{ item.product_management_code }}</td>
                             <td class="text-center">{{ item.ratio }}</td>
+                            <td class="text-center">
+                                {% if item.outstock_auto_input_enabled %}
+                                    <span class="badge bg-success">ON</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">OFF</span>
+                                {% endif %}
+                            </td>
                             <td class="text-center">
                                 {{ item.compare_ratio|default_if_none:"80"|floatformat:1 }}%
                             </td>
                             <td class="text-center">
+                                {% if request.user.is_superuser %}
                                 <a href="{% url 'edit_qa_device' item.id %}" class="btn btn-info btn-sm">編集</a>
                                 <form method="post" action="{% url 'delete_qa_device' item.id %}" style="display:inline;">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当に削除しますか？');">削除</button>
                                 </form>
+                                {% else %}
+                                <span class="text-muted">閲覧のみ</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted">データがありません。</td>
+                            <td colspan="10" class="text-center text-muted">データがありません。</td>
                         </tr>
                         {% endfor %}
                     </tbody>

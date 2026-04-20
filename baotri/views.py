@@ -371,28 +371,6 @@ def task_code_list(request):
         'creators': creators,
     })
 
-def task_code_detail(request, task_code_id):
-    task_code = get_object_or_404(TaskCode, id=task_code_id)
-    task = task_code.task
-    task_code_details = TaskCodeDetail.objects.filter(task_code=task_code).order_by('detail__order')
-
-    # Lấy counter tổng từ MoldLifetime theo tên sản phẩm
-    counter_total = None
-    if task and hasattr(task, 'name'):
-        task_name_norm = normalize_name(task.name)
-        for m in MoldLifetime.objects.all():
-            mold_name_norm = normalize_name(m.mold.name)
-            if task_name_norm == mold_name_norm:
-                counter_total = m.total_shot
-                break
-
-    return render(request, 'baotri/task_code_detail.html', {
-        'task_code': task_code,
-        'task': task,
-        'task_code_details': task_code_details,
-        'counter_total': counter_total,  # Truyền vào template
-    })
-
 @login_required
 def delete_task_code(request, task_code_id):
     task_code = get_object_or_404(TaskCode, id=task_code_id)
@@ -412,6 +390,7 @@ def edit_task(request, task_id):
 
     if request.method == 'POST':
         task.name = request.POST.get('name')
+        task.product_code = request.POST.get('product_code')
         task.code = request.POST.get('code')
         task.machine_count = request.POST.get('machine_count')
         task.material = request.POST.get('material')

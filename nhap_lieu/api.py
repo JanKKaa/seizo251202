@@ -250,6 +250,15 @@ def type_material_code_keys(material_code_value: str):
         time.sleep(0.02)
 
 
+def type_product_code_keys(product_code_value: str):
+    """Nhập mã sản phẩm bằng chuỗi phím (tương tự MATERIAL_CODE_KEYS)."""
+    normalized = normalize_material_code(product_code_value)
+    if not normalized:
+        raise ValueError("product_code_value rỗng cho token PRODUCT_CODE_KEYS")
+    # Gõ trực tiếp toàn chuỗi để đảm bảo ký tự '-' luôn đúng dạng 1701-01.
+    pyautogui.write(normalized, interval=0.03)
+
+
 def type_inout_mode_keys(mode_value: str):
     """Nhập chế độ 入/出庫: 1=入庫, 2=出庫."""
     normalized = normalize_mode_value(mode_value)
@@ -596,6 +605,7 @@ def _send_input_impl(typing_only: bool = False):
         quy_tac = data.get("quy_tac", [])
         kg_value = str(data.get("kg_value") or "").strip()
         material_code_value = str(data.get("material_code_value") or "").strip()
+        product_code_value = str(data.get("product_code_value") or "").strip()
         mode_value = str(data.get("mode_value") or "").strip()
         lot_number_value = str(data.get("lot_number") or "").strip()
         date_yymmdd_value = str(data.get("date_yymmdd_value") or "").strip()
@@ -662,8 +672,12 @@ def _send_input_impl(typing_only: bool = False):
                 type_kg_keys(kg_value)
                 time.sleep(delay)
                 continue
-            if item == "MATERIAL_CODE_KEYS":
+            if item in {"MATERIAL_CODE_KEYS", "MATERIAL CODE", "MATERIAL_CODE", "材料コード", "材料ｺｰﾄﾞ"}:
                 type_material_code_keys(material_code_value)
+                time.sleep(delay)
+                continue
+            if item in {"PRODUCT_CODE_KEYS", "PRODUCT CODE", "PRODUCT_CODE", "PRODUCTCODE", "製品コード", "製品ｺｰﾄﾞ"}:
+                type_product_code_keys(product_code_value)
                 time.sleep(delay)
                 continue
             if item in {"INOUT_MODE_KEYS", "入/出庫"}:

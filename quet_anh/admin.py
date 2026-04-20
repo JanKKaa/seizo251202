@@ -5,14 +5,24 @@ from .models import QADeviceInfo, QAResult, QAMaterialMaster, QAAutoInputLedger,
 
 @admin.register(QADeviceInfo)
 class QADeviceInfoAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "material_code", "material", "product", "ratio", "compare_ratio")
-    search_fields = ("name", "material_code", "material", "product")
+    list_display = (
+        "id",
+        "name",
+        "maintenance_task",
+        "material_code",
+        "material",
+        "product_name",
+        "product_management_code",
+        "ratio",
+        "compare_ratio",
+    )
+    search_fields = ("name", "material_code", "material", "product", "maintenance_task__name", "maintenance_task__code")
 
 
 @admin.register(QAResult)
 class QAResultAdmin(admin.ModelAdmin):
-    list_display = ("id", "machine_number", "operator_name", "result", "match_ratio", "created_at")
-    search_fields = ("machine_number", "operator_name", "data", "result")
+    list_display = ("id", "machine_number", "operator_name", "product_code", "result", "match_ratio", "created_at")
+    search_fields = ("machine_number", "operator_name", "product_code", "data", "result")
     list_filter = ("result", "created_at")
 
 
@@ -68,6 +78,7 @@ class QAMaterialOutStockLedgerAdmin(admin.ModelAdmin):
         "material_name",
         "material_code",
         "lot_number",
+        "product_code",
         "lot_color",
         "weight_kg",
         "workstation_management_no",
@@ -77,6 +88,7 @@ class QAMaterialOutStockLedgerAdmin(admin.ModelAdmin):
         "material_name",
         "material_code",
         "lot_number",
+        "product_code",
         "workstation_management_no",
         "supervisor_name",
         "auto_input_ledger__job_id",

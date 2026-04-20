@@ -14,6 +14,7 @@
                     <tr>
                         <th class="small text-center font-weight-bold" style="width: 5%;">No.</th>
                         <th class="small text-center font-weight-bold" style="width: 20%;">製品名</th>
+                        <th class="small text-center font-weight-bold" style="width: 15%;">製品コード</th>
                         <th class="small text-center font-weight-bold" style="width: 15%;">コード</th>
                         <th class="small text-center font-weight-bold" style="width: 15%;">作成者</th>
                         <th class="small text-center font-weight-bold" style="width: 10%;">アクション</th>
@@ -24,6 +25,7 @@
                     <tr>
                         <td class="small text-center">{{ forloop.counter }}</td>
                         <td class="small">{{ task.name }}</td>
+                        <td class="small text-center">{{ task.product_code }}</td>
                         <td class="small text-center">{{ task.code }}</td>
                         <td class="small">{{ task.creator.first_name }} {{ task.creator.last_name }}</td>
                         <td class="small text-center">

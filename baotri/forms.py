@@ -5,9 +5,10 @@ from .models import MaintenanceTask, TaskCode, MaintenanceMistake
 class MaintenanceTaskForm(forms.ModelForm):
     class Meta:
         model = MaintenanceTask
-        fields = ['name', 'code', 'machine_count', 'quantity', 'material', 'maintenance_frequency', 'task_image', 'product_image']
+        fields = ['name', 'product_code', 'code', 'machine_count', 'quantity', 'material', 'maintenance_frequency', 'task_image', 'product_image']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '製品名を入力してください'}),
+            'product_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '製品コードを入力してください'}),
             'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'コードを入力してください'}),
             'machine_count': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '機械番号'}),
             'quantity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '取数を入力してください'}),
@@ -18,6 +19,7 @@ class MaintenanceTaskForm(forms.ModelForm):
         }
         labels = {
             'name': '名前',
+            'product_code': '製品コード',
             'code': 'コード',
             'machine_count': '機械の数',
             'quantity': '数量',
@@ -28,6 +30,7 @@ class MaintenanceTaskForm(forms.ModelForm):
         }
         help_texts = {
             'name': '名前を入力してください。',
+            'product_code': '製品コードを入力してください。',
             'code': 'コードを入力してください。',
             'machine_count': '機械の数を入力してください。',
             'quantity': '数量を入力してください。',

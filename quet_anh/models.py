@@ -23,14 +23,35 @@ class QAMaterialMaster(models.Model):
 
 class QADeviceInfo(models.Model):
     name = models.CharField(max_length=100)
+    maintenance_task = models.ForeignKey(
+        "baotri.MaintenanceTask",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="qa_devices",
+        verbose_name="製品マスター連携",
+    )
     material_code = models.CharField("材料コード", max_length=100, blank=True, default="")
     material = models.CharField(max_length=100)
     product = models.CharField(max_length=100)
     ratio = models.CharField("混合率", max_length=50, blank=True, default="")
     compare_ratio = models.DecimalField("画像とQR比較一致率(%)", max_digits=5, decimal_places=2, default=80)
+    outstock_auto_input_enabled = models.BooleanField("出庫自動入力ON/OFF", default=False)
+
+    @property
+    def product_name(self):
+        if self.maintenance_task_id and self.maintenance_task:
+            return (self.maintenance_task.name or "").strip()
+        return (self.product or "").strip()
+
+    @property
+    def product_management_code(self):
+        if self.maintenance_task_id and self.maintenance_task:
+            return (self.maintenance_task.product_code or "").strip()
+        return ""
 
     def __str__(self):
-        return f"{self.name} - {self.product}"
+        return f"{self.name} - {self.product_name}"
 
 class QAResult(models.Model):
     LOT_COLOR_GREEN = "green"
@@ -58,6 +79,7 @@ class QAResult(models.Model):
     input_weight = models.DecimalField("投入した材料の重さ (kg)", max_digits=8, decimal_places=2, null=True, blank=True)
     lot_color = models.CharField("ロット識別色", max_length=10, choices=LOT_COLOR_CHOICES, default=LOT_COLOR_GREEN)
     lot_number = models.CharField("ロット番号", max_length=120, blank=True, default="")
+    product_code = models.CharField("製品コード", max_length=120, blank=True, default="")
 
     def __str__(self):
         return f"機械番号 {self.machine_number} - {self.created_at}"
@@ -151,6 +173,7 @@ class QAMaterialOutStockLedger(models.Model):
     weight_kg = models.DecimalField("重量(kg)", max_digits=10, decimal_places=2, default=0)
     bag_sequence_no = models.CharField("袋順番号", max_length=50, blank=True, default="")
     lot_number = models.CharField("ロット番号", max_length=120, db_index=True, blank=True, default="")
+    product_code = models.CharField("製品コード", max_length=120, db_index=True, blank=True, default="")
     workstation_management_no = models.CharField("端末管理番号", max_length=120, blank=True, default="")
     supervisor_confirmed = models.BooleanField("上長確認", default=False)
     supervisor_name = models.CharField("上長名", max_length=120, blank=True, default="")
@@ -233,3 +256,4 @@ class QADeletedJobMarker(models.Model):
 
     def __str__(self):
         return self.job_id
+
