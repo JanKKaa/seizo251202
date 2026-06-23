@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from phe_duyet.models import Message, Document, Approval
 from trang_chu.utils.japan_events import get_japan_event
@@ -24,3 +25,7 @@ def approve_button_count(request):
 
 def japan_event(request):
     return {'japan_event': get_japan_event()}
+
+
+def gtech_dev_apps(request):
+    return {"gtech_dev_apps_enabled": getattr(settings, "GTECH_DEV_APPS_ENABLED", False)}

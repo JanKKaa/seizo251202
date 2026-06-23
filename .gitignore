@@ -11,10 +11,12 @@ env/
 
 # Logs
 *.log
+logs/
 
 # Database
 *.sqlite3
 db.sqlite3
+db.sqlite3*
 
 # Django runtime/user uploads
 media/
@@ -32,8 +34,12 @@ htmlcov/
 # Editor/OS
 .vscode/
 .idea/
+.codex/
 .DS_Store
 Thumbs.db
+
+# Local test screenshots
+/*.png
 
 # Node (if frontend tooling is used)
 node_modules/

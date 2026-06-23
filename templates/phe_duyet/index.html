@@ -3,35 +3,99 @@
 {% block title %}承認{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4 text-gray-800">ドキュメント一覧</h1>
-<a href="{% url 'phe_duyet:create_document' %}" class="btn btn-primary mb-4">申請</a>
-<div class="card shadow mb-4 export-fixed">
-    <a href="{% url 'phe_duyet:export_pdf' %}" class="btn btn-danger btn-sm">PDFをエクスポート</a>
-    <a href="{% url 'phe_duyet:export_csv' %}" class="btn btn-success btn-sm">CSVをエクスポート</a>
+<div class="approval-page-header mb-4">
+    <h1 class="h3 mb-0 text-gray-800">ドキュメント一覧</h1>
+    <div class="approval-toolbar">
+        <a href="{% url 'phe_duyet:create_document' %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus"></i> 申請
+        </a>
+        <a href="{% url 'phe_duyet:export_pdf' %}" class="btn btn-danger btn-sm">
+            <i class="fas fa-file-pdf"></i> PDF
+        </a>
+        <a href="{% url 'phe_duyet:export_csv' %}" class="btn btn-success btn-sm">
+            <i class="fas fa-file-csv"></i> CSV
+        </a>
+    </div>
 </div>
 
 <style>
-    .export-fixed {
-        position: fixed;
-        right: 20px;
-        top: 80px; /* Mặc định bằng chiều cao banner */
-        width: 170px;
-        text-align: right;
-        z-index: 1100;
+    .approval-page-header {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
     }
-    @media (max-width: 600px) {
-        .export-fixed { top: 56px; }
+    .approval-toolbar {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .approval-list-summary {
+        color: #6c757d;
+        font-size: 13px;
+    }
+    .approval-pagination {
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 0;
+    }
+    .approval-pagination .page-link {
+        min-width: 36px;
+        text-align: center;
+    }
+    .approval-pagination .page-item.disabled .page-link {
+        color: #9aa0a6;
+        background: #f8f9fc;
+    }
+    #dataTable td {
+        vertical-align: middle;
+        padding-top: .35rem;
+        padding-bottom: .35rem;
+    }
+    .approval-link {
+        color: #0d6efd;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .approval-link:hover {
+        color: #0a58ca;
+    }
+    .approval-clamp-2 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+        line-height: 1.35;
+        max-height: 2.7em;
+    }
+    .approval-icon-actions {
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+    }
+    .approval-icon-btn {
+        align-items: center;
+        display: inline-flex;
+        height: 30px;
+        justify-content: center;
+        padding: 0;
+        width: 30px;
+    }
+    .approval-comment-form textarea {
+        min-height: 34px;
+        resize: vertical;
     }
 </style>
 
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
-    <div class="card-header py-3">
+    <div class="card-header py-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
         <h6 class="m-0 font-weight-bold text-primary">ドキュメント一覧</h6>
         {% with total_documents=page_obj.paginator.count %}
-        <tr>
-            <td colspan="9" class="small text-right">総ドキュメント数: {{ total_documents }}</td>
-        </tr>
+        <div class="small text-muted mt-1 mt-md-0">総ドキュメント数: {{ total_documents }}</div>
         {% endwith %}
     </div>
     <div class="card-body">
@@ -42,6 +106,7 @@
                     <tr>
                         <th class="small text-center font-weight-bold" style="width: 2%; font-size: 13px;">No.</th>
                         <th class="small text-center font-weight-bold" style="width: 5%; font-size: 13px;">提出日</th>
+                        <th class="small text-center font-weight-bold" style="width: 8%; font-size: 13px;">分類</th>
                         <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">依頼者</th>
                         <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">タイトル</th>
                         <th class="small text-center font-weight-bold" style="width: 15%; font-size: 13px;">ファイル名</th>
@@ -49,6 +114,7 @@
                         <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">承認者</th>
                         <th class="small text-center font-weight-bold" style="width: 10%; font-size: 13px;">アクション</th>
                         <th class="small text-center font-weight-bold" style="width: 60%; font-size: 13px;">コメント</th>
+                        <th class="small text-center font-weight-bold" style="width: 8%; font-size: 13px;">差し替え</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,26 +122,16 @@
                     <tr>
                         <td class="small text-center">{{ forloop.counter0|add:page_obj.start_index }}</td>
                         <td class="small text-center">{{ document.submission_date }}</td>
-                        <td class="small text-center">{{ document.created_by.first_name }} {{ document.created_by.last_name }}</td>
-                        <td class="small">{{ document.title }}
-                            <br>
-                            <a href="{{ document.file.url }}" class="btn btn-primary btn-sm" target="_blank">ドキュメントを見る</a>
+                        <td class="small text-center">{{ document.get_category_display }}</td>
+                        <td class="small text-center">{{ document.created_by.last_name }}</td>
+                        <td class="small">
+                            <div class="approval-clamp-2" title="{{ document.title }}">{{ document.title }}</div>
                         </td>
-                        <td class="small" id="file-name-{{ document.id }}">
-                            {{ document.file.name|cut:"documents/" }}
-                            
+                        <td class="small">
+                            <a href="{{ document.file.url }}" class="approval-link approval-clamp-2" target="_blank" title="{{ document.file.name|cut:'documents/' }}">
+                                {{ document.file.name|cut:"documents/" }}
+                            </a>
                         </td>
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {
-                                var fileNameElement = document.getElementById('file-name-{{ document.id }}');
-                                var fileName = fileNameElement.textContent.trim();
-                                var maxLength = 20;
-                                if (fileName.length > maxLength) {
-                                    var truncatedFileName = fileName.substring(0, maxLength) + '...';
-                                    fileNameElement.textContent = truncatedFileName;
-                                }
-                            });
-                        </script>
                         <td class="small text-center">
                             {% if document.is_approved %}
                                 <a href="#" class="btn btn-success btn-icon-split btn-sm">
@@ -108,19 +164,24 @@
                             {% endif %}
                         </td>
                         <td class="small text-center">
+                            <div class="approval-icon-actions">
                             {% if document.is_approved %}
                                 <!-- Nút Download nếu tài liệu đã được phê duyệt -->
-                                <a href="{{ document.approved_file.url }}" class="btn btn-success btn-sm" download>
-                                    <i class="fas fa-download"></i> ダウンロード
+                                <a href="{{ document.approved_file.url }}" class="btn btn-success btn-sm approval-icon-btn" download title="ダウンロード" aria-label="ダウンロード">
+                                    <i class="fas fa-download"></i>
                                 </a>
                             {% elif not document.is_rejected %}
                                 <!-- Nút Approve và Reject nếu tài liệu chưa được phê duyệt -->
                                 {% if document.recipient == user %}
-                                    <a href="{% url 'phe_duyet:approve_document' document.id %}" class="btn btn-primary btn-sm">承認</a>
+                                    <a href="{% url 'phe_duyet:approve_document' document.id %}" class="btn btn-primary btn-sm approval-icon-btn" title="承認" aria-label="承認">
+                                        <i class="fas fa-check"></i>
+                                    </a>
                                     <form method="post" action="{% url 'phe_duyet:approve_document' document.id %}" style="display:inline;">
                                         {% csrf_token %}
                                         <input type="hidden" name="reject" value="true">
-                                        <button type="submit" class="btn btn-danger btn-sm">不承認</button>
+                                        <button type="submit" class="btn btn-danger btn-sm approval-icon-btn" title="不承認" aria-label="不承認">
+                                            <i class="fas fa-times"></i>
+                                        </button>
                                     </form>
                                 {% endif %}
                             {% endif %}
@@ -129,7 +190,9 @@
                             {% if not document.is_approved %}
                                 <form method="post" action="{% url 'phe_duyet:send_reminder_email' document.id %}" style="display:inline;">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-warning btn-sm">メールを送信</button>
+                                    <button type="submit" class="btn btn-warning btn-sm approval-icon-btn" title="メールを送信" aria-label="メールを送信">
+                                        <i class="fas fa-envelope"></i>
+                                    </button>
                                 </form>
                             {% endif %}
                             
@@ -138,19 +201,26 @@
                             {% if user.is_superuser %}
                             <form method="post" action="{% url 'phe_duyet:delete_document' document.id %}" style="display:inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('このドキュメントを削除しますか？');">削除</button>
+                                <button type="submit" class="btn btn-danger btn-sm approval-icon-btn" title="削除" aria-label="削除" onclick="return confirm('このドキュメントを削除しますか？');">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </form>
                             {% endif %}
+                            </div>
                         </td>
                         <td class="small">
-                            <form method="post" action="{% url 'phe_duyet:index' %}">
+                            <form method="post" action="{% url 'phe_duyet:index' %}" class="approval-comment-form">
                                 {% csrf_token %}
                                 <input type="hidden" name="document_id" value="{{ document.id }}">
-                                <textarea name="comment" class="form-control form-control-sm" rows="2" placeholder="コメントを追加..." oninput="checkComment(this)"></textarea>
+                                <textarea name="comment" class="form-control form-control-sm" rows="1" placeholder="コメントを追加..." oninput="checkComment(this)"></textarea>
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <button type="submit" id="submit-button-{{ document.id }}" class="btn btn-primary btn-sm mt-2" disabled>送信</button>
+                                    <button type="submit" id="submit-button-{{ document.id }}" class="btn btn-primary btn-sm approval-icon-btn mt-1" disabled title="送信" aria-label="送信">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
                                     {% if document.approved_by %}
-                                        <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="toggleComments('{{ document.id }}')">コメントを表示/非表示</button>
+                                        <button type="button" class="btn btn-secondary btn-sm approval-icon-btn mt-1" onclick="toggleComments('{{ document.id }}')" title="コメントを表示/非表示" aria-label="コメントを表示/非表示">
+                                            <i class="fas fa-comments"></i>
+                                        </button>
                                     {% endif %}
                                 </div>
                             </form>
@@ -166,7 +236,9 @@
                         <td class="text-center">
                             <!-- Các nút khác (xem, tải về, ...) -->
                             {% if document.created_by == user or document.recipient == user or user.is_superuser %}
-                                <a href="{% url 'phe_duyet:update_document_file' document.id %}" class="btn btn-info btn-sm">差し替え</a>
+                                <a href="{% url 'phe_duyet:update_document_file' document.id %}" class="btn btn-info btn-sm approval-icon-btn" title="差し替え" aria-label="差し替え">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </a>
                             {% endif %}
                         </td>
                     </tr>
@@ -174,28 +246,45 @@
                 </tbody>
             </table>
         </div>
-        <div class="d-flex justify-content-center">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-3">
+            <div class="approval-list-summary mb-2 mb-md-0">
+                {% if page_obj.paginator.count %}
+                    {{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }} 件
+                {% else %}
+                    0 件
+                {% endif %}
+            </div>
             <nav aria-label="Page navigation">
-                <ul class="pagination">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
-                                <span aria-hidden="true">&laquo;</span>
-                            </a>
-                        </li>
-                    {% endif %}
-                    {% for num in page_obj.paginator.page_range %}
-                        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                        </li>
+                <ul class="pagination approval-pagination">
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        <a class="page-link" href="?page=1" aria-label="First">&laquo;</a>
+                    </li>
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        {% if page_obj.has_previous %}
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">&lsaquo;</a>
+                        {% else %}
+                            <span class="page-link" aria-hidden="true">&lsaquo;</span>
+                        {% endif %}
+                    </li>
+                    {% for num in page_range %}
+                        {% if num == page_obj.paginator.ELLIPSIS %}
+                            <li class="page-item disabled"><span class="page-link">{{ num }}</span></li>
+                        {% else %}
+                            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
                     {% endfor %}
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                    {% endif %}
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        {% if page_obj.has_next %}
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">&rsaquo;</a>
+                        {% else %}
+                            <span class="page-link" aria-hidden="true">&rsaquo;</span>
+                        {% endif %}
+                    </li>
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}" aria-label="Last">&raquo;</a>
+                    </li>
                 </ul>
             </nav>
         </div>

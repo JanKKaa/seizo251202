@@ -1,0 +1,144 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}QAタブレット点検{% endblock %}
+
+{% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">QAタブレット点検（試験運用）</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'tablet_inspection_add' %}" class="btn btn-success">点検登録</a>
+      {% if can_edit_tablet %}
+        <a href="{% url 'tablet_device_add' %}" class="btn btn-outline-primary">タブレット追加</a>
+      {% endif %}
+      <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">戻る</a>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="alert alert-info">
+    IATF向けの試験運用です。点検NGや未点検でもスキャンは停止しません。QR読取不良、カメラ不良、通信不良などを記録し、監査証跡として残します。
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header">タブレット管理番号</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>管理番号</th>
+              <th>表示名</th>
+              <th>OS</th>
+              <th>シリアルNo.</th>
+              <th>状態</th>
+              <th>最終点検</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tablet in tablets %}
+              <tr>
+                <td class="fw-bold">{{ tablet.code }}</td>
+                <td>{{ tablet.name }}</td>
+                <td>{{ tablet.os_name }}</td>
+                <td>{{ tablet.serial_no|default:"-" }}</td>
+                <td>
+                  {% if tablet.status == "active" %}
+                    <span class="badge bg-success">使用可</span>
+                  {% elif tablet.status == "stopped" %}
+                    <span class="badge bg-danger">使用停止</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">修理中</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% for key, latest in latest_by_tablet.items %}
+                    {% if key == tablet.id %}
+                      {{ latest.check_date|date:"Y-m-d" }} / {{ latest.get_check_type_display }} / {{ latest.get_result_display }}
+                    {% endif %}
+                  {% endfor %}
+                </td>
+                <td>
+                  <a href="{% url 'tablet_inspection_add' %}?tablet={{ tablet.id }}" class="btn btn-sm btn-success">点検</a>
+                  {% if can_edit_tablet %}
+                    <a href="{% url 'tablet_device_edit' tablet.id %}" class="btn btn-sm btn-warning">編集</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-center text-muted">データがありません。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header">点検履歴（最新30件）</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>点検日</th>
+              <th>管理番号</th>
+              <th>区分</th>
+              <th>判定</th>
+              <th>異常分類</th>
+              <th>異常内容</th>
+              <th>処置内容</th>
+              <th>点検者</th>
+              <th>確認</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in inspections %}
+              <tr>
+                <td>{{ row.check_date|date:"Y-m-d" }}</td>
+                <td>{{ row.tablet.code }}</td>
+                <td>{{ row.get_check_type_display }}</td>
+                <td>
+                  {% if row.result == "ok" %}
+                    <span class="badge bg-success">OK</span>
+                  {% else %}
+                    <span class="badge bg-danger">NG</span>
+                  {% endif %}
+                </td>
+                <td>{{ row.get_problem_category_display }}</td>
+                <td>{{ row.problem_detail|default:"-" }}</td>
+                <td>{{ row.action_taken|default:"-" }}</td>
+                <td>{{ row.checked_by|default:"-" }}</td>
+                <td>
+                  {% if row.confirmed_at %}
+                    <span class="badge bg-success">確認済: {{ row.confirmed_by }}</span>
+                    <div class="small text-muted">{{ row.confirmed_at|date:"Y-m-d H:i" }}</div>
+                  {% elif can_confirm %}
+                    <form method="post" action="{% url 'tablet_inspection_confirm' row.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-secondary" type="submit">確認</button>
+                    </form>
+                  {% else %}
+                    <span class="badge bg-secondary">未確認</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="text-center text-muted">点検履歴がありません。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

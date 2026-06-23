@@ -24,6 +24,7 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.GET.next }}">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">原材料名</label>
@@ -65,10 +66,38 @@
                         <label class="form-label">端末管理番号</label>
                         {{ form.workstation_management_no }}
                     </div>
+                    <div class="col-md-4">
+                        <label class="form-label">作業者</label>
+                        {{ form.operator_name }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">取引区分</label>
+                        {{ form.transaction_type }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">ADJ理由カテゴリ</label>
+                        {{ form.adjustment_reason_code }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">ADJ理由</label>
+                        {{ form.adjustment_reason }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">調整前在庫(kg)</label>
+                        {{ form.stock_before_kg }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">調整後在庫(kg)</label>
+                        {{ form.stock_after_kg }}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">IATF audit note</label>
+                        {{ form.adjustment_note }}
+                    </div>
                 </div>
                 <div class="mt-3">
                     <button type="submit" class="btn btn-success">更新</button>
-                    <a href="{% url 'material_stock_ledger' %}" class="btn btn-secondary">戻る</a>
+                    <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'material_stock_ledger' %}{% endif %}" class="btn btn-secondary">戻る</a>
                 </div>
             </form>
         </div>

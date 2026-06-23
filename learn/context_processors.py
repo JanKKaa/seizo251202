@@ -2,6 +2,12 @@ from .models import Enrollment, MotivationalQuote
 from menu.models import NhanVien
 from django.db.models import Q
 
+def is_kanri_account(user):
+    if not user or not user.is_authenticated:
+        return False
+    username = (user.username or '').strip().lower()
+    return bool(username == 'kanri' or user.is_staff or user.is_superuser)
+
 def get_subordinate_ma_so_list(ma_so):
     try:
         nv = NhanVien.objects.get(ma_so=ma_so)
@@ -11,7 +17,7 @@ def get_subordinate_ma_so_list(ma_so):
 
 def pending_counts(request):
     user = getattr(request, "user", None)
-    if user and user.is_authenticated and user.username == 'kanri':
+    if is_kanri_account(user):
         # Kanri thấy tất cả đơn chờ kanri duyệt
         pending_course = Enrollment.objects.filter(status='pending_kanri').count()
         pending_report = Enrollment.objects.filter(report_status='pending_kanri').count()

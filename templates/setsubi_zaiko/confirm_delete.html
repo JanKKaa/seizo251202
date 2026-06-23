@@ -1,0 +1,34 @@
+{% extends "setsubi_zaiko/base.html" %}
+
+{% block setsubi_content %}
+<div class="mx-auto max-w-2xl space-y-4">
+  <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <h2 class="mb-1 text-xl font-bold text-slate-900">{{ title }}</h2>
+    <div class="text-sm text-slate-500">削除前に対象を確認してください。</div>
+  </section>
+
+  <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div class="rounded-lg bg-slate-50 p-4">
+      <div class="text-xs font-bold text-slate-500">対象</div>
+      <div class="mt-1 text-lg font-bold text-slate-950">{{ object.code }} {{ object.name }}</div>
+      {% if object.parent %}<div class="mt-1 text-sm text-slate-600">親階層: {{ object.parent.full_name }}</div>{% endif %}
+    </div>
+
+    {% if has_dependencies %}
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        このマスターは品目または子階層で使用中です。履歴とリンクを守るため、完全削除ではなく「無効」にします。
+      </div>
+    {% else %}
+      <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+        未使用のマスターです。削除すると一覧から消えます。
+      </div>
+    {% endif %}
+
+    <form class="mt-4 flex flex-wrap justify-end gap-2" method="post">
+      {% csrf_token %}
+      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% if cancel_url_name %}{% url cancel_url_name %}{% else %}{% url 'setsubi_zaiko:dashboard' %}{% endif %}">キャンセル</a>
+      <button class="rounded-lg bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-500" type="submit">{% if has_dependencies %}無効にする{% else %}削除する{% endif %}</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

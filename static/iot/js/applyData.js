@@ -700,7 +700,10 @@ function layoutFactory2Row() {
 // ...call these after render...
 
 const CHANGE4M_REFRESH_MS = 60000;
+const CHANGE4M_SEEN_KEY = 'iot:last-seen-change4m-id';
+const CHANGE4M_POPUP_MS = 60000;
 let change4mPollHandle = null;
+let change4mPopupTimer = null;
 let latestChange4MEntries = [];
 
 function renderChange4MPopup(entries) {
@@ -750,6 +753,9 @@ function openChange4MPopup() {
   backdrop.hidden = false;
   renderChange4MPopup(latestChange4MEntries);
   document.body.classList.add('modal-open');
+
+  if (change4mPopupTimer) clearTimeout(change4mPopupTimer);
+  change4mPopupTimer = setTimeout(closeChange4MPopup, CHANGE4M_POPUP_MS);
 }
 
 function closeChange4MPopup() {
@@ -757,6 +763,41 @@ function closeChange4MPopup() {
   if (!backdrop) return;
   backdrop.hidden = true;
   document.body.classList.remove('modal-open');
+  if (change4mPopupTimer) {
+    clearTimeout(change4mPopupTimer);
+    change4mPopupTimer = null;
+  }
+}
+
+function getLastSeenChange4MId() {
+  try {
+    return Number(localStorage.getItem(CHANGE4M_SEEN_KEY)) || 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function markChange4MSeen(id) {
+  try {
+    localStorage.setItem(CHANGE4M_SEEN_KEY, String(id));
+  } catch (_) {
+    // localStorage có thể bị chặn trên một số WebView; popup vẫn hoạt động.
+  }
+}
+
+function showNewChange4MIfNeeded(entries) {
+  if (!Array.isArray(entries) || !entries.length) return;
+
+  const newestId = Number(entries[0].id) || 0;
+  if (!newestId || newestId <= getLastSeenChange4MId()) return;
+
+  // Alarm luôn được ưu tiên. Tin 4M chưa được đánh dấu đã xem nên sẽ hiện
+  // ở lần polling tiếp theo sau khi alarm kết thúc.
+  if ((Number(window.alarmCount) || 0) > 0) return;
+
+  window.dispatchEvent(new Event('open4MPopup'));
+  openChange4MPopup();
+  markChange4MSeen(newestId);
 }
 
 function updateChange4MData(entries) {
@@ -772,6 +813,8 @@ function updateChange4MData(entries) {
   if (backdropVisible) {
     renderChange4MPopup(entries);
   }
+
+  showNewChange4MIfNeeded(entries);
 }
 // ...existing code...
 

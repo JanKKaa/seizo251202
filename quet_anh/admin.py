@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import QADeviceInfo, QAResult, QAMaterialMaster, QAAutoInputLedger, QAMaterialStockLedger, QAMaterialOutStockLedger
+from .models import (
+    QADeviceInfo,
+    QAResult,
+    QAMaterialMaster,
+    QAAutoInputLedger,
+    QAMaterialStockLedger,
+    QAMaterialOutStockLedger,
+    QATabletDevice,
+    QATabletInspection,
+)
 
 
 @admin.register(QADeviceInfo)
@@ -17,6 +26,20 @@ class QADeviceInfoAdmin(admin.ModelAdmin):
         "compare_ratio",
     )
     search_fields = ("name", "material_code", "material", "product", "maintenance_task__name", "maintenance_task__code")
+
+
+@admin.register(QATabletDevice)
+class QATabletDeviceAdmin(admin.ModelAdmin):
+    list_display = ("id", "code", "name", "os_name", "serial_no", "status", "updated_at")
+    search_fields = ("code", "name", "serial_no", "note")
+    list_filter = ("status", "os_name")
+
+
+@admin.register(QATabletInspection)
+class QATabletInspectionAdmin(admin.ModelAdmin):
+    list_display = ("id", "tablet", "check_date", "check_type", "result", "problem_category", "checked_by", "confirmed_by", "confirmed_at")
+    search_fields = ("tablet__code", "tablet__name", "problem_detail", "action_taken", "checked_by", "confirmed_by")
+    list_filter = ("check_date", "check_type", "result", "problem_category")
 
 
 @admin.register(QAResult)
@@ -53,6 +76,10 @@ class QAMaterialStockLedgerAdmin(admin.ModelAdmin):
         "order_no",
         "lot_color",
         "weight_kg",
+        "transaction_type",
+        "adjustment_reason_code",
+        "stock_before_kg",
+        "stock_after_kg",
         "workstation_management_no",
         "supervisor_confirmed",
     )
@@ -63,10 +90,14 @@ class QAMaterialStockLedgerAdmin(admin.ModelAdmin):
         "lot_number",
         "order_no",
         "workstation_management_no",
+        "transaction_type",
+        "adjustment_reason_code",
+        "adjustment_reason",
+        "adjustment_note",
         "supervisor_name",
         "auto_input_ledger__job_id",
     )
-    list_filter = ("stock_in_date", "lot_color", "supervisor_confirmed")
+    list_filter = ("stock_in_date", "lot_color", "transaction_type", "adjustment_reason_code", "supervisor_confirmed")
 
 
 @admin.register(QAMaterialOutStockLedger)
@@ -81,8 +112,13 @@ class QAMaterialOutStockLedgerAdmin(admin.ModelAdmin):
         "product_code",
         "lot_color",
         "weight_kg",
+        "transaction_type",
+        "adjustment_reason_code",
+        "stock_before_kg",
+        "stock_after_kg",
         "workstation_management_no",
         "supervisor_confirmed",
+        "low_stock_alert_sent_at",
     )
     search_fields = (
         "material_name",
@@ -90,7 +126,12 @@ class QAMaterialOutStockLedgerAdmin(admin.ModelAdmin):
         "lot_number",
         "product_code",
         "workstation_management_no",
+        "operator_name",
+        "transaction_type",
+        "adjustment_reason_code",
+        "adjustment_reason",
+        "adjustment_note",
         "supervisor_name",
         "auto_input_ledger__job_id",
     )
-    list_filter = ("stock_out_date", "lot_color", "supervisor_confirmed")
+    list_filter = ("stock_out_date", "lot_color", "transaction_type", "adjustment_reason_code", "supervisor_confirmed", "low_stock_alert_sent_at")

@@ -1,4 +1,4 @@
-from django.utils import timezone
+﻿from django.utils import timezone
 from django.db import transaction
 import re
 from .models import Machine, MachineStatusEvent, MachineAlarmEvent, STATUS_CHOICES, Esp32Device, Esp32StatusLog
@@ -10,7 +10,7 @@ def log_status_change(machine: Machine, new_code: str):
         MachineStatusEvent.objects.create(
             machine=machine,
             status_code=new_code,
-            status_jp=STATUS_LABEL_MAP.get(new_code,"不明")
+            status_jp=STATUS_LABEL_MAP.get(new_code,"荳肴・")
         )
         machine.status = new_code
         machine.save(update_fields=["status","last_update"])
@@ -53,7 +53,8 @@ def save_esp32_status(device_id, pins, status_code, status_jp):
         status_code=status_code,
         status_jp=status_jp
     )
-    device.name = f"{re.search(r'(\\d+)', device_id).group(1)}号機" if re.search(r'(\\d+)', device_id) else device_id
+    match = re.search(r'(\d+)', device_id)
+    device.name = f"{match.group(1)}号機" if match else device_id
     device.save()
 
 def get_latest_esp32_status():
@@ -77,7 +78,7 @@ def get_latest_esp32_status():
                 'address': device.name,
                 'name': device.name,
                 'runtime_status_code': 'offline',
-                'runtime_status_jp': 'オフライン',
+                'runtime_status_jp': '繧ｪ繝輔Λ繧､繝ｳ',
                 'alarm_active': False,
                 'shotno': '',
                 'cycletime': '',

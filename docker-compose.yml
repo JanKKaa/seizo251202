@@ -1,0 +1,332 @@
+﻿services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: seizo0-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seizo0}
+      POSTGRES_USER: ${POSTGRES_USER:-seizo0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seizo0-postgres-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seizo0} -d ${POSTGRES_DB:-seizo0}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    image: seizo0-django:latest
+    container_name: seizo0-django
+    restart: unless-stopped
+    ports:
+      - "${DJANGO_PORT:-8000}:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      DB_ENGINE: ${DB_ENGINE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-seizo0}
+      POSTGRES_USER: ${POSTGRES_USER:-seizo0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seizo0-postgres-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: seizo0-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - C:/seigi-server/nginx/conf/selfsigned.crt:/etc/nginx/certs/selfsigned.crt:ro
+      - C:/seigi-server/nginx/conf/selfsigned.key:/etc/nginx/certs/selfsigned.key:ro
+      - ./staticfiles:/app/staticfiles:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - web
+
+  esp32-bridge:
+    image: seizo0-django:latest
+    container_name: seizo0-esp32-bridge
+    restart: unless-stopped
+    command: python iot/esp32_bridge.py --host 0.0.0.0 --port 9000
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./logs:/app/logs
+
+  fetch-mail-notify:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py fetch_mail_notify; sleep 10; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  update-machine-counter:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py update_machine_counter; sleep 10; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  update-mold-shot:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py update_mold_shot; sleep 10; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  update-esp32-shot:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py update_esp32_shot; sleep 10; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  update-net100-shots:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py update_net100_shots; sleep 60; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  sync-chatwork:
+    image: seizo0-django:latest
+    profiles:
+      - disabled
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py sync_chatwork; sleep 60; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  iot-worker-serial:
+    image: seizo0-django:latest
+    profiles:
+      - workers
+    restart: unless-stopped
+    command: python manage.py run_iot_workers_serial --fast-interval 30 --slow-interval 180 --db-check-interval 300
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      DB_ENGINE: ${DB_ENGINE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-seizo0}
+      POSTGRES_USER: ${POSTGRES_USER:-seizo0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seizo0-postgres-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  fax-reminder-daily:
+    image: seizo0-django:latest
+    profiles:
+      - workers
+    restart: unless-stopped
+    command: sh -c "while true; do if [ \"$$(TZ=JST-9 date +%H:%M)\" = \"14:50\" ]; then python manage.py fax_reminder --force; sleep 70; else sleep 20; fi; done"
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      DB_ENGINE: ${DB_ENGINE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-seizo0}
+      POSTGRES_USER: ${POSTGRES_USER:-seizo0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seizo0-postgres-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+      - redis
+
+  fax-reminder:
+    image: seizo0-django:latest
+    profiles:
+      - manual
+    command: python manage.py fax_reminder --force
+    environment:
+      DJANGO_SETTINGS_MODULE: trang_chu.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-your-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-192.168.10.250,localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://192.168.10.250,http://192.168.10.250}
+      DB_ENGINE: ${DB_ENGINE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-seizo0}
+      POSTGRES_USER: ${POSTGRES_USER:-seizo0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seizo0-postgres-change-me}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      DASHBOARD_LOG_FILE: /app/logs/dashboard.log
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    depends_on:
+      - web
+
+  redis:
+    image: redis:7-alpine
+    container_name: seizo0-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
+  postgres-data:
+
+
+
+

@@ -1,5 +1,7 @@
 from decimal import Decimal, ROUND_CEILING
 
+from django.core.mail import send_mail
+from django.db.models import Sum
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -7,6 +9,14 @@ from django.utils import timezone
 from nhap_lieu.models import KetQuaNhapLieu, PhienNhapLieu
 
 from .models import QAAutoInputLedger, QAResult, QAMaterialMaster, QAMaterialStockLedger, QAMaterialOutStockLedger, QADeletedJobMarker
+
+
+LOW_STOCK_ALERT_RECIPIENTS = [
+    "k_arita@hayashi-p.co.jp",
+    "t_miyasaka@hayashi-p.co.jp",
+    "giang@hayashi-p.co.jp",
+    "seisan_kanri@hayashi-p.co.jp",
+]
 
 
 def _find_qa_result_for_phien(phien):
@@ -34,6 +44,95 @@ def _calculate_bag_count_by_material_code(material_code, weight_kg):
     if count < 1:
         count = Decimal("1")
     return str(int(count))
+
+
+def _decimal_or_zero(value):
+    try:
+        return Decimal(value or 0)
+    except Exception:
+        return Decimal("0")
+
+
+def _get_current_stock_kg(material_code):
+    code = (material_code or "").strip()
+    if not code:
+        return Decimal("0")
+    total_in = (
+        QAMaterialStockLedger.objects.filter(material_code=code)
+        .aggregate(total=Sum("weight_kg"))
+        .get("total")
+        or Decimal("0")
+    )
+    total_out = (
+        QAMaterialOutStockLedger.objects.filter(material_code=code)
+        .aggregate(total=Sum("weight_kg"))
+        .get("total")
+        or Decimal("0")
+    )
+    return Decimal(total_in) - Decimal(total_out)
+
+
+def _send_low_stock_alert_if_needed(row):
+    if not row or row.low_stock_alert_sent_at:
+        return
+
+    material_code = (row.material_code or "").strip()
+    if not material_code:
+        return
+
+    master = QAMaterialMaster.objects.filter(material_code=material_code, is_active=True).first()
+    if not master or not master.bag_weight_kg:
+        return
+
+    bag_weight = _decimal_or_zero(master.bag_weight_kg)
+    if bag_weight <= 0:
+        return
+
+    safety_stock = (bag_weight * Decimal("5")).quantize(Decimal("0.01"))
+    current_stock = _get_current_stock_kg(material_code).quantize(Decimal("0.01"))
+    last_out_weight = _decimal_or_zero(row.weight_kg)
+    stock_before_this_out = (current_stock + last_out_weight).quantize(Decimal("0.01"))
+
+    if not (stock_before_this_out > safety_stock and current_stock <= safety_stock):
+        return
+
+    operator_name = (
+        (row.operator_name or "").strip()
+        or (row.qa_result.operator_name if row.qa_result and row.qa_result.operator_name else "")
+        or "-"
+    )
+    material_name = (row.material_name or "").strip() or (master.material_name or "").strip() or "未設定"
+    stock_out_date = row.stock_out_date.strftime("%Y-%m-%d") if row.stock_out_date else "-"
+    created_at = timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M:%S") if row.created_at else "-"
+
+    subject = f"【安全在庫アラート】{material_name} が安全在庫以下です"
+    message = (
+        "原材料の現在庫が安全在庫以下になりました。確認をお願いします。\n\n"
+        f"原材料名: {material_name}\n"
+        f"原材料コード: {material_code}\n"
+        f"現在庫: {current_stock} kg\n"
+        f"安全在庫: {safety_stock} kg（1袋 {bag_weight} kg × 5袋）\n"
+        f"今回出庫量: {last_out_weight} kg\n"
+        f"出庫前在庫: {stock_before_this_out} kg\n\n"
+        f"最後の出庫日: {stock_out_date}\n"
+        f"最後の出庫登録日時: {created_at}\n"
+        f"最後に出庫した作業者: {operator_name}\n"
+        f"ロット番号: {row.lot_number or '-'}\n"
+        f"システムNo.: {row.workstation_management_no or '-'}\n\n"
+        "在庫管理画面で補充要否を確認してください。\n"
+    )
+
+    sent_count = send_mail(
+        subject,
+        message,
+        None,
+        LOW_STOCK_ALERT_RECIPIENTS,
+        fail_silently=True,
+    )
+    if sent_count:
+        QAMaterialOutStockLedger.objects.filter(pk=row.pk, low_stock_alert_sent_at__isnull=True).update(
+            low_stock_alert_sent_at=timezone.now()
+        )
 
 
 def _sync_ledger_from_phien(phien):
@@ -112,6 +211,7 @@ def _sync_material_stock_from_ledger(ledger):
             "lot_color": QAMaterialStockLedger.LOT_COLOR_GREEN,
             "weight_kg": weight_kg if weight_kg is not None else Decimal("0"),
             "workstation_management_no": mgmt_no,
+            "operator_name": (qa_result.operator_name if qa_result else "") or "",
         },
     )
 
@@ -133,6 +233,9 @@ def _sync_material_stock_from_ledger(ledger):
         changed = True
     if not row.workstation_management_no and mgmt_no:
         row.workstation_management_no = mgmt_no
+        changed = True
+    if qa_result and qa_result.operator_name and not row.operator_name:
+        row.operator_name = qa_result.operator_name
         changed = True
     if not row.stock_in_date:
         row.stock_in_date = stock_in_date
@@ -256,3 +359,8 @@ def on_ket_qua_saved(sender, instance, **kwargs):
 @receiver(post_save, sender=QAAutoInputLedger)
 def on_auto_ledger_saved(sender, instance, **kwargs):
     _sync_material_out_stock_from_ledger(instance)
+
+
+@receiver(post_save, sender=QAMaterialOutStockLedger)
+def on_material_out_stock_saved(sender, instance, **kwargs):
+    _send_low_stock_alert_if_needed(instance)

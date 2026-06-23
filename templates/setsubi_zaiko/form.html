@@ -1,0 +1,264 @@
+{% extends "setsubi_zaiko/base.html" %}
+
+{% block setsubi_content %}
+<div class="mx-auto max-w-5xl space-y-4">
+  <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 class="mb-0 text-xl font-bold text-slate-900">{{ title }}</h2>
+        <div class="text-sm text-slate-500">
+          {% if form_kind == "ledger" %}
+            入庫・出庫・調整は台帳として履歴保存されます。
+          {% elif form_kind == "item" %}
+            写真・銘板・メーカー品番・適用機械/金型・棚番を登録できます。
+          {% else %}
+            分類は検索・集計・CSV出力の基準になります。
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {% if item %}
+          <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">詳細へ戻る</a>
+        {% endif %}
+        <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% if cancel_url_name %}{% url cancel_url_name %}{% else %}{% url 'setsubi_zaiko:dashboard' %}{% endif %}">戻る</a>
+      </div>
+    </div>
+  </div>
+
+  {% if item and form_kind == "item" %}
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div class="mb-2 text-sm font-bold text-slate-700">現在の外観写真</div>
+        {% if item.item_image %}
+          <img src="{{ item.item_image.url }}" alt="{{ item.name }}" class="max-h-72 w-full rounded-lg object-contain ring-1 ring-slate-200">
+        {% else %}
+          <div class="flex h-48 items-center justify-center rounded-lg bg-slate-100 text-slate-400 ring-1 ring-slate-200">No image</div>
+        {% endif %}
+      </div>
+      <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div class="mb-2 text-sm font-bold text-slate-700">現在の銘板・ラベル写真</div>
+        {% if item.nameplate_image %}
+          <img src="{{ item.nameplate_image.url }}" alt="{{ item.name }} label" class="max-h-72 w-full rounded-lg object-contain ring-1 ring-slate-200">
+        {% else %}
+          <div class="flex h-48 items-center justify-center rounded-lg bg-slate-100 text-slate-400 ring-1 ring-slate-200">No image</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+    <div class="font-bold">入力ルール</div>
+    <div>履歴データは削除しません。誤りがある場合は訂正・調整台帳で記録します。</div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+    {% csrf_token %}
+    <div class="p-4">
+      {% if form_kind == "item" %}
+        {% if form.non_field_errors %}
+          <div class="mb-4 rounded-lg bg-rose-50 p-3 text-rose-700">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <div class="text-sm font-bold text-slate-800">基本情報</div>
+          <div class="text-xs text-slate-500">まずここだけ入力すれば、部品マスターとして登録できます。</div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.code.label }}</label>
+            {{ form.code }}
+            {% if form.code.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.code.help_text }}</div>{% endif %}
+            {% for error in form.code.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.name.label }}</label>
+            {{ form.name }}
+            {% if form.name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.name.help_text }}</div>{% endif %}
+            {% for error in form.name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.category.label }}</label>
+            {{ form.category }}
+            {% for error in form.category.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.catalog_node.label }}</label>
+            {{ form.catalog_node }}
+            {% for error in form.catalog_node.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.equipment_type.label }}</label>
+            {{ form.equipment_type }}
+            {% for error in form.equipment_type.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.item_kind.label }}</label>
+            {{ form.item_kind }}
+            {% for error in form.item_kind.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.equipment_group_name.label }}</label>
+            {{ form.equipment_group_name }}
+            {% if form.equipment_group_name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.equipment_group_name.help_text }}</div>{% endif %}
+            {% for error in form.equipment_group_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.equipment_series_name.label }}</label>
+            {{ form.equipment_series_name }}
+            {% if form.equipment_series_name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.equipment_series_name.help_text }}</div>{% endif %}
+            {% for error in form.equipment_series_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.maker.label }}</label>
+            {{ form.maker }}
+            {% for error in form.maker.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.model_no.label }}</label>
+            {{ form.model_no }}
+            {% for error in form.model_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.maker_part_no.label }}</label>
+            {{ form.maker_part_no }}
+            {% if form.maker_part_no.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.maker_part_no.help_text }}</div>{% endif %}
+            {% for error in form.maker_part_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.shelf_no.label }}</label>
+            {{ form.shelf_no }}
+            {% for error in form.shelf_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.current_quantity.label }}</label>
+            {{ form.current_quantity }}
+            {% for error in form.current_quantity.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.unit.label }}</label>
+            {{ form.unit }}
+            {% for error in form.unit.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.minimum_stock.label }}</label>
+            {{ form.minimum_stock }}
+            {% for error in form.minimum_stock.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.location.label }}</label>
+            {{ form.location }}
+            {% for error in form.location.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <div class="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <div class="text-sm font-bold text-slate-800">写真</div>
+          <div class="text-xs text-slate-500">外観写真と銘板・ラベル写真を登録できます。</div>
+        </div>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.item_image.label }}</label>
+            {{ form.item_image }}
+            {% for error in form.item_image.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.nameplate_image.label }}</label>
+            {{ form.nameplate_image }}
+            {% for error in form.nameplate_image.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <details class="mt-6 rounded-lg border border-slate-200 bg-white">
+          <summary class="cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">詳細情報・IATF管理項目を開く</summary>
+          <div class="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2">
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.applicable_machine_no.label }}</label>{{ form.applicable_machine_no }}{% for error in form.applicable_machine_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.applicable_mold_no.label }}</label>{{ form.applicable_mold_no }}{% for error in form.applicable_mold_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.serial_no.label }}</label>{{ form.serial_no }}{% for error in form.serial_no.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.department.label }}</label>{{ form.department }}{% for error in form.department.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_customer_code.label }}</label>
+              {{ form.mold_customer_code }}
+              {% if form.mold_customer_code.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_customer_code.help_text }}</div>{% endif %}
+              {% for error in form.mold_customer_code.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_customer_name.label }}</label>
+              {{ form.mold_customer_name }}
+              {% if form.mold_customer_name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_customer_name.help_text }}</div>{% endif %}
+              {% for error in form.mold_customer_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_product_code.label }}</label>
+              {{ form.mold_product_code }}
+              {% if form.mold_product_code.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_product_code.help_text }}</div>{% endif %}
+              {% for error in form.mold_product_code.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_product_name.label }}</label>
+              {{ form.mold_product_name }}
+              {% if form.mold_product_name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_product_name.help_text }}</div>{% endif %}
+              {% for error in form.mold_product_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="md:col-span-2">
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_component_name.label }}</label>
+              {{ form.mold_component_name }}
+              {% if form.mold_component_name.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_component_name.help_text }}</div>{% endif %}
+              {% for error in form.mold_component_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.equipment_document_root_path.label }}</label>
+              {{ form.equipment_document_root_path }}
+              {% if form.equipment_document_root_path.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.equipment_document_root_path.help_text }}</div>{% endif %}
+              {% for error in form.equipment_document_root_path.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.equipment_document_subfolder_path.label }}</label>
+              {{ form.equipment_document_subfolder_path }}
+              {% if form.equipment_document_subfolder_path.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.equipment_document_subfolder_path.help_text }}</div>{% endif %}
+              {% for error in form.equipment_document_subfolder_path.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_drawing_root_path.label }}</label>
+              {{ form.mold_drawing_root_path }}
+              {% if form.mold_drawing_root_path.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_drawing_root_path.help_text }}</div>{% endif %}
+              {% for error in form.mold_drawing_root_path.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.mold_drawing_subfolder_path.label }}</label>
+              {{ form.mold_drawing_subfolder_path }}
+              {% if form.mold_drawing_subfolder_path.help_text %}<div class="mt-1 text-xs text-slate-500">{{ form.mold_drawing_subfolder_path.help_text }}</div>{% endif %}
+              {% for error in form.mold_drawing_subfolder_path.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
+            </div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.reorder_point.label }}</label>{{ form.reorder_point }}{% for error in form.reorder_point.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.quality_rank.label }}</label>{{ form.quality_rank }}{% for error in form.quality_rank.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.supplier_name.label }}</label>{{ form.supplier_name }}{% for error in form.supplier_name.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.status.label }}</label>{{ form.status }}{% for error in form.status.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+            <div class="md:col-span-2"><label class="mb-1 block text-sm font-bold text-slate-700">{{ form.note.label }}</label>{{ form.note }}{% for error in form.note.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}</div>
+          </div>
+        </details>
+      {% else %}
+        <div class="grid gap-4 md:grid-cols-2">
+          {% for field in form %}
+            <div class="{% if field.field.widget.input_type == 'textarea' %}md:col-span-2{% endif %}">
+              <label class="mb-1 block text-sm font-bold text-slate-700">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="mt-1 text-xs text-slate-500">{{ field.help_text }}</div>{% endif %}
+              {% for error in field.errors %}
+                <div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if form.non_field_errors and form_kind != "item" %}
+        <div class="md:col-span-2 rounded-lg bg-rose-50 p-3 text-rose-700">{{ form.non_field_errors }}</div>
+      {% endif %}
+    </div>
+    <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% if cancel_url_name %}{% url cancel_url_name %}{% else %}{% url 'setsubi_zaiko:dashboard' %}{% endif %}">キャンセル</a>
+      <button class="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-500" type="submit">登録</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

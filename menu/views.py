@@ -817,7 +817,7 @@ def order_kanri_pdf(request):
                 row['orders'].append(0)
         row['calamviec'] = calam or '日勤'
         row['so_luong'] = total_qty
-        row['total'] = row['gia2'] * total_qty
+        row['total'] = row['gia'] * total_qty
         row['orders_with_day'] = list(zip(row['orders'], days))
         # Ẩn nhân viên không có order nào
         if total_qty == 0:

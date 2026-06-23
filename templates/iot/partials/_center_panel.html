@@ -332,97 +332,6 @@
 </script>
 {% endif %}
 
-<script>
-let popupTimer = null;
-let popupInterval = null;   // Giữ lại theo yêu cầu của anh
-
-function pollChange4MPopup() {
-  fetch('/iot/api/change-4m/')
-    .then(r => r.json())
-    .then(data => {
-      const now = new Date();
-      const entries = (Array.isArray(data.entries) ? data.entries : []).filter(entry => {
-        if (!entry.stop_at) return true;
-        const stopAtDate = new Date(entry.stop_at.replace(/\//g, '-').replace(' ', 'T') + ':00');
-        return stopAtDate > now;
-      });
-
-      window._4mEntries = entries; // chỉ lưu
-    });
-}
-window.pollChange4MPopup = pollChange4MPopup;
-
-function showChange4MPopupIfNeededInterval() {
-  if (window.alarmCount == 0 && document.getElementById('screen1').style.display !== 'none') {
-    const entries = window._4mEntries || [];
-    showChange4MPopupIfNeeded(entries);
-  } else {
-    // Nếu có alarm hoặc sang màn hình 2 → đóng popup
-    document.getElementById('change-4m-popup-backdrop').hidden = true;
-    document.body.classList.remove('modal-open');
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  pollChange4MPopup();
-  setInterval(pollChange4MPopup, 30000); // cập nhật entries mỗi 30s
-
-  // Kiểm tra mở popup mỗi 10 phút
-  popupInterval = setInterval(showChange4MPopupIfNeededInterval, 600000);
-});
-</script>
-
-<script>
-window.renderChange4MPopup = function(entries) {
-  console.log('renderChange4MPopup called', entries);
-  const list = document.getElementById('change-4m-popup-list');
-  const empty = document.getElementById('change-4m-popup-empty');
-  if (!list || !empty) return;
-
-  if (!entries || entries.length === 0) {
-    empty.hidden = false;
-    list.innerHTML = '';
-    return;
-  }
-
-  empty.hidden = true;
-  list.innerHTML = entries.map(entry => `
-    <div class="list-group-item change-4m-popup-item${entry.highlight ? ' highlight' : ''}">
-      <div class="fw-bold">${entry.code || '4M'}: ${entry.message}</div>
-      <div>${entry.detail || ''}</div>
-      <div class="change-4m-popup-meta">
-        <span><i class="bi bi-person"></i> ${entry.reporter || ''}</span>
-        <span><i class="bi bi-clock-history"></i> ${entry.timestamp || ''}</span>
-        ${entry.stop_at ? `<span class="change-4m-popup-period">~ ${entry.stop_at}</span>` : ''}
-        ${entry.tags && entry.tags.length ? `<span class="change-4m-popup-tags">${entry.tags.map(t => `<span>${t}</span>`).join('')}</span>` : ''}
-      </div>
-    </div>
-  `).join('');
-};
-</script>
-
-<script>
-function showChange4MPopupIfNeeded(entries) {
-  const backdrop = document.getElementById('change-4m-popup-backdrop');
-
-  // Nếu popup đang mở → không mở lại
-  if (!backdrop.hidden) return;
-
-  // Điều kiện mở popup
-  if (entries.length > 0 && window.alarmCount == 0) {
-    backdrop.hidden = false;
-    if (window.renderChange4MPopup) window.renderChange4MPopup(entries);
-    document.body.classList.add('modal-open');
-
-    if (popupTimer) clearTimeout(popupTimer);
-    popupTimer = setTimeout(() => {
-      backdrop.hidden = true;
-      document.body.classList.remove('modal-open');
-    }, 60000); // 1 phút
-  }
-}
-</script>
-
 <!-- GIỮ NGUYÊN TOÀN BỘ CODE CHATWORK BÊN DƯỚI -->
 <script>
 let lastChatworkMsg = localStorage.getItem('lastChatworkMsg') || '';
@@ -534,11 +443,4 @@ function fetchAndRender() {
       checkNewMessageAndNotify(allGroups);
     });
 }
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  pollChange4MPopup();
-  setInterval(pollChange4MPopup, 30000);
-});
 </script>

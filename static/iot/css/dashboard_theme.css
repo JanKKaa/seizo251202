@@ -542,8 +542,8 @@ body.theme-aprilfool {
   border: 4px solid #c2185b;
 }
 .modal-theme-aprilfool {
-  background: linear-gradient(135deg, #fffde7 0%, #fff9c4 100%) !important;
-  border: 4px solid #fbc02d;
+   background: linear-gradient(135deg, #fffde7 0%, #ffe082 100%) !important;
+  border: 4px solid #ff3c00;
 }
 
 /* Đổi màu chữ cho modal-body phù hợp từng theme */
@@ -566,7 +566,7 @@ body.theme-aprilfool {
 .modal-theme-kinrou .modal-body       { color: #ff8f00; }
 .modal-theme-tennou .modal-body       { color: #512da8; }
 .modal-theme-hinamatsuri .modal-body  { color: #c2185b; }
-.modal-theme-aprilfool .modal-body    { color: #fbc02d; }
+.modal-theme-aprilfool .modal-body    { color: #f13709; }
 
 .modal-theme-christmas .modal-header { background: #388e3c !important; color: #fff !important; }
 .modal-theme-newyear .modal-header { background: #ffd700 !important; color: #b22222 !important; }
@@ -587,7 +587,7 @@ body.theme-aprilfool {
 .modal-theme-kinrou .modal-header { background: #ffe082 !important; color: #ff8f00 !important; }
 .modal-theme-tennou .modal-header { background: #d1c4e9 !important; color: #512da8 !important; }
 .modal-theme-hinamatsuri .modal-header { background: #f8bbd0 !important; color: #c2185b !important; }
-.modal-theme-aprilfool .modal-header { background: #fff9c4 !important; color: #fbc02d !important; }
+.modal-theme-aprilfool .modal-header { background: #ece7b7 !important; color: #fbc02d !important; }
 
 
 /* Modal mặc định: nền xanh dương, chữ trắng */

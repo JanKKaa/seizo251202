@@ -49,48 +49,51 @@
     border-radius: 10px;
 }
 .kg-modal-dialog {
-    max-width: min(92vw, 680px);
+    max-width: min(94vw, 640px);
 }
 .kg-modal .modal-content {
     border-radius: 18px;
+    max-height: calc(100dvh - 18px);
 }
 .kg-modal .modal-body {
-    padding: 1.25rem 1.25rem 1rem 1.25rem;
+    padding: 0.75rem;
+    overflow-y: auto;
 }
 .kg-display {
-    height: 62px;
-    font-size: 2rem;
+    height: 54px;
+    font-size: 1.65rem;
     letter-spacing: 0.5px;
 }
 .kg-pad-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
 .kg-pad-btn {
-    height: 72px;
-    font-size: 1.45rem;
+    height: 56px;
+    font-size: 1.2rem;
     font-weight: 700;
-    border-radius: 14px;
+    border-radius: 10px;
     touch-action: manipulation;
+    padding: 0.35rem 0.45rem;
 }
 .kg-pad-btn.zero {
     grid-column: span 2;
 }
 .kg-modal .modal-footer {
-    padding: 0.75rem 1.25rem 1.25rem 1.25rem;
+    padding: 0.5rem 0.75rem 0.75rem 0.75rem;
 }
 .kg-modal .btn-done {
-    min-width: 180px;
-    height: 52px;
+    min-width: 150px;
+    height: 44px;
     font-size: 1.1rem;
     border-radius: 999px;
 }
 .kg-quick-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 8px;
 }
 .quick-kg-inline {
     display: grid;
@@ -106,6 +109,158 @@
     min-height: 46px;
     border-radius: 12px;
     font-weight: 700;
+}
+.lot-keyboard-dialog {
+    max-width: min(98vw, 900px);
+}
+.lot-keyboard .modal-content {
+    border-radius: 18px;
+    max-height: calc(100dvh - 18px);
+}
+.lot-keyboard .modal-body {
+    padding: 0.75rem;
+    overflow-y: auto;
+}
+.lot-display {
+    height: 54px;
+    font-size: 1.55rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+.lot-keyboard-grid,
+.lot-symbol-grid {
+    display: grid;
+    gap: 7px;
+}
+.lot-keyboard-grid {
+    grid-template-columns: repeat(10, 1fr);
+}
+.lot-symbol-grid {
+    grid-template-columns: repeat(6, 1fr);
+    margin-top: 8px;
+}
+.lot-key-btn {
+    height: 46px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 9px;
+    touch-action: manipulation;
+    padding: 0.25rem 0.35rem;
+}
+.lot-key-btn.wide {
+    grid-column: span 2;
+}
+.lot-keyboard .btn-done {
+    min-width: 150px;
+    height: 44px;
+    font-size: 1.1rem;
+    border-radius: 999px;
+}
+@media (max-width: 1024px) {
+    .qa-sync .container {
+        max-width: 100%;
+        margin-top: 0.75rem !important;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+    #upload-form .card-body,
+    #upload-form .card {
+        padding: 0.75rem !important;
+    }
+    #upload-form .row.g-3 {
+        --bs-gutter-x: 0.75rem;
+        --bs-gutter-y: 0.65rem;
+    }
+    #upload-form label,
+    #upload-form .form-text,
+    #upload-form .form-control-plaintext {
+        font-size: 0.92rem;
+    }
+    #upload-form .form-control,
+    #upload-form .form-select {
+        min-height: 38px;
+        font-size: 0.95rem;
+        padding: 0.35rem 0.5rem;
+    }
+    .step-note {
+        margin-bottom: 0.6rem !important;
+        padding: 0.55rem 0.7rem;
+    }
+    .quick-kg-inline {
+        grid-template-columns: repeat(4, minmax(72px, 1fr));
+        gap: 6px;
+    }
+    .quick-kg-inline .quick-kg-btn,
+    .quick-kg-inline #open-numpad-modal-btn {
+        min-height: 36px;
+        font-size: 0.86rem;
+        padding: 0.25rem 0.4rem;
+        border-radius: 9px;
+    }
+    .camera-frame-wrap {
+        aspect-ratio: 16 / 8.5;
+    }
+    .kg-modal .modal-dialog,
+    .lot-keyboard .modal-dialog {
+        margin-top: 0.35rem;
+        margin-bottom: 0.35rem;
+    }
+    .kg-modal .modal-header,
+    .kg-modal .modal-footer,
+    .lot-keyboard .modal-header,
+    .lot-keyboard .modal-footer {
+        padding: 0.45rem 0.75rem;
+    }
+    .kg-display,
+    .lot-display {
+        height: 46px;
+        font-size: 1.35rem;
+        margin-bottom: 0.55rem !important;
+    }
+    .kg-pad-btn {
+        height: 48px;
+        font-size: 1.05rem;
+    }
+    .lot-keyboard-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+    .lot-symbol-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .lot-key-btn {
+        height: 42px;
+        font-size: 0.95rem;
+    }
+}
+@media (max-width: 640px) {
+    .quick-kg-inline {
+        grid-template-columns: repeat(2, minmax(110px, 1fr));
+    }
+    .lot-keyboard-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .lot-symbol-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (max-height: 720px) {
+    .kg-display,
+    .lot-display {
+        height: 42px;
+        font-size: 1.2rem;
+    }
+    .kg-pad-btn {
+        height: 42px;
+        font-size: 0.95rem;
+    }
+    .lot-key-btn {
+        height: 36px;
+        font-size: 0.9rem;
+    }
+    .kg-modal .modal-title,
+    .lot-keyboard .modal-title {
+        font-size: 1rem;
+    }
 }
 .camera-frame-wrap {
     position: relative;
@@ -346,7 +501,12 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="lot_number"><strong>ロット番号（必須）：</strong></label>
-                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力" required value="{{ request.POST.lot_number|default:'' }}">
+                                <input type="text" class="form-control" id="lot_number" name="lot_number" placeholder="ロット番号を入力" required autocomplete="off" inputmode="none" readonly value="{{ request.POST.lot_number|default:'' }}">
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="open-lot-keyboard-btn">
+                                        <i class="fas fa-keyboard"></i> ロット入力
+                                    </button>
+                                </div>
                                 <div class="invalid-feedback" id="lot-number-error"></div>
                             </div>
                             <div class="col-md-6">
@@ -446,6 +606,68 @@
                         <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="75">75kg</button>
                         <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="80">80kg</button>
                         <button type="button" class="btn btn-outline-secondary quick-kg-btn kg-pad-btn" data-kg="100">100kg</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary btn-done" data-bs-dismiss="modal">完了</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade lot-keyboard" id="lotKeyboardModal" tabindex="-1" aria-labelledby="lotKeyboardModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered lot-keyboard-dialog">
+            <div class="modal-content shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="lotKeyboardModalLabel">ロット番号入力</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="lot-modal-display" class="form-control text-end fw-bold mb-3 lot-display" value="" readonly>
+                    <div id="lot-alpha-keyboard" class="lot-keyboard-grid">
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="1">1</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="2">2</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="3">3</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="4">4</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="5">5</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="6">6</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="7">7</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="8">8</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="9">9</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="0">0</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="A">A</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="B">B</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="C">C</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="D">D</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="E">E</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="F">F</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="G">G</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="H">H</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="I">I</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="J">J</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="K">K</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="L">L</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="M">M</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="N">N</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="O">O</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="P">P</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Q">Q</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="R">R</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="S">S</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="T">T</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="U">U</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="V">V</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="W">W</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="X">X</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Y">Y</button>
+                        <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Z">Z</button>
+                    </div>
+                    <div class="lot-symbol-grid">
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="-">-</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="/">/</button>
+                        <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key=".">.</button>
+                        <button type="button" class="btn btn-danger lot-key-btn wide" data-lot-key="del">←</button>
+                        <button type="button" class="btn btn-warning lot-key-btn wide" data-lot-key="clear">C</button>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1156,11 +1378,42 @@ document.addEventListener('DOMContentLoaded', function() {
     const kgModalEl = document.getElementById('kgNumpadModal');
     const quickKgButtons = document.querySelectorAll('.quick-kg-btn');
     const openNumpadModalBtn = document.getElementById('open-numpad-modal-btn');
+    const lotNumber = document.getElementById('lot_number');
+    const lotModalEl = document.getElementById('lotKeyboardModal');
+    const lotModalDisplay = document.getElementById('lot-modal-display');
+    const openLotKeyboardBtn = document.getElementById('open-lot-keyboard-btn');
 
     function syncKgDisplay() {
         if (kgModalDisplay && inputWeight) {
             kgModalDisplay.value = inputWeight.value || "";
         }
+    }
+
+    function syncLotDisplay() {
+        if (lotModalDisplay && lotNumber) {
+            lotModalDisplay.value = lotNumber.value || "";
+        }
+    }
+
+    function openLotKeyboard() {
+        syncLotDisplay();
+        if (lotModalEl && window.bootstrap) {
+            window.bootstrap.Modal.getOrCreateInstance(lotModalEl).show();
+        }
+    }
+
+    function applyLotKey(key) {
+        if (!lotNumber) return;
+        const current = lotNumber.value || "";
+        if (key === "del") {
+            lotNumber.value = current.slice(0, -1);
+        } else if (key === "clear") {
+            lotNumber.value = "";
+        } else {
+            lotNumber.value = `${current}${String(key || "").toUpperCase()}`.slice(0, 60);
+        }
+        lotNumber.dispatchEvent(new Event('input', { bubbles: true }));
+        syncLotDisplay();
     }
 
     quickKgButtons.forEach((btn) => {
@@ -1198,7 +1451,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    lotNumber?.addEventListener('click', openLotKeyboard);
+    openLotKeyboardBtn?.addEventListener('click', openLotKeyboard);
+    lotModalEl?.addEventListener('click', function(e) {
+        const btn = e.target.closest('.lot-key-btn');
+        if (!btn) return;
+        applyLotKey(btn.getAttribute('data-lot-key') || '');
+    });
     syncKgDisplay();
+    syncLotDisplay();
     if (isReloadNavigation()) {
         resetUploadTemporaryState();
     } else {

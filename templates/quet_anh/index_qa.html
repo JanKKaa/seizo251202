@@ -356,6 +356,7 @@
             <div class="qa-mini-nav">
                 <a href="{% url 'qa_history' %}" class="qa-mini-link"><i class="fas fa-list me-1"></i>履歴</a>
                 <a href="{% url 'qa_device_list' %}" class="qa-mini-link"><i class="fas fa-microchip me-1"></i>機械</a>
+                <a href="{% url 'tablet_device_list' %}" class="qa-mini-link"><i class="fas fa-tablet-alt me-1"></i>タブレット点検</a>
                 <a href="{% url 'material_master_list' %}" class="qa-mini-link"><i class="fas fa-boxes me-1"></i>マスター</a>
                 <a href="{% url 'dashboard_qa' %}" class="qa-mini-link"><i class="fas fa-chart-line me-1"></i>分析</a>
                 <a href="{% url 'material_stock_ledger' %}" class="qa-mini-link"><i class="fas fa-warehouse me-1"></i>入庫台帳</a>
@@ -387,17 +388,18 @@
                     </div>
                     <div class="qa-mode-body">
                     <form method="get" action="{% url 'upload_image' %}" class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3">
-                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
-                            {% for d in device_list %}
-                                <option value="{{ d.id }}" data-device-name="{{ d.name }}">{{ d.name }}{% if d.material_code %} | {{ d.material_code }}{% endif %}</option>
+                        <select id="machine_name" name="machine_name" class="form-control mb-2 mb-md-0" style="width: 320px; max-width:100%;">
+                            {% for item in outstock_machine_options %}
+                                <option value="{{ item.machine_name }}">{{ item.machine_name }}</option>
                             {% endfor %}
                         </select>
+                        <select id="device_id" name="device_id" class="form-control mb-2 mb-md-0" style="width: 360px; max-width:100%;"></select>
                         <button type="submit" class="btn btn-primary shadow rounded px-6 py-2">
                             <i class="fas fa-search"></i>  選択
                         </button>
                     </form>
                     <div id="device-selected-msg" class="mt-2 mb-2 text-center" style="font-weight:bold; color:#155724; display:none;">
-                        <i class="fas fa-check-circle"></i> 機械番号「<span id="selected-device-name"></span>」が選択されました！
+                        <i class="fas fa-check-circle"></i> 機械番号「<span id="selected-device-name"></span>」を確認しました。<span id="selected-device-product-note"></span>
                     </div>
                     <div class="w-100 text-center mb-2">
                         <button type="button" class="btn btn-outline-success" id="start-qr-btn" style="min-width:120px;">
@@ -482,14 +484,17 @@
 <script defer src="https://unpkg.com/html5-qrcode"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
+{{ outstock_machine_options|json_script:"outstock-machine-options" }}
 <script>
 const startQrBtn = document.getElementById('start-qr-btn');
 const refocusQrBtn = document.getElementById('refocus-qr-btn');
 const qrReader = document.getElementById('qr-reader');
 const qrGuideWrapDevice = document.getElementById('qr-guide-wrap-device');
+const selectMachine = document.getElementById('machine_name');
 const selectDevice = document.getElementById('device_id');
 const deviceMsg = document.getElementById('device-selected-msg');
 const selectedDeviceName = document.getElementById('selected-device-name');
+const selectedDeviceProductNote = document.getElementById('selected-device-product-note');
 const startMaterialQrBtn = document.getElementById('start-material-qr-btn');
 const refocusMaterialQrBtn = document.getElementById('refocus-material-qr-btn');
 const materialQrReader = document.getElementById('material-qr-reader');
@@ -510,6 +515,7 @@ let materialQrCode = null;
 let materialQrRunning = false;
 let deviceCornerTracker = null;
 let materialCornerTracker = null;
+const outstockMachineOptions = JSON.parse(document.getElementById('outstock-machine-options')?.textContent || '[]');
 const cornerCanvas = document.createElement("canvas");
 const cornerCtx = cornerCanvas.getContext("2d", { willReadFrequently: true });
 
@@ -738,16 +744,79 @@ function getQrScanConfig() {
 }
 
 function showDeviceSelectedMsg() {
-    const selectedOption = selectDevice.options[selectDevice.selectedIndex];
-    selectedDeviceName.textContent = selectedOption.text;
+    const selectedMachine = selectMachine.options[selectMachine.selectedIndex];
+    const selectedProduct = selectDevice.options[selectDevice.selectedIndex];
+    const machineName = selectedMachine ? selectedMachine.text : '';
+    selectedDeviceName.textContent = machineName;
+    selectedDeviceProductNote.textContent = selectedProduct && selectDevice.options.length > 1
+        ? ` 製品「${selectedProduct.text}」を選択してください。`
+        : '';
     deviceMsg.style.display = 'block';
-    // Đổi màu chữ option đã chọn
-    for (let i = 0; i < selectDevice.options.length; i++) {
-        selectDevice.options[i].style.color = '';
-        selectDevice.options[i].style.fontWeight = '';
+    for (let i = 0; i < selectMachine.options.length; i++) {
+        selectMachine.options[i].style.color = '';
+        selectMachine.options[i].style.fontWeight = '';
     }
-    selectedOption.style.color = '#006400';
-    selectedOption.style.fontWeight = 'bold';
+    if (selectedMachine) {
+        selectedMachine.style.color = '#006400';
+        selectedMachine.style.fontWeight = 'bold';
+    }
+}
+
+function getSelectedMachineGroup() {
+    const machineName = selectMachine ? (selectMachine.value || '').trim() : '';
+    return outstockMachineOptions.find(item => (item.machine_name || '').trim() === machineName) || null;
+}
+
+function syncOutstockDeviceChoices() {
+    if (!selectMachine || !selectDevice) return;
+    const group = getSelectedMachineGroup();
+    const devices = group ? (group.devices || []) : [];
+    const previousValue = selectDevice.value;
+    selectDevice.innerHTML = '';
+    devices.forEach((device) => {
+        const option = document.createElement('option');
+        option.value = String(device.id || '');
+        option.textContent = device.label || device.product_name || device.material_code || device.machine_name || String(device.id || '');
+        option.dataset.productName = device.product_name || '';
+        option.dataset.productCode = device.product_code || '';
+        option.dataset.materialCode = device.material_code || '';
+        selectDevice.appendChild(option);
+    });
+    if (previousValue && Array.from(selectDevice.options).some(option => option.value === previousValue)) {
+        selectDevice.value = previousValue;
+    }
+    const needsChoice = Boolean(group && group.needs_product_choice);
+    selectDevice.style.display = needsChoice ? '' : 'none';
+    selectDevice.required = needsChoice;
+    showDeviceSelectedMsg();
+}
+
+function selectMachineByQr(qrCodeMessage) {
+    const scanned = (qrCodeMessage || '').trim();
+    let foundIndex = -1;
+    for (let i = 0; i < selectMachine.options.length; i++) {
+        const option = selectMachine.options[i];
+        if (option.value === scanned || option.text === scanned) {
+            foundIndex = i;
+            break;
+        }
+    }
+    if (foundIndex < 0) {
+        const groupIndex = outstockMachineOptions.findIndex((group) => {
+            const devices = group.devices || [];
+            return devices.some((device) => (
+                String(device.id || '') === scanned ||
+                (device.machine_name || '') === scanned
+            ));
+        });
+        foundIndex = groupIndex;
+    }
+    if (foundIndex >= 0) {
+        selectMachine.selectedIndex = foundIndex;
+        syncOutstockDeviceChoices();
+        return true;
+    }
+    return false;
 }
 
 function syncMaterialCodeField() {
@@ -782,19 +851,7 @@ startQrBtn.addEventListener('click', function() {
         getQrScanConfig(),
         (qrCodeMessage, decodedResult) => {
             renderDetectedCorners(qrGuideWrapDevice, qrReader, decodedResult);
-            // Tìm thiết bị theo id hoặc tên
-            let found = false;
-            for (let i = 0; i < selectDevice.options.length; i++) {
-                if (
-                    selectDevice.options[i].value === qrCodeMessage ||
-                    selectDevice.options[i].dataset.deviceName === qrCodeMessage ||
-                    selectDevice.options[i].text === qrCodeMessage
-                ) {
-                    selectDevice.selectedIndex = i;
-                    found = true;
-                    break;
-                }
-            }
+            let found = selectMachineByQr(qrCodeMessage);
             if (found) {
                 window.QAStageAudio?.play('scan_ok');
                 setGuideState(qrGuideWrapDevice, 'locked', 'QRを確認しました');
@@ -809,7 +866,7 @@ startQrBtn.addEventListener('click', function() {
                 }, 700);
             } else {
                 window.QAStageAudio?.play('error');
-                alert("QRコードがリストに一致しません: " + qrCodeMessage);
+                alert("QRコードが機械リストに一致しません: " + qrCodeMessage);
             }
         },
         errorMessage => {}
@@ -830,18 +887,7 @@ refocusQrBtn.addEventListener('click', function() {
                     getQrScanConfig(),
                 (qrCodeMessage, decodedResult) => {
                     renderDetectedCorners(qrGuideWrapDevice, qrReader, decodedResult);
-                    let found = false;
-                    for (let i = 0; i < selectDevice.options.length; i++) {
-                        if (
-                            selectDevice.options[i].value === qrCodeMessage ||
-                            selectDevice.options[i].dataset.deviceName === qrCodeMessage ||
-                            selectDevice.options[i].text === qrCodeMessage
-                        ) {
-                            selectDevice.selectedIndex = i;
-                            found = true;
-                            break;
-                        }
-                    }
+                    let found = selectMachineByQr(qrCodeMessage);
                     if (found) {
                         setGuideState(qrGuideWrapDevice, 'locked', 'QRを確認しました');
                         setTimeout(() => {
@@ -854,7 +900,7 @@ refocusQrBtn.addEventListener('click', function() {
                             showDeviceSelectedMsg();
                         }, 700);
                     } else {
-                        alert("QRコードがリストに一致しません: " + qrCodeMessage);
+                        alert("QRコードが機械リストに一致しません: " + qrCodeMessage);
                     }
                 },
                 errorMessage => {}
@@ -867,6 +913,11 @@ refocusQrBtn.addEventListener('click', function() {
 if (selectMaterial) {
     syncMaterialCodeField();
     selectMaterial.addEventListener('change', syncMaterialCodeField);
+}
+if (selectMachine) {
+    syncOutstockDeviceChoices();
+    selectMachine.addEventListener('change', syncOutstockDeviceChoices);
+    selectDevice.addEventListener('change', showDeviceSelectedMsg);
 }
 
 startMaterialQrBtn.addEventListener('click', function() {

@@ -1,0 +1,72 @@
+<!-- {% load static %} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}設備・部品在庫管理{% endblock %}</title>
+  <script>
+    if (window.location.protocol === "file:") {
+      window.location.replace("http://localhost:8010/setsubi-zaiko/equipment/");
+    }
+  </script>
+  <script>
+    tailwind = { config: { corePlugins: { preflight: false } } };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'setsubi_zaiko/css/app.css' %}">
+  <style>
+    body { margin: 0; background: #f3f4f6; color: #111827; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    .setsubi-shell, .setsubi-shell * { box-sizing: border-box; letter-spacing: 0; }
+    .setsubi-shell input, .setsubi-shell select, .setsubi-shell textarea {
+      min-height: 42px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: none;
+    }
+    .setsubi-table { min-width: 980px; }
+    .setsubi-table th { white-space: nowrap; font-size: 0.74rem; color: #4b5563; font-weight: 700; }
+    .setsubi-table td { vertical-align: middle; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <div class="setsubi-shell min-h-screen">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center">
+        <a class="flex items-center gap-3" href="{% url 'setsubi_zaiko:dashboard' %}">
+          <div class="flex h-10 w-10 items-center justify-center rounded bg-slate-950 text-sm font-black text-white">HT</div>
+          <div>
+            <div class="text-xl font-black leading-tight text-slate-950">設備・部品在庫</div>
+            <div class="text-xs font-semibold text-slate-500">Asset / Mold / Parts Catalog</div>
+          </div>
+        </a>
+
+        <form class="flex min-w-0 flex-1 lg:mx-5" action="{{ request.path }}" method="get">
+          {% if filters.item_kind %}<input type="hidden" name="item_kind" value="{{ filters.item_kind }}">{% endif %}
+          <input class="h-11 min-w-0 flex-1 rounded-l border border-r-0 border-slate-300 px-4 text-base" name="q" value="{{ filters.q }}" placeholder="キーワード・型番・管理番号で検索">
+          <button class="h-11 rounded-r bg-blue-700 px-6 font-bold text-white hover:bg-blue-800" type="submit">検索</button>
+        </form>
+
+        <div class="text-right text-xs font-semibold text-slate-500">
+          <div>{{ request.user.get_full_name|default:request.user.username }}</div>
+          <a class="text-blue-700" href="/">ポータルへ</a>
+        </div>
+      </div>
+
+      <nav class="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-3">
+        <a class="whitespace-nowrap rounded px-4 py-2 text-sm font-bold {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-800 hover:bg-slate-200{% endif %}" href="{% url 'setsubi_zaiko:dashboard' %}">Dashboard</a>
+        <a class="whitespace-nowrap rounded px-4 py-2 text-sm font-bold {% if request.resolver_match.url_name == 'equipment_list' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-800 hover:bg-slate-200{% endif %}" href="{% url 'setsubi_zaiko:equipment_list' %}">設備・機械部品</a>
+        <a class="whitespace-nowrap rounded px-4 py-2 text-sm font-bold {% if request.resolver_match.url_name == 'mold_list' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-800 hover:bg-slate-200{% endif %}" href="{% url 'setsubi_zaiko:mold_list' %}">金型部品</a>
+        <a class="whitespace-nowrap rounded px-4 py-2 text-sm font-bold {% if request.resolver_match.url_name == 'ledger_list' or request.resolver_match.url_name == 'ledger_in' or request.resolver_match.url_name == 'ledger_out' or request.resolver_match.url_name == 'ledger_adjust' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-800 hover:bg-slate-200{% endif %}" href="{% url 'setsubi_zaiko:ledger_list' %}">入出庫台帳</a>
+        <a class="whitespace-nowrap rounded px-4 py-2 text-sm font-bold {% if request.resolver_match.url_name == 'master_list' or request.resolver_match.url_name == 'category_create' or request.resolver_match.url_name == 'catalog_create' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-800 hover:bg-slate-200{% endif %}" href="{% url 'setsubi_zaiko:master_list' %}">マスター管理</a>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-4">
+      {% block setsubi_content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

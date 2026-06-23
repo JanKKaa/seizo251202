@@ -7,7 +7,7 @@ from calendar import monthrange
 from datetime import date
 import re
 
-MATERIAL_MACHINES = [str(code) for code in range(200, 216)]
+MATERIAL_MACHINES = [str(code) for code in range(200, 221)]
 
 def _strip_material_code(name: str) -> str:
     if not name:

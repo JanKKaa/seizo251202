@@ -160,7 +160,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold course-link-btn" data-bs-toggle="modal" data-bs-target="#courseModal{{ enrollment.course.id }}" title="{{ enrollment.course.title }}">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold course-link-btn" data-bs-toggle="modal" data-bs-target="#courseModal{{ enrollment.id }}" title="{{ enrollment.course.title }}">
                                     {{ enrollment.course.title }}
                                 </button>
                             </td>
@@ -361,17 +361,17 @@
 </div>
 
 {% for enrollment in user_enrollments %}
-<div class="modal fade" id="courseModal{{ enrollment.course.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ enrollment.course.id }}" aria-hidden="true">
+<div class="modal fade" id="courseModal{{ enrollment.id }}" tabindex="-1" aria-labelledby="courseModalLabel{{ enrollment.id }}" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="courseModalLabel{{ enrollment.course.id }}">研修・講習詳細</h5>
+                <h5 class="modal-title" id="courseModalLabel{{ enrollment.id }}">受講申請詳細（{{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}）</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
                 <div class="modal-body learn-modal-body">
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}</p>
+                            <p><strong>この申請の申請者:</strong> {{ enrollment.user.username }}{% if enrollment.nhanvien and enrollment.nhanvien.ten %} - {{ enrollment.nhanvien.ten }}{% endif %}</p>
                             <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
                            
                             <p><strong>外部リンク:</strong>
@@ -381,8 +381,8 @@
                                     なし
                                 {% endif %}
                             </p>
-                            <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
-                            <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
+                            <p><strong>申込開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
+                            <p><strong>申込締切日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
                             <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
                             <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
                             <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
@@ -395,7 +395,7 @@
                                     <span class="badge bg-secondary">無効</span>
                                 {% endif %}
                             </p>
-                           <p><strong>作成者:</strong>
+                           <p><strong>研修・講習の作成者:</strong>
                                     {% if enrollment.course.creator_name %}
                                         {{ enrollment.course.creator_name }}
                                     {% elif enrollment.course.creator %}

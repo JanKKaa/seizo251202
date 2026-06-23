@@ -1,5 +1,13 @@
 from django import forms
-from .models import QAResult, QADeviceInfo, QAMaterialMaster, QAMaterialStockLedger, QAMaterialOutStockLedger
+from .models import (
+    QAResult,
+    QADeviceInfo,
+    QAMaterialMaster,
+    QAMaterialStockLedger,
+    QAMaterialOutStockLedger,
+    QATabletDevice,
+    QATabletInspection,
+)
 from baotri.models import MaintenanceTask
 
 class QAResultForm(forms.ModelForm):
@@ -88,6 +96,13 @@ class QAMaterialStockLedgerForm(forms.ModelForm):
             "hinmei_name",
             "order_no",
             "workstation_management_no",
+            "operator_name",
+            "transaction_type",
+            "adjustment_reason_code",
+            "adjustment_reason",
+            "adjustment_note",
+            "stock_before_kg",
+            "stock_after_kg",
         ]
         widgets = {
             "stock_in_date": forms.DateInput(attrs={"type": "date"}),
@@ -95,6 +110,7 @@ class QAMaterialStockLedgerForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["lot_number"].required = True
         for name, field in self.fields.items():
             field.widget.attrs["class"] = "form-control"
 
@@ -112,6 +128,13 @@ class QAMaterialOutStockLedgerForm(forms.ModelForm):
             "lot_number",
             "product_code",
             "workstation_management_no",
+            "operator_name",
+            "transaction_type",
+            "adjustment_reason_code",
+            "adjustment_reason",
+            "adjustment_note",
+            "stock_before_kg",
+            "stock_after_kg",
         ]
         widgets = {
             "stock_out_date": forms.DateInput(attrs={"type": "date"}),
@@ -119,5 +142,50 @@ class QAMaterialOutStockLedgerForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["lot_number"].required = True
         for name, field in self.fields.items():
             field.widget.attrs["class"] = "form-control"
+
+
+class QATabletDeviceForm(forms.ModelForm):
+    class Meta:
+        model = QATabletDevice
+        fields = ["code", "name", "os_name", "serial_no", "status", "note"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            field.widget.attrs["class"] = "form-control"
+
+
+class QATabletInspectionForm(forms.ModelForm):
+    class Meta:
+        model = QATabletInspection
+        fields = [
+            "tablet",
+            "check_type",
+            "check_date",
+            "camera_ok",
+            "qr_sample_ok",
+            "qr_sample_text",
+            "qr_sample_checked_at",
+            "ocr_sample_ok",
+            "network_ok",
+            "workstation_ok",
+            "result",
+            "problem_category",
+            "problem_detail",
+            "action_taken",
+        ]
+        widgets = {
+            "check_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["tablet"].queryset = QATabletDevice.objects.all().order_by("code")
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs["class"] = "form-check-input"
+            else:
+                field.widget.attrs["class"] = "form-control"

@@ -159,8 +159,7 @@
                             <th class="text-center" style="width: 4%;">#</th>
                             <th style="width: 26%;">研修・講習</th>
                             <th style="width: 10%;">作成日</th>
-                            <th style="width: 9%;">開始日</th>
-                            <th style="width: 9%;">終了日</th>
+                            <th style="width: 9%;">申込締切日</th>
                             <th style="width: 10%;">申請者</th>
                             <th style="width: 10%;">申込資料</th>
                             <th style="width: 10%;">アクション</th>
@@ -178,7 +177,6 @@
                             </td>
                             
                             <td>{{ course.created_at|date:"Y-m-d" }}</td>
-                            <td>{{ course.start_date|date:"Y-m-d" }}</td>
                             <td>{{ course.end_date|date:"Y-m-d" }}</td>
                             <td>{{ course.creator_name }}</td>
                             <td>
@@ -204,6 +202,10 @@
                                         <span class="learn-chip learn-chip-warn">待ち</span>
                                     {% elif course.status == 'expired' %}
                                         <span class="learn-chip learn-chip-neutral">終了</span>
+                                    {% elif course.user_enrollment %}
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                                            申請済み
+                                        </button>
                                     {% else %}
                                         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#enrollModal{{ course.id }}">
                                             申請
@@ -223,23 +225,21 @@
                                     <span class="learn-chip learn-chip-warn">待ち</span>
                                 {% elif course.status == 'expired' %}
                                     <span class="learn-chip learn-chip-neutral">終了</span>
+                                {% elif course.user_enrollment %}
+                                    {% if course.user_enrollment.status == 'pending_supervisor' %}
+                                        <span class="learn-chip learn-chip-warn">上司承認待ち</span>
+                                    {% endif %}
+                                    {% if course.user_enrollment.status == 'pending_kanri' %}
+                                        <span class="learn-chip learn-chip-warn">管理課承認待ち</span>
+                                    {% endif %}
+                                    {% if course.user_enrollment.status == 'approved' %}
+                                        <span class="learn-chip learn-chip-success">承認済み</span>
+                                    {% endif %}
+                                    {% if course.user_enrollment.status == 'rejected' or course.user_enrollment.status == 'rejected_by_kanri' or course.user_enrollment.status == 'rejected_by_supervisor' %}
+                                        <span class="learn-chip learn-chip-danger">見送り</span>
+                                    {% endif %}
                                 {% else %}
-                                    {% for enrollment in user_enrollments %}
-                                        {% if enrollment.course == course %}
-                                            {% if enrollment.status == 'pending_supervisor' %}
-                                                <span class="learn-chip learn-chip-warn">上司承認待ち</span>
-                                            {% endif %}
-                                            {% if enrollment.status == 'pending_kanri' %}
-                                                <span class="learn-chip learn-chip-warn">管理課承認待ち</span>
-                                            {% endif %}
-                                            {% if enrollment.status == 'approved' %}
-                                                <span class="learn-chip learn-chip-success">承認済み</span>
-                                            {% endif %}
-                                            {% if enrollment.status == 'rejected' %}
-                                                <span class="learn-chip learn-chip-danger">見送り</span>
-                                            {% endif %}
-                                        {% endif %}
-                                    {% endfor %}
+                                    <span class="text-muted">未申請</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -355,13 +355,13 @@
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="approvalDetailModalLabel{{ enrollment.id }}">申請詳細</h5>
+                        <h5 class="modal-title" id="approvalDetailModalLabel{{ enrollment.id }}">受講申請詳細（{{ enrollment.user.username }}{% if enrollment.user.ten %} - {{ enrollment.user.ten }}{% endif %}）</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body learn-modal-body">
                         <div class="row g-3">
                             <div class="col-lg-6">
-                                <p><strong>申請者:</strong> {{ enrollment.user.username }}{% if enrollment.user.ten %} - {{ enrollment.user.ten }}{% endif %}</p>
+                                <p><strong>この申請の申請者:</strong> {{ enrollment.user.username }}{% if enrollment.user.ten %} - {{ enrollment.user.ten }}{% endif %}</p>
                                 <p><strong>研修・講習:</strong> {{ enrollment.course.title }}</p>
                                 <p><strong>外部リンク:</strong>
                                     {% if enrollment.course.external_url %}
@@ -370,14 +370,14 @@
                                         なし
                                     {% endif %}
                                 </p>
-                                <p><strong>開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
-                                <p><strong>終了日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
+                                <p><strong>申込開始日:</strong> {{ enrollment.course.start_date|date:"Y-m-d" }}</p>
+                                <p><strong>申込締切日:</strong> {{ enrollment.course.end_date|date:"Y-m-d" }}</p>
                                 <p><strong>受講料:</strong> {{ enrollment.course.price }}</p>
                                 <p><strong>研修期間（時間）:</strong> {{ enrollment.course.duration }}</p>
                                 <p><strong>定員:</strong> {{ enrollment.course.capacity }}</p>
                                 <p><strong>場所:</strong> {{ enrollment.course.location }}</p>
                                 <p><strong>対象:</strong> {{ enrollment.course.target }}</p>
-                                <p><strong>作成者:</strong>
+                                <p><strong>研修・講習の作成者:</strong>
                                     {% if enrollment.course.creator_name %}
                                         {{ enrollment.course.creator_name }}
                                     {% elif enrollment.course.creator %}
@@ -501,11 +501,11 @@
                             <div class="learn-info-title">運用情報</div>
                             <dl class="learn-info-list">
                                 <div class="learn-info-row">
-                                    <dt class="learn-info-label">開始日</dt>
+                                    <dt class="learn-info-label">申込開始日</dt>
                                     <dd class="learn-info-value">{{ course.start_date|date:"Y-m-d" }}</dd>
                                 </div>
                                 <div class="learn-info-row">
-                                    <dt class="learn-info-label">終了日</dt>
+                                    <dt class="learn-info-label">申込締切日</dt>
                                     <dd class="learn-info-value">{{ course.end_date|date:"Y-m-d" }}</dd>
                                 </div>
                                 <div class="learn-info-row">

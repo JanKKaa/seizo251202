@@ -21,7 +21,8 @@
                 <thead class="thead-light">
                     <tr>
                         <th class="small" style="width: 25%;">申請者名</th>
-                        <th class="small" style="width: 25%;">ドキュメント名</th>
+                        <th class="small" style="width: 15%;">分類</th>
+                        <th class="small" style="width: 20%;">ドキュメント名</th>
                         <th class="small" style="width: 25%;">承認済みドキュメントをアップロード</th>
                         <th class="small" style="width: 25%;">アクション</th>
                     </tr>
@@ -29,6 +30,7 @@
                 <tbody>
                     <tr>
                         <td class="small">{{ document.created_by.first_name }} {{ document.created_by.last_name }}</td>
+                        <td class="small">{{ document.get_category_display }}</td>
                         <td class="small">{{ document.title }}</td>
                         <td class="small">
                             {% if not document.approved_file %}

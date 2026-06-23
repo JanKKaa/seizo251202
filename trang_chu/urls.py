@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views
@@ -41,6 +42,8 @@ urlpatterns = [
     path('nhap-lieu/', include(('nhap_lieu.urls', 'nhap_lieu_alias'), namespace='nhap_lieu_alias')),  # alias route cho Flask callback
     path('menu/', include('menu.urls')),  # Đúng với cấu trúc của bạn
     path('learn/', include('learn.urls', namespace='learn')),
+    path('setsubi-zaiko/', include('setsubi_zaiko.urls')),
+    path('dev/setsubi-zaiko/', RedirectView.as_view(url='/setsubi-zaiko/', permanent=False)),
 ]
 
 if settings.DEBUG:

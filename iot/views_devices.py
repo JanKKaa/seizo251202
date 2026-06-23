@@ -171,7 +171,7 @@ def device_create(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Tạo thiết bị thành công.")
-            return redirect('device_list')
+            return redirect('iot:device_list')
     else:
         form = MachineForm()
     return render(request, 'iot/device_form.html', {'form': form, 'mode': 'create'})
@@ -184,7 +184,7 @@ def device_update(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, "Cập nhật thành công.")
-            return redirect('device_detail', pk=machine.pk)
+            return redirect('iot:device_detail', pk=machine.pk)
     else:
         form = MachineForm(instance=machine)
     return render(request, 'iot/device_form.html', {'form': form, 'mode': 'update', 'machine': machine})
@@ -195,7 +195,7 @@ def device_delete(request, pk):
     if request.method == 'POST':
         machine.delete()
         messages.success(request, "Đã xóa thiết bị.")
-        return redirect('device_list')
+        return redirect('iot:device_list')
     return render(request, 'iot/device_delete_confirm.html', {'machine': machine})
 
 # ------ TOGGLE ACTIVE (AJAX/POST) ------
@@ -235,7 +235,7 @@ def device_bulk_import(request):
             else:
                 updated += 1
         messages.success(request, f"Import xong. Tạo mới {created}, cập nhật {updated}.")
-        return redirect('device_list')
+        return redirect('iot:device_list')
     return render(request, 'iot/device_bulk_import.html')
 
 # ------ JSON API: LIST ------
@@ -455,14 +455,15 @@ def api_device_raw(request):
 
 @require_GET
 def api_alarms_active(request):
-    qs = MachineAlarmEvent.objects.filter(active=True).select_related('machine').order_by('-started_at')[:200]
+    qs = MachineAlarmEvent.objects.filter(cleared_at__isnull=True).select_related('machine').order_by('-created_at')[:200]
     data = []
     for ev in qs:
         data.append({
             'address': ev.machine.address,
             'alarm_code': ev.alarm_code,
             'alarm_name': ev.alarm_name,
-            'started_at': ev.started_at.isoformat(),
+            'started_at': ev.created_at.isoformat(),
+            'created_at': ev.created_at.isoformat(),
         })
     return JsonResponse({'ok': True, 'alarms': data})
 
@@ -470,14 +471,14 @@ def api_alarms_active(request):
 def api_alarm_distribution(request):
     days = int(request.GET.get('days', 30))
     since = timezone.now() - timezone.timedelta(days=days)
-    qs = MachineAlarmEvent.objects.filter(started_at__gte=since)
-    agg = qs.values('alarm_category','alarm_category_label').annotate(cnt=Count('id'))
+    qs = MachineAlarmEvent.objects.filter(created_at__gte=since)
+    agg = qs.values('alarm_code', 'alarm_name').annotate(cnt=Count('id')).order_by('-cnt')[:20]
     total = sum(a['cnt'] for a in agg) or 1
     data = []
     for a in agg:
         data.append({
-            'category': a['alarm_category'] or '',
-            'label': a['alarm_category_label'] or '',
+            'category': a['alarm_code'] or '',
+            'label': a['alarm_name'] or a['alarm_code'] or '',
             'count': a['cnt'],
             'percent': round(a['cnt']*100/total,2)
         })

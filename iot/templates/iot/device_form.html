@@ -16,7 +16,7 @@
   </div>
   <div class="card-footer d-flex gap-2">
     <button class="btn btn-primary btn-sm">Lưu</button>
-    <a class="btn btn-outline-secondary btn-sm" href="{% if mode == 'create' %}{% url 'device_list' %}{% else %}{% url 'device_detail' machine.pk %}{% endif %}">Hủy</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% if mode == 'create' %}{% url 'iot:device_list' %}{% else %}{% url 'iot:device_detail' machine.pk %}{% endif %}">Hủy</a>
   </div>
 </form>
 {% endblock %}

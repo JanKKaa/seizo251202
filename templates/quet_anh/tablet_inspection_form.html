@@ -1,0 +1,320 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}タブレット点検登録{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .tenken-surface {
+    --tenken-gap: 0.85rem;
+  }
+  .tenken-surface input[type="text"],
+  .tenken-surface input[type="date"],
+  .tenken-surface input[type="datetime-local"],
+  .tenken-surface select,
+  .tenken-surface textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.8rem;
+    background: #fff;
+    color: #0f172a;
+    min-height: 44px;
+  }
+  .tenken-surface textarea { min-height: 76px; }
+  .tenken-surface input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  @media (min-width: 768px) and (max-width: 1180px) {
+    .tenken-page { padding-top: 0.75rem; padding-bottom: 0.5rem; }
+    .tenken-title { font-size: 1.45rem; line-height: 1.15; }
+    .tenken-card-head { padding: 0.75rem 1rem; }
+    .tenken-card-body { padding: 0.9rem 1rem; }
+    .tenken-preset-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.55rem; }
+    .tenken-preset { min-height: 74px; padding: 0.65rem; border-radius: 0.85rem; }
+    .tenken-preset-title { font-size: 0.88rem; line-height: 1.15; }
+    .tenken-preset-sub { font-size: 0.72rem; }
+    .tenken-qr-reader { max-width: 320px; min-height: 220px; }
+    .tenken-surface textarea { min-height: 64px; }
+    .tenken-sticky { position: static; margin-top: 0.75rem; }
+  }
+  @media (max-width: 767px) {
+    .tenken-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tenken-sticky { position: static; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tenken-surface tenken-page bg-slate-100 min-h-screen py-4">
+  <div class="max-w-6xl mx-auto px-3">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-3">
+      <div>
+        <div class="text-xs font-semibold tracking-wide text-slate-500">IATF TRACEABILITY / TRIAL OPERATION</div>
+        <h1 class="tenken-title text-2xl font-bold text-slate-900">QAタブレット 始業前点検</h1>
+        <p class="text-sm text-slate-600 mt-1">QR読取、カメラ、通信、端末連携の状態を記録します。試験運用中のため、NGでもスキャン画面は停止しません。</p>
+      </div>
+      <a href="{% url 'tablet_device_list' %}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 md:min-w-28">一覧へ戻る</a>
+    </div>
+
+    {% if messages %}
+      <div class="space-y-2 mb-4">
+        {% for message in messages %}
+          <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" class="space-y-3" id="tablet-inspection-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <section class="lg:col-span-2 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+          <div class="tenken-card-head border-b border-slate-200 px-5 py-4">
+            <h2 class="text-lg font-bold text-slate-900">点検情報</h2>
+          </div>
+          <div class="tenken-card-body p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="text-sm font-semibold text-slate-700">タブレット</label>
+              {{ form.tablet }}
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-slate-700">点検区分</label>
+              {{ form.check_type }}
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-slate-700">点検日</label>
+              {{ form.check_date }}
+            </div>
+          </div>
+        </section>
+
+        <aside class="rounded-2xl bg-slate-900 text-white shadow-sm overflow-hidden">
+          <div class="tenken-card-body p-5">
+            <div class="text-xs font-semibold text-slate-300">判定ルール</div>
+            <div class="mt-2 text-sm leading-6 text-slate-100">
+              QR読取内容が <span class="font-bold text-emerald-300">QA-TABLET-CHECK</span> で始まればOK。読取不可、内容不一致、カメラ不良はNGとして記録します。
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+        <div class="tenken-card-head border-b border-slate-200 px-5 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">QR読取確認</h2>
+            <p class="text-sm text-slate-500">共通QRラベルを読み取り、読取内容を監査証跡として保存します。</p>
+          </div>
+          <div id="tablet-qr-status" class="rounded-full bg-slate-200 px-3 py-1 text-sm font-bold text-slate-700">未確認</div>
+        </div>
+        <div class="tenken-card-body p-5 grid grid-cols-1 md:grid-cols-[360px_minmax(0,1fr)] gap-4">
+          <div>
+            <div id="tablet-qr-reader" class="tenken-qr-reader w-full max-w-md rounded-2xl overflow-hidden bg-slate-100"></div>
+            <div class="mt-3 flex gap-2">
+              <button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700" id="tablet-qr-start">QR読取開始</button>
+              <button type="button" class="hidden rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" id="tablet-qr-stop">停止</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-slate-700">QR読取内容</label>
+            {{ form.qr_sample_text }}
+            {{ form.qr_sample_checked_at.as_hidden }}
+            <p class="text-xs text-slate-500 mt-2">正しいサンプル: QA-TABLET-CHECK|CHECK=STARTUP|PURPOSE=QR_SAMPLE|VERSION=1|STATUS=OK</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+        <div class="tenken-card-head border-b border-slate-200 px-5 py-4">
+          <h2 class="text-lg font-bold text-slate-900">よくある異常を選択</h2>
+          <p class="text-sm text-slate-500">現場で多い内容をワンタップで入力できます。</p>
+        </div>
+        <div class="tenken-card-body tenken-preset-grid p-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button type="button" class="preset tenken-preset rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-left hover:bg-emerald-100" data-result="ok" data-problem="none" data-detail="" data-action="" data-ok="all">
+            <div class="tenken-preset-title font-bold text-emerald-800">異常なし</div>
+            <div class="tenken-preset-sub text-xs text-emerald-700 mt-1">全項目OK</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-left hover:bg-rose-100" data-result="ng" data-problem="qr" data-detail="QRサンプルを読み取れない、または読取内容が基準と一致しない。" data-action="使用を停止し、QRラベル・カメラ状態を確認。上長または生産技術へ連絡。" data-off="qr">
+            <div class="tenken-preset-title font-bold text-rose-800">QR読取不良</div>
+            <div class="tenken-preset-sub text-xs text-rose-700 mt-1">読めない/内容不一致</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-left hover:bg-rose-100" data-result="ng" data-problem="camera" data-detail="カメラ画像が暗い、ぼやける、ピントが合わない、または起動できない。" data-action="レンズ清掃、再起動を実施。改善しない場合は使用停止し生産技術へ連絡。" data-off="camera">
+            <div class="tenken-preset-title font-bold text-rose-800">カメラ不良</div>
+            <div class="tenken-preset-sub text-xs text-rose-700 mt-1">ぼやけ/起動不可</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-left hover:bg-amber-100" data-result="ng" data-problem="ocr" data-detail="OCRまたは画像確認の結果が不安定、文字が正しく認識されない。" data-action="照明、撮影距離、レンズ汚れを確認。改善しない場合は使用停止し確認依頼。" data-off="ocr">
+            <div class="tenken-preset-title font-bold text-amber-800">OCR不良</div>
+            <div class="tenken-preset-sub text-xs text-amber-700 mt-1">文字認識不安定</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-left hover:bg-amber-100" data-result="ng" data-problem="network" data-detail="Wi-Fiまたはサーバー接続が不安定、画面更新や送信に失敗する。" data-action="Wi-Fi接続、電波状態、サーバー接続を確認。改善しない場合は生産技術へ連絡。" data-off="network">
+            <div class="tenken-preset-title font-bold text-amber-800">通信不良</div>
+            <div class="tenken-preset-sub text-xs text-amber-700 mt-1">Wi-Fi/送信失敗</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-left hover:bg-amber-100" data-result="ng" data-problem="workstation" data-detail="端末連携または自動入力処理が正常に完了しない。" data-action="端末アプリ、IP設定、連携状態を確認。必要に応じて端末を再起動。" data-off="workstation">
+            <div class="tenken-preset-title font-bold text-amber-800">端末連携不良</div>
+            <div class="tenken-preset-sub text-xs text-amber-700 mt-1">自動入力NG</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-left hover:bg-rose-100" data-result="ng" data-problem="app" data-detail="アプリが固まる、画面が戻らない、ボタン操作に反応しない。" data-action="アプリ再起動、端末再起動を実施。再発時は使用停止し生産技術へ連絡。" data-off="none">
+            <div class="tenken-preset-title font-bold text-rose-800">アプリ動作不良</div>
+            <div class="tenken-preset-sub text-xs text-rose-700 mt-1">フリーズ/無反応</div>
+          </button>
+          <button type="button" class="preset tenken-preset rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-left hover:bg-rose-100" data-result="ng" data-problem="damage" data-detail="画面割れ、汚れ、ケース破損、レンズ部の傷または汚れがある。" data-action="使用を停止し、予備機へ切替。上長または生産技術へ連絡。" data-off="camera">
+            <div class="tenken-preset-title font-bold text-rose-800">破損・汚れ</div>
+            <div class="tenken-preset-sub text-xs text-rose-700 mt-1">画面/レンズ</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+        <div class="tenken-card-head border-b border-slate-200 px-5 py-4">
+          <h2 class="text-lg font-bold text-slate-900">点検結果</h2>
+        </div>
+        <div class="tenken-card-body p-5 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{{ form.camera_ok }} カメラ</label>
+            <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{{ form.qr_sample_ok }} QR読取</label>
+            <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{{ form.ocr_sample_ok }} OCR/画像</label>
+            <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{{ form.network_ok }} 通信</label>
+            <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{{ form.workstation_ok }} 端末連携</label>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm font-semibold text-slate-700">判定</label>
+              {{ form.result }}
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-slate-700">異常分類</label>
+              {{ form.problem_category }}
+            </div>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-slate-700">異常内容</label>
+            {{ form.problem_detail }}
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-slate-700">処置内容</label>
+            {{ form.action_taken }}
+          </div>
+        </div>
+      </section>
+
+      <div class="tenken-sticky sticky bottom-0 z-10 -mx-3 bg-slate-100/95 px-3 py-3 backdrop-blur">
+        <div class="max-w-6xl mx-auto flex justify-end gap-2">
+          <a href="{% url 'tablet_device_list' %}" class="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">戻る</a>
+          <button type="submit" class="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">点検記録を保存</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script defer src="https://unpkg.com/html5-qrcode"></script>
+<script>
+(() => {
+  const expectedPrefix = "QA-TABLET-CHECK";
+  const startBtn = document.getElementById("tablet-qr-start");
+  const stopBtn = document.getElementById("tablet-qr-stop");
+  const readerEl = document.getElementById("tablet-qr-reader");
+  const statusEl = document.getElementById("tablet-qr-status");
+  const textInput = document.getElementById("id_qr_sample_text");
+  const checkedAtInput = document.getElementById("id_qr_sample_checked_at");
+  const qrOkInput = document.getElementById("id_qr_sample_ok");
+  const cameraOkInput = document.getElementById("id_camera_ok");
+  const ocrOkInput = document.getElementById("id_ocr_sample_ok");
+  const networkOkInput = document.getElementById("id_network_ok");
+  const workstationOkInput = document.getElementById("id_workstation_ok");
+  const resultSelect = document.getElementById("id_result");
+  const problemSelect = document.getElementById("id_problem_category");
+  const detailInput = document.getElementById("id_problem_detail");
+  const actionInput = document.getElementById("id_action_taken");
+  let scanner = null;
+
+  function setStatus(ok, message) {
+    if (!statusEl) return;
+    statusEl.className = `rounded-full px-3 py-1 text-sm font-bold ${ok ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`;
+    statusEl.textContent = message;
+  }
+
+  function setAllChecks(value) {
+    [cameraOkInput, qrOkInput, ocrOkInput, networkOkInput, workstationOkInput].forEach((el) => {
+      if (el) el.checked = value;
+    });
+  }
+
+  function markOff(target) {
+    if (target === "camera" && cameraOkInput) cameraOkInput.checked = false;
+    if (target === "qr" && qrOkInput) qrOkInput.checked = false;
+    if (target === "ocr" && ocrOkInput) ocrOkInput.checked = false;
+    if (target === "network" && networkOkInput) networkOkInput.checked = false;
+    if (target === "workstation" && workstationOkInput) workstationOkInput.checked = false;
+  }
+
+  document.querySelectorAll(".preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const result = btn.dataset.result || "ng";
+      if (result === "ok") {
+        setAllChecks(true);
+        if (resultSelect) resultSelect.value = "ok";
+        if (problemSelect) problemSelect.value = "none";
+        if (detailInput) detailInput.value = "";
+        if (actionInput) actionInput.value = "";
+        return;
+      }
+      setAllChecks(true);
+      markOff(btn.dataset.off || "");
+      if (resultSelect) resultSelect.value = result;
+      if (problemSelect) problemSelect.value = btn.dataset.problem || "other";
+      if (detailInput) detailInput.value = btn.dataset.detail || "";
+      if (actionInput) actionInput.value = btn.dataset.action || "";
+    });
+  });
+
+  function stopScanner() {
+    if (!scanner) return Promise.resolve();
+    return scanner.stop().catch(() => {}).finally(() => {
+      scanner = null;
+      if (readerEl) readerEl.innerHTML = "";
+      startBtn?.classList.remove("hidden");
+      stopBtn?.classList.add("hidden");
+    });
+  }
+
+  startBtn?.addEventListener("click", () => {
+    if (typeof Html5Qrcode === "undefined") {
+      setStatus(false, "QRライブラリを読み込めません");
+      return;
+    }
+    scanner = new Html5Qrcode("tablet-qr-reader");
+    startBtn.classList.add("hidden");
+    stopBtn?.classList.remove("hidden");
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 260, height: 260 } },
+      (decodedText) => {
+        const text = decodedText || "";
+        if (textInput) textInput.value = text;
+        if (checkedAtInput) checkedAtInput.value = new Date().toISOString().slice(0, 19).replace("T", " ");
+        const ok = text.startsWith(expectedPrefix);
+        if (qrOkInput) qrOkInput.checked = ok;
+        if (resultSelect) resultSelect.value = ok ? "ok" : "ng";
+        if (!ok && problemSelect) problemSelect.value = "qr";
+        if (!ok && detailInput) detailInput.value = "QRサンプルの読取内容が基準と一致しない。";
+        if (!ok && actionInput) actionInput.value = "使用を停止し、QRラベル・カメラ状態を確認。上長または生産技術へ連絡。";
+        setStatus(ok, ok ? "QR確認OK" : "QR確認NG");
+        stopScanner();
+      },
+      () => {}
+    ).catch(() => {
+      setStatus(false, "カメラを開始できません");
+      startBtn.classList.remove("hidden");
+      stopBtn?.classList.add("hidden");
+    });
+  });
+
+  stopBtn?.addEventListener("click", stopScanner);
+})();
+</script>
+{% endblock %}

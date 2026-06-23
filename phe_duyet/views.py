@@ -47,16 +47,22 @@ def index(request):
         )
     ).order_by('is_pending', '-submission_date')  # Sắp xếp theo "確認中" trước, sau đó theo ngày nộp mới nhất
 
-    paginator = Paginator(documents, 5)  # 1ページに最大5つのドキュメントを表示
+    paginator = Paginator(documents, 10)  # 1ページに最大10件のドキュメントを表示
 
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        number=page_obj.number,
+        on_each_side=1,
+        on_ends=1,
+    )
 
     approve_button_count = sum(1 for document in page_obj if document.approvals.filter(approved=False, rejected=False, approver=request.user).exists())
 
     unread_messages_count = Message.objects.filter(recipient=request.user, read=False).count()
     return render(request, 'phe_duyet/index.html', {
         'page_obj': page_obj,
+        'page_range': page_range,
         'unread_messages_count': unread_messages_count,
         'approve_button_count': approve_button_count,
     })
@@ -323,7 +329,7 @@ def export_csv(request):
 
     # Tạo writer cho file CSV
     writer = csv.writer(response)
-    writer.writerow(['ID', 'Title', 'Submission Date', 'Created By', 'Recipient', 'Status'])
+    writer.writerow(['ID', 'Category', 'Title', 'Submission Date', 'Created By', 'Recipient', 'Status'])
 
     # Lấy dữ liệu từ model Document
     documents = Document.objects.all()
@@ -331,6 +337,7 @@ def export_csv(request):
         status = '承認' if document.is_approved else '不承認' if document.is_rejected else '確認中'
         writer.writerow([
             document.id,
+            document.get_category_display(),
             document.title,
             document.submission_date,
             f"{document.created_by.first_name} {document.created_by.last_name}",

@@ -34,17 +34,18 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql=CREATE_XULYANH2_TABLE_SQL,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.RunSQL(
-            sql=CREATE_XULYANH2_INDEX_MACHINE_SQL,
-            reverse_sql='DROP INDEX IF EXISTS "xu_ly_anh_xulyanh2_machine_id_2207558c";',
-        ),
-        migrations.RunSQL(
-            sql=CREATE_XULYANH2_INDEX_USER_SQL,
-            reverse_sql='DROP INDEX IF EXISTS "xu_ly_anh_xulyanh2_user_id_b824ba18";',
+        migrations.RunPython(
+            code=lambda apps, schema_editor: (
+                _ensure_sqlite_xulyanh2_table(schema_editor)
+            ),
+            reverse_code=migrations.RunPython.noop,
         ),
     ]
 
+
+def _ensure_sqlite_xulyanh2_table(schema_editor):
+    if schema_editor.connection.vendor != "sqlite":
+        return
+    schema_editor.execute(CREATE_XULYANH2_TABLE_SQL)
+    schema_editor.execute(CREATE_XULYANH2_INDEX_MACHINE_SQL)
+    schema_editor.execute(CREATE_XULYANH2_INDEX_USER_SQL)

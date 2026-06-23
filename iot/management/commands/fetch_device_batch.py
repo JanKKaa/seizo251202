@@ -3,7 +3,7 @@ import os
 import django
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(project_root)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'seizo0.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trang_chu.settings')
 django.setup()
 
 from django.core.management.base import BaseCommand

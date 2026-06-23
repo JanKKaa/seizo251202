@@ -1,0 +1,115 @@
+{% extends "setsubi_zaiko/base.html" %}
+
+{% block setsubi_content %}
+<div class="space-y-4">
+  <section class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <h2 class="mb-0 text-xl font-bold text-slate-900">入出庫ワークフロー</h2>
+        <div class="text-sm text-slate-500">入庫・出庫・調整を分けて、現場で迷わず記録します。</div>
+      </div>
+      <div class="grid gap-2 sm:grid-cols-3">
+        <a class="rounded-lg bg-emerald-600 px-4 py-3 text-center font-bold text-white no-underline hover:bg-emerald-500" href="{% url 'setsubi_zaiko:ledger_in' %}">入庫</a>
+        <a class="rounded-lg bg-rose-600 px-4 py-3 text-center font-bold text-white no-underline hover:bg-rose-500" href="{% url 'setsubi_zaiko:ledger_out' %}">出庫</a>
+        <a class="rounded-lg bg-amber-400 px-4 py-3 text-center font-bold text-slate-950 no-underline hover:bg-amber-300" href="{% url 'setsubi_zaiko:ledger_adjust' %}">調整</a>
+      </div>
+    </div>
+  </section>
+
+  <form class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200" method="get">
+    <div class="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px]">
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">取引区分</label>
+        <select class="w-full" name="transaction_type">
+          <option value="">すべて</option>
+          {% for value,label in transaction_choices %}
+            <option value="{{ value }}" {% if filters.transaction_type == value %}selected{% endif %}>{{ value }}: {{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">1段目: 設備・製品・分類</label>
+        <input class="w-full" type="search" name="q1" value="{{ filters.q1 }}" placeholder="例: 成形 / seikei / 13号機">
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">2段目: 部品・型式</label>
+        <input class="w-full" type="search" name="q2" value="{{ filters.q2 }}" placeholder="例: スクリュー / sukuryu">
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">3段目: 棚番・金型・メモ</label>
+        <input class="w-full" type="search" name="q3" value="{{ filters.q3 }}" placeholder="例: A-01 / mold">
+      </div>
+      <div class="flex items-end">
+        <button class="w-full rounded-lg bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-700" type="submit">検索</button>
+      </div>
+    </div>
+  </form>
+
+  <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    {% for row in summary_rows %}
+      <div class="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
+        <div class="text-sm font-bold text-slate-900">{{ row.item__category__name|default:"未分類" }}</div>
+        <div class="mt-1 flex items-end justify-between">
+          <div class="text-xs font-bold text-slate-500">{{ row.transaction_type }}</div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-slate-900">{{ row.total_quantity|default:"0" }}</div>
+            <div class="text-xs text-slate-500">{{ row.row_count }} 件</div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="rounded-lg bg-white p-4 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">集計対象がありません</div>
+    {% endfor %}
+  </section>
+
+  <div class="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+    <div class="overflow-x-auto">
+      <table class="setsubi-table w-full table-auto">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-4 py-3 text-left">日時</th>
+            <th class="px-4 py-3 text-left">区分</th>
+            <th class="px-4 py-3 text-left">理由</th>
+            <th class="px-4 py-3 text-left">前後</th>
+            <th class="px-4 py-3 text-right">数量</th>
+            <th class="px-4 py-3 text-left">設備・部品</th>
+            <th class="px-4 py-3 text-left">作業者</th>
+            <th class="px-4 py-3 text-left">確認</th>
+            <th class="px-4 py-3 text-left">System No.</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for ledger in page_obj %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3 text-slate-600">{{ ledger.created_at|date:"Y-m-d H:i" }}</td>
+              <td class="px-4 py-3">
+                <span class="rounded-full bg-slate-900 px-2 py-1 text-xs font-bold text-white">{{ ledger.transaction_type }}</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-bold text-slate-900">{{ ledger.reason_label }}</div>
+                <div class="text-xs text-slate-500">{{ ledger.reason_code }}</div>
+              </td>
+              <td class="px-4 py-3">{{ ledger.quantity_before }} -> {{ ledger.quantity_after }}</td>
+              <td class="px-4 py-3 text-right font-bold text-slate-900">{{ ledger.quantity }}</td>
+              <td class="px-4 py-3"><code class="rounded bg-slate-100 px-2 py-1">{{ ledger.item.code }}</code> {{ ledger.item.name }}</td>
+              <td class="px-4 py-3">{{ ledger.operator_name|default:"-" }}</td>
+              <td class="px-4 py-3">
+                {% if ledger.supervisor_confirmed %}
+                  <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">済</span>
+                {% else %}
+                  <span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">未</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3"><code>{{ ledger.system_no }}</code></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="px-4 py-8 text-center text-slate-500">台帳データがありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% include "setsubi_zaiko/pagination.html" %}
+</div>
+{% endblock %}

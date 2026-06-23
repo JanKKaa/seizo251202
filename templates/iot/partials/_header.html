@@ -171,7 +171,7 @@
 
 
 <script>
-  const LAT = 35.989, LON = 137.981; // Minowa, Nagano
+  const LAT = 35.8729, LON = 137.9753; // Minami Minowa, Nagano
   const CURRENT_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=Asia%2FTokyo`;
   const HOURLY_URL  = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation,snowfall,weather_code&timezone=Asia%2FTokyo`;
 
@@ -213,7 +213,7 @@
       const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       document.getElementById('wgTemp').textContent = `${temp}°C`;
-      document.getElementById('wgCity').textContent = 'Minowa, Nagano';
+      document.getElementById('wgCity').textContent = 'Minami Minowa, Nagano';
       document.getElementById('wgCond').textContent = descMap(wcode);
       document.getElementById('wgHum').textContent = `湿度 ${hum}%`;
       document.getElementById('wgWind').textContent = `風 ${wind} m/s`;

@@ -3,7 +3,8 @@
 ## 1) Tong quan
 - Project root: `trang_chu`
 - Django settings module: `trang_chu.settings`
-- DB: SQLite (`db.sqlite3`)
+- DB: PostgreSQL Docker service `postgres` (volume `postgres-data`)
+- SQLite `db.sqlite3` chi con la file backup/fallback sau migration 2026-05-11
 - Time zone: `Asia/Tokyo`
 - Static: `static/` -> `staticfiles/`
 - Media: `media/` (hien tai khong track trong git)
@@ -47,12 +48,19 @@ File: `trang_chu/urls.py`
   - `ProductionPlan`, `Change4MEntry`, `ChatworkMessage`
 - Commands:
   - `python manage.py fetch_device_batch`
-  - `python manage.py fetch_mail_notify`
+  - `python manage.py fetch_mail_notify` (hien khong chay mac dinh)
+  - `python manage.py run_iot_workers_serial` (chay lai tren PostgreSQL: machine/mold/esp32 moi 30s, net100/chatwork moi 180s)
   - `python manage.py sync_chatwork`
   - `python manage.py update_esp32_shot`
   - `python manage.py update_machine_counter`
   - `python manage.py update_mold_shot`
   - `python manage.py update_net100_shots`
+- ESP32 bridge:
+  - Docker service: `esp32-bridge`
+  - HTTP status API: `http://192.168.10.250:9000/esp32/api/button_status/`
+  - WebSocket ingest: `ws://192.168.10.250:9000/esp32/ws/` or `ws://192.168.10.250:9000/ws/`
+  - Legacy ESP32 firmware path also supported: `ws://192.168.10.250:9000/ws/esp32/buttons/`
+  - State file: `logs/esp32_bridge_state.json`
 
 ### `menu` (meal ordering)
 - Main routes:
@@ -103,6 +111,19 @@ File: `trang_chu/urls.py`
   - dashboard + API latest events
 - Main models: `QADeviceInfo`, `QAResult`
 
+### `setsubi_zaiko` (equipment/spare-part inventory)
+- Status: enabled in production Docker from 2026-05-25.
+- Main route: `/setsubi-zaiko/`
+- Legacy route: `/dev/setsubi-zaiko/` redirects to `/setsubi-zaiko/`.
+- Purpose:
+  - Hayashi Techno internal equipment/spare-part stock in/out/inventory management.
+  - MISUMI-style part master with maker part number, alternative part number, supplier URL, applicable machine/mold, shelf number.
+  - Item photo and nameplate/label photo upload.
+  - IATF-readiness fields: quality rank, Control Plan No., process owner, calibration due date, inventory check due date.
+  - Keeps ledger-style audit trail for IN/OUT/ADJ+/ADJ-/RETURN/SCRAP.
+- Main models:
+  - `EquipmentCategory`, `EquipmentItem`, `EquipmentStockLedger`
+
 ### `xu_ly_anh` (image processing v2)
 - Main routes:
   - `/xu_ly_anh/`, upload, device-info CRUD, history
@@ -116,11 +137,25 @@ File: `trang_chu/urls.py`
 ## 4) Van hanh nhanh
 - Run server:
   - `python manage.py runserver`
+- Run with Docker:
+  - `cd trang_chu`
+  - `docker compose up -d --build`
+  - See `DOCKER_DEPLOY.md`
 - Migrate:
   - `python manage.py makemigrations`
   - `python manage.py migrate`
 - Daily backup (code-only):
   - `git add -A && git commit -m "backup: ..." && git push`
+- Daily runtime backup:
+  - Full local test: `.\scripts\backup_runtime_to_drive.ps1 -SkipUpload`
+  - Full Google Drive backup: `.\scripts\backup_runtime_to_drive.ps1 -RcloneRemote "gdrive:seizo0-backups"`
+  - Google Drive Desktop fallback folder: `G:\マイドライブ\seizo0-backups`
+  - Google Drive upload uses `rclone` if available, otherwise copies to the Drive Desktop folder.
+  - Full backup includes `source/`, DB, media, staticfiles, logs, nginx, `.env`, and deploy files.
+  - See `BACKUP_DRIVE.md` and `RESTORE_FROM_DRIVE.md`
+- Incident recovery:
+  - See `SERVER_RECOVERY_RUNBOOK.md` for old SQLite malformed recovery and nginx 502 recovery.
+  - Current DB runtime is PostgreSQL; backup/restore should include Docker volume `postgres-data`.
 
 ## 5) Tech debt / canh bao quan trong
 - Secret/SMTP password dang hardcode trong source (`settings.py`, mot so command iot).
@@ -130,4 +165,5 @@ File: `trang_chu/urls.py`
 ## 6) Team docs
 - COLLAB_RULES.md (quy tac phoi hop va quy dinh ghi thay doi lon)
 - PROJECT_CHANGELOG.md (nhat ky thay doi lon de handoff nhanh)
+- SERVER_HANDOFF.md (doc nhanh nhat khi doi server/tiep quan van hanh)
 

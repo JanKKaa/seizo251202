@@ -537,7 +537,7 @@ def edit_shot_total(request, pk):
         form = MachineShotTotalForm(request.POST, instance=machine)
         if form.is_valid():
             form.save()
-            return redirect('machine_counter')
+            return redirect('iot:machine_counter')
     else:
         form = MachineShotTotalForm(instance=machine)
     return render(request, 'iot/edit_shot_total.html', {'form': form, 'machine': machine})

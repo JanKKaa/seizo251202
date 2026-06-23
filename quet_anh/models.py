@@ -53,6 +53,107 @@ class QADeviceInfo(models.Model):
     def __str__(self):
         return f"{self.name} - {self.product_name}"
 
+
+class QATabletDevice(models.Model):
+    STATUS_ACTIVE = "active"
+    STATUS_STOPPED = "stopped"
+    STATUS_REPAIR = "repair"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "使用可"),
+        (STATUS_STOPPED, "使用停止"),
+        (STATUS_REPAIR, "修理中"),
+    ]
+
+    code = models.CharField("管理番号", max_length=20, unique=True, db_index=True)
+    name = models.CharField("表示名", max_length=80)
+    os_name = models.CharField("OS", max_length=40, default="Android")
+    serial_no = models.CharField("シリアルNo.", max_length=120, blank=True, default="")
+    status = models.CharField("状態", max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    note = models.TextField("備考", blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "QAタブレット"
+        verbose_name_plural = "QAタブレット"
+
+    def __str__(self):
+        return f"{self.code} {self.name}"
+
+
+class QATabletInspection(models.Model):
+    CHECK_STARTUP = "startup"
+    CHECK_DAILY = "daily"
+    CHECK_ABNORMAL = "abnormal"
+    CHECK_RECOVERY = "recovery"
+    CHECK_TYPE_CHOICES = [
+        (CHECK_STARTUP, "始業前点検"),
+        (CHECK_DAILY, "定期点検"),
+        (CHECK_ABNORMAL, "異常時点検"),
+        (CHECK_RECOVERY, "復旧確認"),
+    ]
+
+    RESULT_OK = "ok"
+    RESULT_NG = "ng"
+    RESULT_CHOICES = [
+        (RESULT_OK, "OK"),
+        (RESULT_NG, "NG"),
+    ]
+
+    PROBLEM_NONE = "none"
+    PROBLEM_QR = "qr"
+    PROBLEM_CAMERA = "camera"
+    PROBLEM_OCR = "ocr"
+    PROBLEM_NETWORK = "network"
+    PROBLEM_WORKSTATION = "workstation"
+    PROBLEM_APP = "app"
+    PROBLEM_DAMAGE = "damage"
+    PROBLEM_OTHER = "other"
+    PROBLEM_CHOICES = [
+        (PROBLEM_NONE, "異常なし"),
+        (PROBLEM_QR, "QR読取不良"),
+        (PROBLEM_CAMERA, "カメラ不良"),
+        (PROBLEM_OCR, "OCR不良"),
+        (PROBLEM_NETWORK, "通信不良"),
+        (PROBLEM_WORKSTATION, "端末連携不良"),
+        (PROBLEM_APP, "アプリ動作不良"),
+        (PROBLEM_DAMAGE, "破損・汚れ"),
+        (PROBLEM_OTHER, "その他"),
+    ]
+
+    tablet = models.ForeignKey(QATabletDevice, on_delete=models.PROTECT, related_name="inspections")
+    check_type = models.CharField("点検区分", max_length=20, choices=CHECK_TYPE_CHOICES, default=CHECK_STARTUP)
+    check_date = models.DateField("点検日", db_index=True)
+    camera_ok = models.BooleanField("カメラ確認", default=True)
+    qr_sample_ok = models.BooleanField("QRサンプル読取", default=True)
+    qr_sample_text = models.TextField("QR読取内容", blank=True, default="")
+    qr_sample_checked_at = models.DateTimeField("QR確認日時", null=True, blank=True)
+    ocr_sample_ok = models.BooleanField("OCR/画像確認", default=True)
+    network_ok = models.BooleanField("通信確認", default=True)
+    workstation_ok = models.BooleanField("端末連携確認", default=True)
+    result = models.CharField("判定", max_length=10, choices=RESULT_CHOICES, default=RESULT_OK, db_index=True)
+    problem_category = models.CharField("異常分類", max_length=30, choices=PROBLEM_CHOICES, default=PROBLEM_NONE)
+    problem_detail = models.TextField("異常内容", blank=True, default="")
+    action_taken = models.TextField("処置内容", blank=True, default="")
+    checked_by = models.CharField("点検者", max_length=120, blank=True, default="")
+    confirmed_by = models.CharField("確認者", max_length=120, blank=True, default="")
+    confirmed_at = models.DateTimeField("確認日時", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-check_date", "-id"]
+        indexes = [
+            models.Index(fields=["tablet", "-check_date"]),
+            models.Index(fields=["result", "-check_date"]),
+        ]
+        verbose_name = "QAタブレット点検"
+        verbose_name_plural = "QAタブレット点検"
+
+    def __str__(self):
+        return f"{self.check_date} {self.tablet.code} {self.get_result_display()}"
+
 class QAResult(models.Model):
     LOT_COLOR_GREEN = "green"
     LOT_COLOR_BLACK = "black"
@@ -86,6 +187,30 @@ class QAResult(models.Model):
 
 
 class QAMaterialStockLedger(models.Model):
+    TRANSACTION_IN = "IN"
+    TRANSACTION_ADJ_POS = "ADJ+"
+    TRANSACTION_CORR = "CORR"
+    TRANSACTION_CHOICES = [
+        (TRANSACTION_IN, "Normal stock-in"),
+        (TRANSACTION_ADJ_POS, "Inventory adjustment increase"),
+        (TRANSACTION_CORR, "Correction"),
+    ]
+
+    ADJUST_REASON_CYCLE_COUNT = "cycle_count"
+    ADJUST_REASON_INPUT_ERROR = "input_error"
+    ADJUST_REASON_DAMAGE = "damage"
+    ADJUST_REASON_MIGRATION = "migration"
+    ADJUST_REASON_CUSTOMER_APPROVED = "customer_approved"
+    ADJUST_REASON_OTHER = "other"
+    ADJUST_REASON_CHOICES = [
+        (ADJUST_REASON_CYCLE_COUNT, "Cycle count difference / 棚卸差異"),
+        (ADJUST_REASON_INPUT_ERROR, "Input error correction / 入力ミス修正"),
+        (ADJUST_REASON_DAMAGE, "Scrap or damage / 廃棄・破損"),
+        (ADJUST_REASON_MIGRATION, "Data migration correction / 移行データ補正"),
+        (ADJUST_REASON_CUSTOMER_APPROVED, "Customer approved correction / 顧客承認補正"),
+        (ADJUST_REASON_OTHER, "Other documented reason / その他"),
+    ]
+
     LOT_COLOR_GREEN = "green"
     LOT_COLOR_BLACK = "black"
     LOT_COLOR_BLUE = "blue"
@@ -123,6 +248,13 @@ class QAMaterialStockLedger(models.Model):
     hinmei_name = models.CharField("品名", max_length=255, blank=True, default="")
     order_no = models.CharField("注文No.", max_length=120, db_index=True, blank=True, default="")
     workstation_management_no = models.CharField("端末管理番号", max_length=120, blank=True, default="")
+    operator_name = models.CharField("作業者", max_length=120, blank=True, default="")
+    transaction_type = models.CharField(max_length=12, choices=TRANSACTION_CHOICES, default=TRANSACTION_IN, db_index=True)
+    adjustment_reason_code = models.CharField(max_length=40, choices=ADJUST_REASON_CHOICES, blank=True, default="", db_index=True)
+    adjustment_reason = models.CharField(max_length=255, blank=True, default="")
+    adjustment_note = models.TextField(blank=True, default="")
+    stock_before_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    stock_after_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     supervisor_confirmed = models.BooleanField("上長確認", default=False)
     supervisor_name = models.CharField("上長名", max_length=120, blank=True, default="")
     supervisor_confirmed_at = models.DateTimeField("確認日時", null=True, blank=True)
@@ -139,6 +271,30 @@ class QAMaterialStockLedger(models.Model):
 
 
 class QAMaterialOutStockLedger(models.Model):
+    TRANSACTION_OUT = "OUT"
+    TRANSACTION_ADJ_NEG = "ADJ-"
+    TRANSACTION_CORR = "CORR"
+    TRANSACTION_CHOICES = [
+        (TRANSACTION_OUT, "Normal stock-out"),
+        (TRANSACTION_ADJ_NEG, "Inventory adjustment decrease"),
+        (TRANSACTION_CORR, "Correction"),
+    ]
+
+    ADJUST_REASON_CYCLE_COUNT = "cycle_count"
+    ADJUST_REASON_INPUT_ERROR = "input_error"
+    ADJUST_REASON_DAMAGE = "damage"
+    ADJUST_REASON_MIGRATION = "migration"
+    ADJUST_REASON_CUSTOMER_APPROVED = "customer_approved"
+    ADJUST_REASON_OTHER = "other"
+    ADJUST_REASON_CHOICES = [
+        (ADJUST_REASON_CYCLE_COUNT, "Cycle count difference / 棚卸差異"),
+        (ADJUST_REASON_INPUT_ERROR, "Input error correction / 入力ミス修正"),
+        (ADJUST_REASON_DAMAGE, "Scrap or damage / 廃棄・破損"),
+        (ADJUST_REASON_MIGRATION, "Data migration correction / 移行データ補正"),
+        (ADJUST_REASON_CUSTOMER_APPROVED, "Customer approved correction / 顧客承認補正"),
+        (ADJUST_REASON_OTHER, "Other documented reason / その他"),
+    ]
+
     LOT_COLOR_GREEN = "green"
     LOT_COLOR_BLACK = "black"
     LOT_COLOR_BLUE = "blue"
@@ -175,9 +331,17 @@ class QAMaterialOutStockLedger(models.Model):
     lot_number = models.CharField("ロット番号", max_length=120, db_index=True, blank=True, default="")
     product_code = models.CharField("製品コード", max_length=120, db_index=True, blank=True, default="")
     workstation_management_no = models.CharField("端末管理番号", max_length=120, blank=True, default="")
+    operator_name = models.CharField(max_length=120, blank=True, default="")
+    transaction_type = models.CharField(max_length=12, choices=TRANSACTION_CHOICES, default=TRANSACTION_OUT, db_index=True)
+    adjustment_reason_code = models.CharField(max_length=40, choices=ADJUST_REASON_CHOICES, blank=True, default="", db_index=True)
+    adjustment_reason = models.CharField(max_length=255, blank=True, default="")
+    adjustment_note = models.TextField(blank=True, default="")
+    stock_before_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    stock_after_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     supervisor_confirmed = models.BooleanField("上長確認", default=False)
     supervisor_name = models.CharField("上長名", max_length=120, blank=True, default="")
     supervisor_confirmed_at = models.DateTimeField("確認日時", null=True, blank=True)
+    low_stock_alert_sent_at = models.DateTimeField("安全在庫割れ通知日時", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -256,4 +420,3 @@ class QADeletedJobMarker(models.Model):
 
     def __str__(self):
         return self.job_id
-

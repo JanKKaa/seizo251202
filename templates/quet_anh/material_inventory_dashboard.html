@@ -41,6 +41,72 @@
       .inv-stock-negative { color: #b42318; font-weight: 700; }
       .inv-stock-low { color: #af6f00; font-weight: 700; }
       .inv-stock-ok { color: #0f7b3f; font-weight: 700; }
+      .inv-adjust-note {
+        border-left: 4px solid #0d6efd;
+        background: #eef5ff;
+        color: #17365d;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: .92rem;
+      }
+      .ledger-table td {
+        vertical-align: middle;
+        padding-top: .38rem;
+        padding-bottom: .38rem;
+      }
+      .ledger-clamp-2 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+        line-height: 1.35;
+        max-height: 2.7em;
+      }
+      .ledger-icon-actions {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        justify-content: center;
+      }
+      .ledger-icon-btn {
+        align-items: center;
+        display: inline-flex;
+        height: 30px;
+        justify-content: center;
+        padding: 0;
+        width: 30px;
+      }
+      .ledger-pagination-wrap {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        justify-content: space-between;
+        margin-top: 1rem;
+      }
+      .ledger-list-summary {
+        color: #6c757d;
+        font-size: 13px;
+      }
+      .ledger-pagination {
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 0;
+      }
+      .ledger-pagination .page-link {
+        min-width: 36px;
+        text-align: center;
+      }
+      .ledger-pagination .page-item.disabled .page-link {
+        color: #9aa0a6;
+        background: #f8f9fc;
+      }
+      @media (min-width: 768px) {
+        .ledger-pagination-wrap {
+          flex-direction: row;
+        }
+      }
     </style>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -48,11 +114,24 @@
       <div class="d-flex gap-2">
         <a href="{% url 'material_stock_ledger' %}" class="btn btn-outline-success">入庫台帳</a>
         <a href="{% url 'material_out_stock_ledger' %}" class="btn btn-outline-primary">出庫台帳</a>
+        <a href="{% url 'material_inventory_csv' %}?{{ request.GET.urlencode }}" class="btn btn-outline-dark">
+          <i class="fas fa-file-csv"></i> CSV出力
+        </a>
         <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
           <i class="fas fa-arrow-left"></i> インデックス
         </a>
       </div>
     </div>
+    {% if can_inventory_adjust %}
+      <div class="inv-adjust-note mb-3">
+        スーパーユーザー権限で在庫調整できます。調整は既存データを書き換えず、ADJの入庫/出庫データとして履歴に残します。
+      </div>
+      <div class="alert alert-warning mb-3">
+        <strong>IATF監査対応:</strong>
+        ADJは通常の入庫・出庫ではなく「在庫調整」です。調整前後の在庫、理由、作業者、承認者、日時、システムNo.を履歴として保持します。
+        既存データは削除せず、監査証跡として残します。
+      </div>
+    {% endif %}
 
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-2">
@@ -81,8 +160,8 @@
       </div>
       <div class="col-6 col-md-2">
         <div class="inv-kpi-card">
-          <div class="inv-kpi-label">注意件数</div>
-          <div class="inv-kpi-value">{{ low_count }}</div>
+          <div class="inv-kpi-label">現在庫(袋数)</div>
+          <div class="inv-kpi-value">{{ total_stock_bags }}</div>
         </div>
       </div>
       <div class="col-6 col-md-2">
@@ -118,15 +197,18 @@
         </form>
 
         <div class="table-responsive">
-          <table class="table table-bordered table-sm align-middle">
+          <table class="table table-bordered table-hover table-sm align-middle ledger-table">
             <thead class="table-light">
               <tr>
                 <th>#</th>
                 <th>原材料名</th>
                 <th>原材料コード</th>
                 <th class="text-end">現在庫(kg)</th>
+                <th class="text-end">現在庫(袋数)</th>
                 <th class="text-end">入庫(kg)</th>
+                <th class="text-end">入庫(袋数)</th>
                 <th class="text-end">出庫(kg)</th>
+                <th class="text-end">出庫(袋数)</th>
                 <th class="text-center">状態</th>
                 <th class="text-end">安全在庫(kg)</th>
                 <th class="text-end">発注点(kg)</th>
@@ -141,8 +223,8 @@
               {% for row in rows %}
                 <tr>
                   <td>{{ forloop.counter }}</td>
-                  <td>{{ row.material_name }}</td>
-                  <td>{{ row.material_code }}</td>
+                  <td><div class="ledger-clamp-2" title="{{ row.material_name }}">{{ row.material_name }}</div></td>
+                  <td><div class="ledger-clamp-2" title="{{ row.material_code }}">{{ row.material_code }}</div></td>
                   <td class="text-end">
                     {% if row.status == "danger" %}
                       <span class="inv-stock-negative">{{ row.current_stock_kg|floatformat:2 }}</span>
@@ -152,8 +234,11 @@
                       <span class="inv-stock-ok">{{ row.current_stock_kg|floatformat:2 }}</span>
                     {% endif %}
                   </td>
+                  <td class="text-end">{{ row.current_bag_count|default:"-" }}</td>
                   <td class="text-end">{{ row.total_in_kg|floatformat:2 }}</td>
+                  <td class="text-end">{{ row.total_in_bag_count|default:"-" }}</td>
                   <td class="text-end">{{ row.total_out_kg|floatformat:2 }}</td>
+                  <td class="text-end">{{ row.total_out_bag_count|default:"-" }}</td>
                   <td class="text-center"><span class="inv-status {{ row.status }}">{{ row.status_label }}</span></td>
                   <td class="text-end">{{ row.safety_stock_kg|floatformat:2 }}</td>
                   <td class="text-end">{{ row.reorder_point_kg|floatformat:2 }}</td>
@@ -161,21 +246,124 @@
                   <td class="text-center">{% if row.last_out_date %}{{ row.last_out_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
                   {% if can_inventory_adjust %}
                     <td class="text-center">
-                      <a href="{% url 'material_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-success">入庫</a>
-                      <a href="{% url 'material_out_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-primary">出庫</a>
+                      <div class="ledger-icon-actions">
+                      <a href="{% url 'material_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-success ledger-icon-btn" title="入庫台帳" aria-label="入庫台帳">
+                        <i class="fas fa-warehouse"></i>
+                      </a>
+                      <a href="{% url 'material_out_stock_ledger' %}?keyword={{ row.material_code }}" class="btn btn-sm btn-outline-primary ledger-icon-btn" title="出庫台帳" aria-label="出庫台帳">
+                        <i class="fas fa-dolly-flatbed"></i>
+                      </a>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-warning inv-adjust-open ledger-icon-btn"
+                        data-material-code="{{ row.material_code }}"
+                        data-material-name="{{ row.material_name }}"
+                        data-current-stock="{{ row.current_stock_kg|floatformat:2 }}"
+                        title="在庫調整"
+                        aria-label="在庫調整"
+                      ><i class="fas fa-sliders-h"></i></button>
+                      </div>
                     </td>
                   {% endif %}
                 </tr>
               {% empty %}
                 <tr>
-                  <td colspan="{% if can_inventory_adjust %}12{% else %}11{% endif %}" class="text-center text-muted py-3">在庫データがありません。</td>
+                  <td colspan="{% if can_inventory_adjust %}15{% else %}14{% endif %}" class="text-center text-muted py-3">在庫データがありません。</td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% include "quet_anh/_compact_pagination.html" %}
       </div>
     </div>
   </div>
 </div>
+{% if can_inventory_adjust %}
+<div class="modal fade" id="inventoryAdjustModal" tabindex="-1" aria-labelledby="inventoryAdjustModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="{% url 'material_inventory_adjust' %}" class="modal-content">
+      {% csrf_token %}
+      <input type="hidden" name="material_code" id="adjust-material-code">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="inventoryAdjustModalLabel">在庫調整</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <div class="fw-bold" id="adjust-material-name">-</div>
+          <div class="text-muted small">現在庫: <span id="adjust-current-stock">0.00</span> kg</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">調整方法</label>
+          <select class="form-control" name="adjust_mode" id="adjust-mode">
+            <option value="target" selected>正しい在庫kgを入力</option>
+            <option value="delta">差分kgを入力（+入庫 / -出庫）</option>
+          </select>
+        </div>
+        <div class="mb-3" id="adjust-target-wrap">
+          <label class="form-label fw-bold">正しい在庫(kg)</label>
+          <input type="number" class="form-control" name="target_stock_kg" id="adjust-target-stock" step="0.01" inputmode="decimal">
+        </div>
+        <div class="mb-3 d-none" id="adjust-delta-wrap">
+          <label class="form-label fw-bold">差分(kg)</label>
+          <input type="number" class="form-control" name="delta_kg" id="adjust-delta-kg" step="0.01" inputmode="decimal" placeholder="例: 20 または -20">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">調整理由 <span class="text-danger">*</span></label>
+          <select class="form-control" name="reason_code" required>
+            <option value="">理由を選択</option>
+            {% for value, label in adjustment_reason_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">ADJは在庫調整です。監査で説明できる理由を選択してください。</div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Memo / メモ（任意）</label>
+          <input type="text" class="form-control" name="reason" maxlength="255" placeholder="任意入力。空欄の場合は選択した理由を自動記録します。">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button type="submit" class="btn btn-warning" onclick="return confirm('在庫調整データを登録しますか？');">調整登録</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(() => {
+  const modalEl = document.getElementById("inventoryAdjustModal");
+  const codeInput = document.getElementById("adjust-material-code");
+  const nameEl = document.getElementById("adjust-material-name");
+  const currentEl = document.getElementById("adjust-current-stock");
+  const targetInput = document.getElementById("adjust-target-stock");
+  const modeSelect = document.getElementById("adjust-mode");
+  const targetWrap = document.getElementById("adjust-target-wrap");
+  const deltaWrap = document.getElementById("adjust-delta-wrap");
+
+  function syncMode() {
+    const isDelta = modeSelect?.value === "delta";
+    targetWrap?.classList.toggle("d-none", isDelta);
+    deltaWrap?.classList.toggle("d-none", !isDelta);
+  }
+
+  modeSelect?.addEventListener("change", syncMode);
+  document.querySelectorAll(".inv-adjust-open").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const currentStock = btn.dataset.currentStock || "0.00";
+      if (codeInput) codeInput.value = btn.dataset.materialCode || "";
+      if (nameEl) nameEl.textContent = `${btn.dataset.materialName || "-"} (${btn.dataset.materialCode || "-"})`;
+      if (currentEl) currentEl.textContent = currentStock;
+      if (targetInput) targetInput.value = currentStock;
+      syncMode();
+      if (modalEl && window.bootstrap) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

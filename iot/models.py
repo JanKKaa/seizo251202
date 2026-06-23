@@ -205,9 +205,9 @@ class DashboardNotification(models.Model):
  
 
 class MailLog(models.Model):
-    mail_uid = models.CharField(max_length=128, unique=True)
-    sender = models.CharField(max_length=128, blank=True)
-    subject = models.CharField(max_length=256, blank=True)
+    mail_uid = models.CharField(max_length=512, unique=True)
+    sender = models.CharField(max_length=255, blank=True)
+    subject = models.CharField(max_length=512, blank=True)
     received_at = models.DateTimeField()
     processed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

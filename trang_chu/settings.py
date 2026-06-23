@@ -13,6 +13,17 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import os
 
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).lower() in ("1", "true", "yes", "on")
+
+
+def env_list(name, default):
+    value = os.getenv(name)
+    if not value:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,19 +32,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'your-secret-key'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DJANGO_DEBUG', True)
 
-ALLOWED_HOSTS = ['192.168.10.250','localhost','127.0.0.1'] 
+ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', ['192.168.10.250', 'localhost', '127.0.0.1'])
 
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [
     'https://192.168.10.250',  # Thêm địa chỉ IP hoặc tên miền của bạn
     'http://192.168.10.250',
-]
+])
 
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', False)
 
 # Application definition
 
@@ -58,7 +69,9 @@ INSTALLED_APPS = [
     'menu',
     'learn',
     'widget_tweaks',
+    'setsubi_zaiko.apps.SetsubiZaikoConfig',
 ]
+GTECH_DEV_APPS_ENABLED = True
 
 
 
@@ -90,6 +103,7 @@ TEMPLATES = [
                 'trang_chu.context_processors.unread_messages_count',  # Thêm dòng này
                 'trang_chu.context_processors.approve_button_count',  # Thêm dòng này
                 'trang_chu.context_processors.japan_event',  # Thêm dòng này
+                'trang_chu.context_processors.gtech_dev_apps',
                 'learn.context_processors.pending_counts',  # Thêm dòng này
                 'learn.context_processors.motivational_quotes',  # Thêm dòng này
             ],
@@ -106,13 +120,29 @@ WSGI_APPLICATION = 'trang_chu.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.getenv("SQLITE_DB_NAME", BASE_DIR / 'db.sqlite3'),
         'OPTIONS': {
             # Wait for locked writes instead of failing immediately.
             'timeout': 30,
         },
     }
 }
+
+if os.getenv("DB_ENGINE", "sqlite").lower() in ("postgres", "postgresql"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "seizo0"),
+            "USER": os.getenv("POSTGRES_USER", "seizo0"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "seizo0"),
+            "HOST": os.getenv("POSTGRES_HOST", "postgres"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "0")),
+            "OPTIONS": {
+                "connect_timeout": int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "10")),
+            },
+        }
+    }
 
 
 # Password validation
@@ -188,8 +218,8 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-EMAIL_HOST_USER = 'hayashitechno01@gmail.com'
-EMAIL_HOST_PASSWORD = 'mkmy ikqb tooq xbtz'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
@@ -213,6 +243,8 @@ CACHES = {
     }
 }
 
+CACHES['default']['LOCATION'] = os.getenv('REDIS_URL', CACHES['default']['LOCATION'])
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -220,7 +252,7 @@ LOGGING = {
         'dashboard_file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': 'dashboard.log',
+            'filename': os.getenv('DASHBOARD_LOG_FILE', str(BASE_DIR / 'dashboard.log')),
             'encoding': 'utf8',
         },
     },

@@ -33,6 +33,7 @@
             <tr>
                 <th>ID</th>
                 <th>タイトル</th>
+                <th>分類</th>
                 <th>提出日</th>
                 <th>依頼者</th>
                 <th>承認者</th>
@@ -44,6 +45,7 @@
             <tr>
                 <td>{{ document.id }}</td>
                 <td>{{ document.title }}</td>
+                <td>{{ document.get_category_display }}</td>
                 <td>{{ document.submission_date }}</td>
                 <td>{{ document.created_by.first_name }} {{ document.created_by.last_name }}</td>
                 <td>

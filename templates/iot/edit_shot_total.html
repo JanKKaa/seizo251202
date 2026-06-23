@@ -6,7 +6,7 @@
         {% csrf_token %}
         {{ form.as_p }}
         <button type="submit" class="btn btn-primary">保存</button>
-        <a href="{% url 'machine_counter' %}" class="btn btn-secondary">戻る</a>
+        <a href="{% url 'iot:machine_counter' %}" class="btn btn-secondary">戻る</a>
     </form>
 </div>
 {% endblock %}

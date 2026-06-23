@@ -1,0 +1,144 @@
+{% extends "setsubi_zaiko/base.html" %}
+
+{% block setsubi_content %}
+<div class="space-y-4">
+  <section class="relative overflow-hidden rounded-lg bg-slate-950 p-4 text-white shadow-sm">
+    <canvas id="setsubi-flow-canvas" class="absolute inset-0 h-full w-full opacity-60"></canvas>
+    <div class="relative grid gap-3 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+      <div>
+        <div class="text-sm font-bold text-cyan-200">設備管理ボード</div>
+        <h2 class="mb-0 mt-1 text-2xl font-bold">設備・金型から部品在庫まで一画面で確認</h2>
+        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:equipment_list' %}">
+            <div class="text-xs font-bold text-slate-300">設備・金型</div>
+            <div class="text-2xl font-bold text-white">{{ asset_count }}</div>
+          </a>
+          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:part_list' %}">
+            <div class="text-xs font-bold text-slate-300">部品マスター</div>
+            <div class="text-2xl font-bold text-white">{{ part_count }}</div>
+          </a>
+          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:mold_list' %}">
+            <div class="text-xs font-bold text-slate-300">金型</div>
+            <div class="text-2xl font-bold text-white">{{ mold_count }}</div>
+          </a>
+          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:part_link_create_any' %}">
+            <div class="text-xs font-bold text-slate-300">リンク済み部品</div>
+            <div class="text-2xl font-bold text-white">{{ linked_part_count }}</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid gap-3 lg:grid-cols-4">
+    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-rose-200 hover:bg-rose-50" href="{% url 'setsubi_zaiko:part_list' %}?alert=low_stock">
+      <div class="text-sm font-bold text-rose-700">在庫アラート</div>
+      <div class="mt-2 text-3xl font-bold text-slate-900">{{ low_stock_items|length }}</div>
+      <div class="text-sm text-slate-500">最低在庫以下</div>
+    </a>
+    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-amber-200 hover:bg-amber-50" href="{% url 'setsubi_zaiko:item_list' %}?alert=inventory_due">
+      <div class="text-sm font-bold text-amber-700">棚卸アラート</div>
+      <div class="mt-2 text-3xl font-bold text-slate-900">{{ inventory_due_items|length }}</div>
+      <div class="text-sm text-slate-500">期限切れ</div>
+    </a>
+    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-blue-200 hover:bg-blue-50" href="{% url 'setsubi_zaiko:ledger_list' %}">
+      <div class="text-sm font-bold text-blue-700">入出庫履歴</div>
+      <div class="mt-2 text-3xl font-bold text-slate-900">{{ ledger_count }}</div>
+      <div class="text-sm text-slate-500">記録件数</div>
+    </a>
+    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-emerald-200 hover:bg-emerald-50" href="{% url 'setsubi_zaiko:export_items_csv' %}">
+      <div class="text-sm font-bold text-emerald-700">資産棚卸</div>
+      <div class="mt-2 text-3xl font-bold text-slate-900">{{ active_items }}</div>
+      <div class="text-sm text-slate-500">有効マスター</div>
+    </a>
+  </section>
+
+  <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div class="rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <h3 class="mb-0 text-lg font-bold text-slate-900">設備・金型</h3>
+        <a class="text-sm font-bold text-blue-700 no-underline" href="{% url 'setsubi_zaiko:equipment_list' %}">一覧</a>
+      </div>
+      <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+        {% for item in asset_cards %}
+          <a class="rounded-lg border border-slate-200 bg-slate-50 p-3 no-underline hover:border-blue-300 hover:bg-blue-50" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+            <div class="text-xs font-bold text-slate-500">{{ item.code }}</div>
+            <div class="mt-1 line-clamp-2 font-bold text-slate-900">{{ item.name }}</div>
+            <div class="mt-2 flex items-center justify-between text-sm">
+              <span class="text-slate-600">{{ item.get_equipment_type_display }}</span>
+              <span class="rounded-full bg-white px-2 py-1 font-bold text-slate-700 ring-1 ring-slate-200">{{ item.part_link_count }} 部品</span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="rounded-lg border border-dashed border-slate-300 p-6 text-center text-slate-500">設備データがありません</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="rounded-lg bg-white shadow-sm ring-1 ring-rose-200">
+        <div class="border-b border-rose-100 px-4 py-3">
+          <h3 class="mb-0 text-base font-bold text-rose-800">在庫アラート</h3>
+        </div>
+        <div class="divide-y divide-slate-100">
+          {% for item in low_stock_items %}
+            <a class="block px-4 py-3 no-underline hover:bg-rose-50" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+              <div class="font-bold text-slate-900">{{ item.code }}</div>
+              <div class="text-sm text-slate-600">{{ item.name }}</div>
+              <div class="text-xs text-rose-700">{{ item.current_quantity }} / 最低 {{ item.minimum_stock }} {{ item.unit }}</div>
+            </a>
+          {% empty %}
+            <div class="px-4 py-6 text-sm text-slate-500">該当なし</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+        <div class="border-b border-slate-200 px-4 py-3">
+          <h3 class="mb-0 text-base font-bold text-slate-900">最近の入出庫</h3>
+        </div>
+        <div class="divide-y divide-slate-100">
+          {% for ledger in recent_ledgers %}
+            <a class="block px-4 py-3 no-underline hover:bg-slate-50" href="{% url 'setsubi_zaiko:item_detail' ledger.item.pk %}">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-bold text-slate-900">{{ ledger.item.code }}</span>
+                <span class="rounded-full bg-slate-900 px-2 py-1 text-xs font-bold text-white">{{ ledger.transaction_type }}</span>
+              </div>
+              <div class="text-sm text-slate-600">{{ ledger.reason_label }} / {{ ledger.quantity }}</div>
+              <div class="text-xs text-slate-500">{{ ledger.created_at|date:"Y-m-d H:i" }}</div>
+            </a>
+          {% empty %}
+            <div class="px-4 py-6 text-sm text-slate-500">履歴なし</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("setsubi-flow-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const draw = () => {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.strokeStyle = "rgba(34,211,238,0.24)";
+    ctx.lineWidth = 2;
+    for (let y = 24; y < rect.height; y += 42) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.bezierCurveTo(rect.width * 0.3, y + 24, rect.width * 0.65, y - 24, rect.width, y + 10);
+      ctx.stroke();
+    }
+  };
+  draw();
+  window.addEventListener("resize", draw);
+})();
+</script>
+{% endblock %}

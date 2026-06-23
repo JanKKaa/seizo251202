@@ -1092,7 +1092,7 @@ def get_alarm_count(machine):
 def delete_notification(request, pk):
     notif = get_object_or_404(DashboardNotification, pk=pk)
     notif.delete()
-    return redirect('iot_index')
+    return redirect('iot:iot_index')
 
 from django.views.decorators.http import require_GET
 

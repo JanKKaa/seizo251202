@@ -1,0 +1,129 @@
+{% extends "trang_chu/base.html" %}
+
+{% block title %}タブレット使用前点検{% endblock %}
+
+{% block content %}
+{% include "quet_anh/_shared_styles.html" %}
+<div class="qa-sync">
+  <div class="container mt-4">
+    <div class="card shadow-sm border-warning">
+      <div class="card-header bg-warning text-dark">
+        <strong>タブレット使用前点検が必要です</strong>
+      </div>
+      <div class="card-body">
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <p class="mb-3">
+          毎日1回、使用するタブレットごとに点検OKを登録してから、出庫・入庫画面を使用してください。
+        </p>
+
+        {% if selected_tablet %}
+          <div class="alert {% if today_tenken %}alert-success{% else %}alert-danger{% endif %}">
+            <div><strong>選択中:</strong> {{ selected_tablet.code }} / {{ selected_tablet.name }}</div>
+            {% if today_tenken %}
+              <div>本日 {{ today }} の点検は完了しています。</div>
+              <a href="{{ next_url }}" class="btn btn-primary mt-2">続行</a>
+            {% else %}
+              <div>本日 {{ today }} の点検がまだ完了していません。</div>
+              <a href="{% url 'tablet_inspection_add' %}?tablet={{ selected_tablet.id }}&next={{ next_url|urlencode }}" class="btn btn-danger mt-2">
+                このタブレットを点検する
+              </a>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if can_admin_bypass_tablet_tenken %}
+          <form method="post" action="{% url 'tablet_select' %}" class="mb-4" id="admin-pc-form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+            <input type="hidden" name="admin_pc_mode" value="1">
+            <button type="submit" class="btn btn-primary fw-bold">
+              Admin / PC
+            </button>
+            <span class="small text-muted ms-2">PC・laptop admin use, skip tablet tenken.</span>
+          </form>
+        {% endif %}
+
+        <form method="post" action="{% url 'tablet_select' %}" class="row g-2 align-items-end mb-4" id="tablet-select-form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <div class="col-md-8">
+            <label for="tablet_id" class="form-label fw-bold">使用するタブレット</label>
+            <select class="form-control" id="tablet_id" name="tablet_id" required>
+              <option value="">選択してください</option>
+              {% for tablet in active_tablets %}
+                <option value="{{ tablet.id }}" data-code="{{ tablet.code }}" {% if selected_tablet and selected_tablet.id == tablet.id %}selected{% endif %}>
+                  {{ tablet.code }} / {{ tablet.name }}{% if tablet.today_tenken %} / 本日点検OK{% else %} / 本日未点検{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-warning w-100 fw-bold">このタブレットを使用</button>
+          </div>
+        </form>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>タブレット</th>
+                <th>名称</th>
+                <th>本日点検</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tablet in active_tablets %}
+                <tr class="{% if tablet.today_tenken %}table-success{% else %}table-warning{% endif %}">
+                  <td class="fw-bold">{{ tablet.code }}</td>
+                  <td>{{ tablet.name }}</td>
+                  <td>
+                    {% if tablet.today_tenken %}
+                      OK / {{ tablet.today_tenken.check_date|date:"Y-m-d" }}
+                    {% else %}
+                      未点検
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a class="btn btn-sm btn-outline-danger" href="{% url 'tablet_inspection_add' %}?tablet={{ tablet.id }}&next={{ next_url|urlencode }}">点検</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted">有効なタブレットが登録されていません。</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="small text-muted mt-3">
+          MACアドレスはブラウザから取得できないため、初回にタブレットを選択して、このブラウザに記憶します。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const storageKey = "qa_selected_tablet_id";
+  const select = document.getElementById("tablet_id");
+  const form = document.getElementById("tablet-select-form");
+  if (!select) return;
+  const saved = localStorage.getItem(storageKey);
+  if (saved && !select.value) {
+    const opt = Array.from(select.options).find((item) => item.value === saved);
+    if (opt) select.value = saved;
+  }
+  form?.addEventListener("submit", () => {
+    if (select.value) localStorage.setItem(storageKey, select.value);
+  });
+})();
+</script>
+{% endblock %}

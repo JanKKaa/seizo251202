@@ -19,6 +19,9 @@
         <a href="{% url 'add_qa_device' %}" class="btn btn-success">
             <i class="fas fa-plus"></i> 新しい機械を追加
         </a>
+        <a href="{% url 'tablet_device_list' %}" class="btn btn-outline-primary">
+            <i class="fas fa-tablet-alt"></i> タブレット点検
+        </a>
     </div>
     {% endif %}
     <div class="card shadow mb-4">
@@ -41,9 +44,14 @@
                     </thead>
                     <tbody>
                         {% for item in device_list %}
-                        <tr>
+                        <tr class="{% if item.duplicate_level == 'machine_product' %}table-danger{% elif item.duplicate_level == 'machine' %}table-warning{% endif %}">
                             <td class="text-center">{{ forloop.counter }}</td>
-                            <td>{{ item.name }}</td>
+                            <td>
+                                {{ item.name }}
+                                {% if item.duplicate_note %}
+                                    <span class="badge {% if item.duplicate_level == 'machine_product' %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-1">{{ item.duplicate_note }}</span>
+                                {% endif %}
+                            </td>
                             <td>{{ item.material }}</td>
                             <td>{{ item.material_code }}</td>
                             <td>{{ item.product_name }}</td>

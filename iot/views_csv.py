@@ -20,15 +20,30 @@ def _decode_uploaded_csv(file_obj):
         return file_obj.read().decode('cp932')
 
 
-def _parse_month_header(header_text):
-    match = re.match(r'(\d+)年(\d+)月', header_text or "")
+def _parse_month_header(header_text, upload_date=None):
+    text = str(header_text or "").strip()
+    match = re.search(r'(\d{2,4})\D+(\d{1,2})', text)
     if match:
         year = int(match.group(1))
         year = 2000 + year if year < 100 else year
         month = int(match.group(2))
-        return year, month, f"{year}-{month:02d}", f"{year}年{month}月"
-    today = datetime.today()
-    return today.year, today.month, f"{today.year}-{today.month:02d}", f"{today.year}年{today.month}月"
+        if month < 1 or month > 12:
+            match = None
+    if not match:
+        base_date = upload_date or timezone.localdate()
+        year = base_date.year
+        month = base_date.month
+
+    if upload_date is not None:
+        if hasattr(upload_date, "date"):
+            upload_date = upload_date.date()
+        upload_month_start = date(upload_date.year, upload_date.month, 1)
+        csv_month_start = date(year, month, 1)
+        if csv_month_start < upload_month_start:
+            year = upload_date.year
+            month = upload_date.month
+
+    return year, month, f"{year}-{month:02d}", f"{year}年{month}月"
 
 def _strip_material_code(name: str) -> str:
     if not name:
@@ -130,7 +145,10 @@ def upload_material_plan(request):
                 return redirect('upload_material_plan')
             plan_month_year = rows[0][0].strip() if len(rows[0]) > 0 else ""
             plan_created_date = rows[0][4].strip() if len(rows[0]) > 4 else datetime.now().strftime("%Y-%m-%d")
-            _, _, month_year, plan_month_year = _parse_month_header(plan_month_year)
+            _, _, month_year, plan_month_year = _parse_month_header(
+                plan_month_year,
+                upload_date=timezone.localdate(),
+            )
             plan_objs = []
             material_rows = []
             for idx, row in enumerate(rows, start=1):

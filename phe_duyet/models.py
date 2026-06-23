@@ -12,7 +12,23 @@ class Comment(models.Model):
         return f'Comment by {self.user.username} on {self.document.title}'
 
 class Document(models.Model):
+    CATEGORY_MAINTENANCE = "maintenance_request"
+    CATEGORY_DOCUMENT = "document_approval"
+    CATEGORY_PURCHASE_ORDER = "purchase_order"
+    CATEGORY_OTHER = "other"
+    CATEGORY_CHOICES = [
+        (CATEGORY_MAINTENANCE, "保全依頼"),
+        (CATEGORY_DOCUMENT, "資料承認"),
+        (CATEGORY_PURCHASE_ORDER, "注文書"),
+        (CATEGORY_OTHER, "その他"),
+    ]
+
     title = models.CharField(max_length=255)
+    category = models.CharField(
+        max_length=32,
+        choices=CATEGORY_CHOICES,
+        default=CATEGORY_OTHER,
+    )
     file = models.FileField(upload_to='documents/')
     created_by = models.ForeignKey(User, related_name='created_documents', on_delete=models.CASCADE)
     recipient = models.ForeignKey(User, related_name='received_documents', on_delete=models.CASCADE, default=1)

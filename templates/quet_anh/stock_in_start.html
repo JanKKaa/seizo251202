@@ -41,27 +41,6 @@
                     <input type="text" class="form-control" id="material_code" name="material_code" value="{{ material_code }}" readonly>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-bold">重量 (kg)</label>
-                    <input type="number" class="form-control" id="input_weight" name="input_weight" step="0.01" min="0.01" required placeholder="例: 25.00" value="{{ request.POST.input_weight|default:'' }}">
-                    <div class="mt-2 d-flex gap-2 flex-wrap">
-                        <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="20">20kg</button>
-                        <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="25">25kg</button>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">ロット識別色</label>
-                    <select class="form-select" name="lot_color" required>
-                        <option value="green" {% if request.POST.lot_color|default:'green' == 'green' %}selected{% endif %}>🟢 緑</option>
-                        <option value="black" {% if request.POST.lot_color == 'black' %}selected{% endif %}>⚫ 黒</option>
-                        <option value="blue" {% if request.POST.lot_color == 'blue' %}selected{% endif %}>🔵 青</option>
-                        <option value="red" {% if request.POST.lot_color == 'red' %}selected{% endif %}>🔴 赤</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">ロット番号</label>
-                    <input type="text" class="form-control" name="lot_number" placeholder="ロット番号" value="{{ request.POST.lot_number|default:'' }}">
-                </div>
-                <div class="col-md-3">
                     <label class="form-label fw-bold">注文No.（ベース）</label>
                     <input
                         type="text"
@@ -75,12 +54,68 @@
                         placeholder="例: 5044"
                         required
                     >
-                    <div class="form-text">システムが自動で「-1/-2/-3」を付番します（例: 5044-1）。</div>
+                    <div class="form-text">1回の入庫に1つだけ付番します。複数ロットでも同じ注文No.を使用します。</div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">袋数（自動計算）</label>
-                    <input type="text" class="form-control" id="bag_count_preview" readonly placeholder="重量入力後に自動計算">
-                    <div class="form-text">計算式: 重量 ÷ 1袋重量（切り上げ、最小1）</div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">ロット明細</label>
+                        <button type="button" class="btn btn-outline-success btn-sm" id="add-lot-row">
+                            <i class="fas fa-plus"></i> ロット追加
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle mb-1">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 70px;">No.</th>
+                                    <th>重量 (kg)</th>
+                                    <th>ロット識別色</th>
+                                    <th>ロット番号</th>
+                                    <th>袋数（自動計算）</th>
+                                    <th style="width: 90px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lot-rows">
+                                {% for row in stock_in_lot_rows %}
+                                <tr class="lot-row">
+                                    <td class="lot-row-index text-center fw-bold">{{ forloop.counter }}</td>
+                                    <td>
+                                        <input type="text" class="form-control lot-weight" name="input_weight" required placeholder="例: 400.00" autocomplete="off" inputmode="none" readonly value="{{ row.input_weight }}">
+                                        <div class="mt-2 d-flex gap-2 flex-wrap">
+                                            <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="20">20kg</button>
+                                            <button type="button" class="btn btn-outline-success btn-sm js-kg" data-kg="25">25kg</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm open-numpad-row">テンキー</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <select class="form-select lot-color-select" name="lot_color" required>
+                                            <option value="green" {% if row.lot_color == 'green' %}selected{% endif %}>緑</option>
+                                            <option value="black" {% if row.lot_color == 'black' %}selected{% endif %}>黒</option>
+                                            <option value="blue" {% if row.lot_color == 'blue' %}selected{% endif %}>青</option>
+                                            <option value="red" {% if row.lot_color == 'red' %}selected{% endif %}>赤</option>
+                                        </select>
+                                        <div class="lot-color-preview mt-2" aria-live="polite"></div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control lot-number-input" name="lot_number" placeholder="ロット番号" value="{{ row.lot_number }}" autocomplete="off" inputmode="none" readonly required>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm open-lot-keyboard-row">
+                                                <i class="fas fa-keyboard"></i> ロット入力
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control bag-count-preview" readonly placeholder="重量入力後に自動計算">
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-lot-row">削除</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-text">計算式: 各行の重量 ÷ 1袋重量（切り上げ、最小1）。例: 5044-1 の中に 400kg/ロット1、600kg/ロット2 を登録できます。</div>
                 </div>
             </div>
 
@@ -177,6 +212,207 @@
     font-size: 1.06rem;
     line-height: 1.65;
 }
+.lot-color-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 86px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #d0d7de;
+    background: #fff;
+    font-weight: 700;
+}
+.lot-color-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid rgba(0, 0, 0, 0.28);
+}
+.lot-color-dot.green { background: #2bbf6a; }
+.lot-color-dot.black { background: #111111; }
+.lot-color-dot.blue { background: #2f80ed; }
+.lot-color-dot.red { background: #e53935; }
+.kg-modal-dialog {
+    max-width: min(94vw, 640px);
+}
+.kg-modal .modal-content {
+    border-radius: 18px;
+    max-height: calc(100dvh - 18px);
+}
+.kg-display {
+    height: 54px;
+    font-size: 1.65rem;
+    letter-spacing: 0.5px;
+}
+.kg-pad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.kg-pad-btn {
+    height: 56px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-radius: 10px;
+    touch-action: manipulation;
+    padding: 0.35rem 0.45rem;
+}
+.kg-pad-btn.zero {
+    grid-column: span 2;
+}
+.kg-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+.kg-modal .btn-done {
+    min-width: 150px;
+    height: 44px;
+    font-size: 1.1rem;
+    border-radius: 999px;
+}
+.lot-keyboard-dialog {
+    max-width: min(98vw, 900px);
+}
+.lot-keyboard .modal-content {
+    border-radius: 18px;
+    max-height: calc(100dvh - 18px);
+}
+.lot-display {
+    height: 54px;
+    font-size: 1.55rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+.lot-keyboard-grid,
+.lot-symbol-grid {
+    display: grid;
+    gap: 7px;
+}
+.lot-keyboard-grid {
+    grid-template-columns: repeat(10, 1fr);
+}
+.lot-symbol-grid {
+    grid-template-columns: repeat(6, 1fr);
+    margin-top: 8px;
+}
+.lot-key-btn {
+    height: 46px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 9px;
+    touch-action: manipulation;
+    padding: 0.25rem 0.35rem;
+}
+.lot-key-btn.wide {
+    grid-column: span 2;
+}
+.lot-keyboard .btn-done {
+    min-width: 150px;
+    height: 44px;
+    font-size: 1.1rem;
+    border-radius: 999px;
+}
+@media (max-width: 1024px) {
+    .container.mt-4 {
+        max-width: 100%;
+        margin-top: 0.75rem !important;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+    .card-body {
+        padding: 0.8rem;
+    }
+    #stock-in-form .table {
+        font-size: 0.9rem;
+    }
+    #stock-in-form .table th,
+    #stock-in-form .table td {
+        padding: 0.45rem;
+    }
+    #stock-in-form .form-control,
+    #stock-in-form .form-select {
+        min-height: 38px;
+        font-size: 0.95rem;
+        padding: 0.35rem 0.5rem;
+    }
+    #stock-in-form .btn-sm {
+        min-height: 34px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .lot-weight,
+    .lot-number-input,
+    .bag-count-preview {
+        min-width: 96px;
+    }
+    .kg-modal .modal-dialog,
+    .lot-keyboard .modal-dialog {
+        margin-top: 0.35rem;
+        margin-bottom: 0.35rem;
+    }
+    .kg-modal .modal-header,
+    .kg-modal .modal-footer,
+    .lot-keyboard .modal-header,
+    .lot-keyboard .modal-footer {
+        padding: 0.45rem 0.75rem;
+    }
+    .kg-modal .modal-body,
+    .lot-keyboard .modal-body {
+        padding: 0.6rem;
+        overflow-y: auto;
+    }
+    .kg-display,
+    .lot-display {
+        height: 46px;
+        font-size: 1.35rem;
+        margin-bottom: 0.55rem !important;
+    }
+    .kg-pad-btn {
+        height: 48px;
+        font-size: 1.05rem;
+    }
+    .lot-keyboard-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+    .lot-symbol-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .lot-key-btn {
+        height: 42px;
+        font-size: 0.95rem;
+    }
+}
+@media (max-width: 640px) {
+    .lot-keyboard-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .lot-symbol-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (max-height: 720px) {
+    .kg-display,
+    .lot-display {
+        height: 42px;
+        font-size: 1.2rem;
+    }
+    .kg-pad-btn {
+        height: 42px;
+        font-size: 0.95rem;
+    }
+    .lot-key-btn {
+        height: 36px;
+        font-size: 0.9rem;
+    }
+    .kg-modal .modal-title,
+    .lot-keyboard .modal-title {
+        font-size: 1rem;
+    }
+}
 </style>
 
 <div id="stockin-loading-overlay" aria-hidden="true">
@@ -186,6 +422,110 @@
         <div class="stockin-loading-text">
             入庫処理を実行中です。<br>
             しばらくお待ちください...
+        </div>
+    </div>
+</div>
+
+<div class="modal fade kg-modal" id="stockInKgNumpadModal" tabindex="-1" aria-labelledby="stockInKgNumpadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered kg-modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockInKgNumpadModalLabel">重量入力テンキー</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="kg-modal-display" class="form-control text-end fw-bold mb-3 kg-display" value="" readonly>
+                <div id="virtual-numpad-modal" class="kg-pad-grid">
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="7">7</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="8">8</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="9">9</button>
+                    <button type="button" class="btn btn-danger num-btn kg-pad-btn" data-num="del">⌫</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="4">4</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="5">5</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="6">6</button>
+                    <button type="button" class="btn btn-warning num-btn kg-pad-btn" data-num="clear">C</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="1">1</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="2">2</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num="3">3</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn" data-num=".">.</button>
+                    <button type="button" class="btn btn-outline-secondary num-btn kg-pad-btn zero" data-num="0">0</button>
+                </div>
+                <div class="kg-quick-grid">
+                    <button type="button" class="btn btn-outline-success quick-kg-modal kg-pad-btn" data-kg="20">20kg</button>
+                    <button type="button" class="btn btn-outline-primary quick-kg-modal kg-pad-btn" data-kg="25">25kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="40">40kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="50">50kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="60">60kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="75">75kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="80">80kg</button>
+                    <button type="button" class="btn btn-outline-secondary quick-kg-modal kg-pad-btn" data-kg="100">100kg</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success btn-done" data-bs-dismiss="modal">入力完了</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade lot-keyboard" id="stockInLotKeyboardModal" tabindex="-1" aria-labelledby="stockInLotKeyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered lot-keyboard-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockInLotKeyboardModalLabel">ロット番号入力</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="lot-modal-display" class="form-control text-end fw-bold mb-3 lot-display" value="" readonly>
+                <div id="lot-alpha-keyboard" class="lot-keyboard-grid">
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="1">1</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="2">2</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="3">3</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="4">4</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="5">5</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="6">6</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="7">7</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="8">8</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="9">9</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="0">0</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="A">A</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="B">B</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="C">C</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="D">D</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="E">E</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="F">F</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="G">G</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="H">H</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="I">I</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="J">J</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="K">K</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="L">L</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="M">M</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="N">N</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="O">O</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="P">P</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Q">Q</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="R">R</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="S">S</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="T">T</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="U">U</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="V">V</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="W">W</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="X">X</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Y">Y</button>
+                    <button type="button" class="btn btn-outline-primary lot-key-btn" data-lot-key="Z">Z</button>
+                </div>
+                <div class="lot-symbol-grid">
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="-">-</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key="/">/</button>
+                    <button type="button" class="btn btn-outline-secondary lot-key-btn" data-lot-key=".">.</button>
+                    <button type="button" class="btn btn-danger lot-key-btn wide" data-lot-key="del">←</button>
+                    <button type="button" class="btn btn-warning lot-key-btn wide" data-lot-key="clear">C</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success btn-done" data-bs-dismiss="modal">入力完了</button>
+            </div>
         </div>
     </div>
 </div>
@@ -218,44 +558,232 @@
     const blockAfterMismatch = {{ block_after_mismatch|yesno:"true,false" }};
     const materialSelect = document.getElementById("material_name");
     const materialCodeInput = document.getElementById("material_code");
-    const weightInput = document.getElementById("input_weight");
-    const bagCountPreview = document.getElementById("bag_count_preview");
+    const lotRows = document.getElementById("lot-rows");
+    const addLotRowBtn = document.getElementById("add-lot-row");
     const form = document.getElementById("stock-in-form");
     const submitBtn = document.getElementById("stock-in-submit-btn");
     const loadingOverlay = document.getElementById("stockin-loading-overlay");
+    const kgModalEl = document.getElementById("stockInKgNumpadModal");
+    const kgModalDisplay = document.getElementById("kg-modal-display");
+    const modalNumpad = document.getElementById("virtual-numpad-modal");
+    const lotModalEl = document.getElementById("stockInLotKeyboardModal");
+    const lotModalDisplay = document.getElementById("lot-modal-display");
+    let activeWeightInput = null;
+    let activeLotInput = null;
+
+    const colorLabels = {
+        green: "緑",
+        black: "黒",
+        blue: "青",
+        red: "赤",
+    };
 
     function syncMaterialCode() {
         if (!materialSelect || !materialCodeInput) return;
         const opt = materialSelect.options[materialSelect.selectedIndex];
         materialCodeInput.value = opt ? (opt.dataset.materialCode || "") : "";
-        updateBagCountPreview();
+        updateAllBagCountPreviews();
     }
 
-    function updateBagCountPreview() {
-        if (!bagCountPreview || !materialSelect || !weightInput) return;
+    function getSelectedBagWeight() {
         const opt = materialSelect.options[materialSelect.selectedIndex];
-        const bagWeight = Number(opt ? (opt.dataset.bagWeight || 0) : 0);
+        return Number(opt ? (opt.dataset.bagWeight || 0) : 0);
+    }
+
+    function updateLotIndexes() {
+        lotRows?.querySelectorAll(".lot-row").forEach((row, idx) => {
+            const indexCell = row.querySelector(".lot-row-index");
+            if (indexCell) indexCell.textContent = String(idx + 1);
+            const removeBtn = row.querySelector(".remove-lot-row");
+            if (removeBtn) removeBtn.disabled = lotRows.querySelectorAll(".lot-row").length <= 1;
+        });
+    }
+
+    function updateColorPreview(row) {
+        if (!row) return;
+        const select = row.querySelector(".lot-color-select");
+        const preview = row.querySelector(".lot-color-preview");
+        if (!select || !preview) return;
+        const value = select.value || "green";
+        preview.innerHTML = `<span class="lot-color-dot ${value}"></span><span>${colorLabels[value] || "-"}</span>`;
+    }
+
+    function updateAllColorPreviews() {
+        lotRows?.querySelectorAll(".lot-row").forEach(updateColorPreview);
+    }
+
+    function updateBagCountPreview(row) {
+        if (!row || !materialSelect) return;
+        const preview = row.querySelector(".bag-count-preview");
+        const weightInput = row.querySelector(".lot-weight");
+        if (!preview || !weightInput) return;
+        const bagWeight = getSelectedBagWeight();
         const weight = Number(weightInput.value || 0);
         if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(bagWeight) || bagWeight <= 0) {
-            bagCountPreview.value = "";
+            preview.value = "";
             return;
         }
-        bagCountPreview.value = String(Math.max(1, Math.ceil(weight / bagWeight)));
+        preview.value = String(Math.max(1, Math.ceil(weight / bagWeight)));
+    }
+
+    function updateAllBagCountPreviews() {
+        lotRows?.querySelectorAll(".lot-row").forEach(updateBagCountPreview);
+    }
+
+    function openKgModalForInput(input) {
+        if (!input) return;
+        activeWeightInput = input;
+        if (kgModalDisplay) kgModalDisplay.value = activeWeightInput.value || "";
+        if (kgModalEl && window.bootstrap) {
+            const modal = window.bootstrap.Modal.getOrCreateInstance(kgModalEl);
+            modal.show();
+        }
+    }
+
+    function syncActiveWeightDisplay() {
+        if (kgModalDisplay && activeWeightInput) {
+            kgModalDisplay.value = activeWeightInput.value || "";
+        }
+        const row = activeWeightInput?.closest(".lot-row");
+        if (row) updateBagCountPreview(row);
+    }
+
+    function openLotKeyboardForInput(input) {
+        if (!input) return;
+        activeLotInput = input;
+        if (lotModalDisplay) lotModalDisplay.value = activeLotInput.value || "";
+        if (lotModalEl && window.bootstrap) {
+            const modal = window.bootstrap.Modal.getOrCreateInstance(lotModalEl);
+            modal.show();
+        }
+    }
+
+    function syncActiveLotDisplay() {
+        if (lotModalDisplay && activeLotInput) {
+            lotModalDisplay.value = activeLotInput.value || "";
+        }
+    }
+
+    function applyLotKey(key) {
+        if (!activeLotInput) return;
+        const current = activeLotInput.value || "";
+        if (key === "del") {
+            activeLotInput.value = current.slice(0, -1);
+        } else if (key === "clear") {
+            activeLotInput.value = "";
+        } else {
+            activeLotInput.value = `${current}${String(key || "").toUpperCase()}`.slice(0, 60);
+        }
+        activeLotInput.dispatchEvent(new Event("input", { bubbles: true }));
+        syncActiveLotDisplay();
     }
 
     materialSelect?.addEventListener("change", syncMaterialCode);
     syncMaterialCode();
 
-    document.querySelectorAll(".js-kg").forEach((btn) => {
-        btn.addEventListener("click", () => {
+    addLotRowBtn?.addEventListener("click", () => {
+        const source = lotRows?.querySelector(".lot-row:last-child");
+        if (!source || !lotRows) return;
+        const clone = source.cloneNode(true);
+        clone.querySelectorAll("input").forEach((input) => {
+            input.value = "";
+        });
+        clone.querySelectorAll("select").forEach((select) => {
+            select.value = "green";
+        });
+        lotRows.appendChild(clone);
+        updateLotIndexes();
+        updateBagCountPreview(clone);
+        updateColorPreview(clone);
+    });
+
+    lotRows?.addEventListener("click", (event) => {
+        const kgBtn = event.target.closest(".js-kg");
+        if (kgBtn) {
+            const row = kgBtn.closest(".lot-row");
+            const weightInput = row?.querySelector(".lot-weight");
             if (!weightInput) return;
-            weightInput.value = btn.dataset.kg || "";
+            weightInput.value = kgBtn.dataset.kg || "";
             weightInput.dispatchEvent(new Event("input", { bubbles: true }));
-            updateBagCountPreview();
+            updateBagCountPreview(row);
+            return;
+        }
+
+        const numpadBtn = event.target.closest(".open-numpad-row");
+        if (numpadBtn) {
+            const row = numpadBtn.closest(".lot-row");
+            openKgModalForInput(row?.querySelector(".lot-weight"));
+            return;
+        }
+
+        const weightInputClick = event.target.closest(".lot-weight");
+        if (weightInputClick) {
+            openKgModalForInput(weightInputClick);
+            return;
+        }
+
+        const lotKeyboardBtn = event.target.closest(".open-lot-keyboard-row");
+        if (lotKeyboardBtn) {
+            const row = lotKeyboardBtn.closest(".lot-row");
+            openLotKeyboardForInput(row?.querySelector(".lot-number-input"));
+            return;
+        }
+
+        const lotInputClick = event.target.closest(".lot-number-input");
+        if (lotInputClick) {
+            openLotKeyboardForInput(lotInputClick);
+            return;
+        }
+
+        const removeBtn = event.target.closest(".remove-lot-row");
+        if (removeBtn && lotRows.querySelectorAll(".lot-row").length > 1) {
+            removeBtn.closest(".lot-row")?.remove();
+            updateLotIndexes();
+        }
+    });
+    lotRows?.addEventListener("input", (event) => {
+        const row = event.target.closest(".lot-row");
+        if (row && event.target.classList.contains("lot-weight")) {
+            updateBagCountPreview(row);
+        }
+    });
+    lotRows?.addEventListener("change", (event) => {
+        const row = event.target.closest(".lot-row");
+        if (row && event.target.classList.contains("lot-color-select")) {
+            updateColorPreview(row);
+        }
+    });
+    modalNumpad?.addEventListener("click", (event) => {
+        const btn = event.target.closest(".num-btn");
+        if (!btn || !activeWeightInput) return;
+        const num = btn.dataset.num;
+        const current = activeWeightInput.value || "";
+        if (num === "del") {
+            activeWeightInput.value = current.slice(0, -1);
+        } else if (num === "clear") {
+            activeWeightInput.value = "";
+        } else if (num === ".") {
+            if (!current.includes(".")) activeWeightInput.value = current ? `${current}.` : "0.";
+        } else {
+            activeWeightInput.value = current + num;
+        }
+        syncActiveWeightDisplay();
+    });
+    document.querySelectorAll(".quick-kg-modal").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            if (!activeWeightInput) return;
+            activeWeightInput.value = btn.dataset.kg || "";
+            syncActiveWeightDisplay();
         });
     });
-    weightInput?.addEventListener("input", updateBagCountPreview);
-    updateBagCountPreview();
+    lotModalEl?.addEventListener("click", (event) => {
+        const btn = event.target.closest(".lot-key-btn");
+        if (!btn) return;
+        applyLotKey(btn.dataset.lotKey || "");
+    });
+    updateLotIndexes();
+    updateAllBagCountPreviews();
+    updateAllColorPreviews();
 
     form?.addEventListener("submit", () => {
         window.QAStageAudio?.play("submit_start");

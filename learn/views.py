@@ -31,10 +31,16 @@ from .models import MotivationalQuote
 from .forms import MotivationalQuoteForm, TrainingProviderLinkForm
 from .models import TrainingProviderLink, AccessLog
 
+def is_kanri_account(user):
+    if not user or not user.is_authenticated:
+        return False
+    username = (user.username or '').strip().lower()
+    return bool(username == 'kanri' or user.is_staff or user.is_superuser)
+
 def login_required_ma_nv(view_func):
     def wrapper(request, *args, **kwargs):
         if request.user.is_authenticated:
-            if request.user.username == 'kanri':
+            if is_kanri_account(request.user):
                 # Kanri login: auto clear employee-session login if exists.
                 request.session.pop('ma_nv', None)
                 request.session.pop('ten', None)
@@ -107,6 +113,7 @@ class NhanVienForm(forms.ModelForm):
         ('社長', '社長'),
         ('部長', '部長'),
         ('次長', '次長'),
+        ('所長', '所長'),
         ('課長', '課長'),
         ('係長', '係長'),
         ('リーダー', 'リーダー'),
@@ -132,11 +139,11 @@ class NhanVienForm(forms.ModelForm):
 
 class CourseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
+        self.can_edit_start_date = kwargs.pop('can_edit_start_date', False)
         super().__init__(*args, **kwargs)
         # UI hiện tại không nhập description, chỉ material là tùy chọn.
         required_fields = {
             'title',
-            'start_date',
             'end_date',
             'external_url',
             'is_active',
@@ -145,6 +152,10 @@ class CourseForm(forms.ModelForm):
             'location',
             'target',
         }
+        if self.can_edit_start_date:
+            required_fields.add('start_date')
+        else:
+            self.fields.pop('start_date', None)
         for name, field in self.fields.items():
             field.required = name in required_fields
 
@@ -158,6 +169,13 @@ class CourseForm(forms.ModelForm):
             'start_date': forms.DateInput(attrs={'type': 'date'}),
             'end_date': forms.DateInput(attrs={'type': 'date'}),
         }
+
+    def clean_end_date(self):
+        end_date = self.cleaned_data.get('end_date')
+        start_date = self.cleaned_data.get('start_date') or self.instance.start_date or timezone.localdate()
+        if end_date and end_date < start_date:
+            raise forms.ValidationError('申込締切日は申込開始日以降の日付を選択してください。')
+        return end_date
 
     def clean_material(self):
         material = self.cleaned_data.get('material')
@@ -228,11 +246,14 @@ def nhanvien_list(request):
 
 @login_required_ma_nv
 def course_create(request):
+    can_edit_start_date = is_kanri_account(request.user)
     if request.method == 'POST':
         # Đảm bảo truyền cả request.FILES vào form
-        form = CourseForm(request.POST, request.FILES)
+        form = CourseForm(request.POST, request.FILES, can_edit_start_date=can_edit_start_date)
         if form.is_valid():
             course = form.save(commit=False)
+            if not can_edit_start_date:
+                course.start_date = timezone.localdate()
             if request.user.is_authenticated:
                 course.creator = request.user
             elif request.session.get('ma_nv'):
@@ -252,14 +273,15 @@ def course_create(request):
             print("FORM ERRORS:", form.errors)
             messages.error(request, "入力内容に誤りがあります。下記のエラーを確認してください。")
     else:
-        form = CourseForm()
-    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習作成'})
+        initial = {'start_date': timezone.localdate()} if can_edit_start_date else None
+        form = CourseForm(initial=initial, can_edit_start_date=can_edit_start_date)
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習作成', 'can_edit_start_date': can_edit_start_date})
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def course_update(request, pk):
     course = get_object_or_404(Course, pk=pk)
     if request.method == 'POST':
-        form = CourseForm(request.POST, request.FILES, instance=course)
+        form = CourseForm(request.POST, request.FILES, instance=course, can_edit_start_date=True)
         if form.is_valid():
             # Cập nhật các trường khác
             for field in form.cleaned_data:
@@ -274,8 +296,8 @@ def course_update(request, pk):
             messages.success(request, '研修・講習情報が更新されました。')
             return redirect('learn:course_list')
     else:
-        form = CourseForm(instance=course)
-    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集'})
+        form = CourseForm(instance=course, can_edit_start_date=True)
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集', 'can_edit_start_date': True})
 
 @user_passes_test(lambda u: u.is_authenticated and u.username == 'kanri')
 def course_delete(request, pk):
@@ -339,13 +361,14 @@ def course_list(request):
         )
     now = timezone.now().date()
     for course in courses:
-        if course.start_date:
-            if now < course.start_date:
-                course.status = 'active'
-            else:
-                course.status = 'expired'
-        else:
+        if not course.is_active:
             course.status = 'expired'
+        elif course.start_date and now < course.start_date:
+            course.status = 'waiting'
+        elif course.end_date and now > course.end_date:
+            course.status = 'expired'
+        else:
+            course.status = 'active'
     # PHÂN TRANG: mỗi trang 10 khóa học
     paginator = Paginator(courses, 10)
     page_number = request.GET.get('page')
@@ -366,7 +389,8 @@ def course_list(request):
 
     # Xác định enrollments cần phê duyệt (giữ nguyên)
     enrollments_to_approve = Enrollment.objects.none()
-    if request.user.is_authenticated and request.user.username == 'kanri':
+    is_kanri = is_kanri_account(request.user)
+    if is_kanri:
         enrollments_to_approve = Enrollment.objects.filter(status='pending_kanri').select_related('user', 'course').order_by('-enrolled_at')
     elif request.session.get('ma_nv'):
         try:
@@ -397,13 +421,11 @@ def course_list(request):
         comment = request.POST.get('comment', '')
         enrollment = get_object_or_404(Enrollment, id=enrollment_id)
         if action == 'approve':
-            if request.user.username == 'kanri' and enrollment.status == 'pending_kanri':
+            if is_kanri and enrollment.status == 'pending_kanri':
                 enrollment.status = 'approved'
-                enrollment.kanri_comment = comment
                 acted_by = None  # kanri duyệt
             elif enrollment.status == 'pending_supervisor':
                 enrollment.status = 'pending_kanri'
-                enrollment.supervisor_comment = comment
                 ma_nv = request.session.get('ma_nv')
                 acted_by = None
                 if ma_nv:
@@ -412,13 +434,11 @@ def course_list(request):
                     except User.DoesNotExist:
                         acted_by = None
         elif action == 'reject':
-            if request.user.username == 'kanri' and enrollment.status == 'pending_kanri':
+            if is_kanri and enrollment.status == 'pending_kanri':
                 enrollment.status = 'rejected_by_kanri'
-                enrollment.kanri_comment = comment
                 acted_by = None
             elif enrollment.status == 'pending_supervisor':
                 enrollment.status = 'rejected_by_supervisor'
-                enrollment.supervisor_comment = comment
                 ma_nv = request.session.get('ma_nv')
                 acted_by = None
                 if ma_nv:
@@ -444,10 +464,13 @@ def course_list(request):
 
     # Enrollments của user hiện tại (giữ nguyên)
     user_enrollments = Enrollment.objects.filter(user__username=request.session.get('ma_nv', request.user.username)).select_related('course').order_by('-enrolled_at')
+    user_enrollment_by_course_id = {enrollment.course_id: enrollment for enrollment in user_enrollments}
+    for course in page_obj:
+        course.user_enrollment = user_enrollment_by_course_id.get(course.id)
 
     # Kiểm tra xem có hiển thị bảng phê duyệt hay không
     show_approval_table = (
-        (request.user.is_authenticated and request.user.username == 'kanri') or
+        is_kanri or
         (request.session.get('ma_nv') and enrollments_to_approve.exists())
     )
 
@@ -464,7 +487,7 @@ def course_list(request):
 @login_required_ma_nv
 def enroll_course(request, course_id):
     # Nếu là kanri thì không cho phép đăng ký, thông báo và chuyển hướng
-    if request.user.is_authenticated and request.user.username == 'kanri':
+    if is_kanri_account(request.user):
         messages.error(request, '管理部アカウントでは研修・講習を申請できません。ログアウトします。')
         logout(request)
         return redirect('learn:dangnhap')
@@ -478,29 +501,12 @@ def enroll_course(request, course_id):
         messages.error(request, '社員コードに対応するユーザーが存在しません。管理者へ連絡してください。')
         return redirect('learn:dangnhap')
     nv = NhanVien.objects.filter(ma_so=user.username).first()
-    # Xử lý đặc biệt cho 係長
+    direct_to_kanri_self_notice_roles = {'課長', '部長', '所長', '次長'}
+    # Xử lý đặc biệt cho 係長: đi thẳng 管理部, chỉ thông báo cho cấp trên.
     if nv and nv.chuc_vu == '係長':
         status = 'pending_kanri'
-        to_emails = []
-        # Gửi cho bản thân
-        if nv.email:
-            to_emails.append(nv.email)
-        # Gửi cho cấp trên (supervisor) nếu có
-        supervisor_name = '未設定'
-        if nv.supervisor and nv.supervisor.email:
-            to_emails.append(nv.supervisor.email)
-            supervisor_name = nv.supervisor.ten
-        # Gửi cho kanri
-        to_emails.append("kanri_2@hayashi-p.co.jp")
-        subject = "【申請受付通知】係長の申請が管理部に送信されました"
-        message = f"{nv.ten}さん（係長）の申請が管理部に送信されました。{supervisor_name}さんと管理部に通知されました。"
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=None,
-            recipient_list=to_emails,
-            fail_silently=False,
-        )
+    elif nv and nv.chuc_vu in direct_to_kanri_self_notice_roles:
+        status = 'pending_kanri'
     elif nv is None or nv.supervisor is None or not nv.supervisor.email:
         status = 'pending_kanri'
     else:
@@ -524,10 +530,39 @@ def enroll_course(request, course_id):
             'q4_purpose_summary': q4_purpose_summary,
         }
     )
-    if created and not (nv and nv.chuc_vu == '係長'):
+    if not created and enrollment.user_id != user.id:
+        messages.error(request, '申請データの整合性エラーです。管理者へ連絡してください。')
+        return redirect('learn:course_list')
+    if created and not (nv and (nv.chuc_vu == '係長' or nv.chuc_vu in direct_to_kanri_self_notice_roles)):
         send_approval_notification(enrollment)
         messages.success(request, '申請を受け付けました。上司の承認をお待ちください。' if status == 'pending_supervisor' else '申請を受け付けました。管理部の承認をお待ちください。')
     elif created:
+        if nv and nv.chuc_vu == '係長':
+            to_emails = ["kanri_2@hayashi-p.co.jp"]
+            if nv.supervisor and nv.supervisor.email:
+                to_emails.append(nv.supervisor.email)
+            subject = "【申請通知】係長の申請が管理部に送信されました"
+            message = f"{nv.ten}さん（係長）の申請が管理部に送信されました。"
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=to_emails,
+                fail_silently=False,
+            )
+        elif nv and nv.chuc_vu in direct_to_kanri_self_notice_roles:
+            to_emails = ["kanri_2@hayashi-p.co.jp"]
+            if nv.email:
+                to_emails.append(nv.email)
+            subject = "【申請受付通知】申請が管理部に送信されました"
+            message = f"{nv.ten}さん（{nv.chuc_vu}）、申請が管理部に送信されました。管理部の承認をお待ちください。"
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=to_emails,
+                fail_silently=False,
+            )
         messages.success(request, '申請を受け付けました。管理部の承認をお待ちください。')
     else:
         messages.info(request, '既に申請済みです。')
@@ -539,14 +574,19 @@ def my_courses(request):
     user = request.user
     ma_so = request.session.get('ma_nv')
     query = request.GET.get('q', '')
-    try:
-        nhanvien = NhanVien.objects.get(ma_so=ma_so)
-        has_subordinates = nhanvien.subordinates.exists()
-    except NhanVien.DoesNotExist:
+    is_kanri = is_kanri_account(user)
+
+    if is_kanri:
         nhanvien = None
         has_subordinates = False
+    else:
+        try:
+            nhanvien = NhanVien.objects.get(ma_so=ma_so)
+            has_subordinates = nhanvien.subordinates.exists()
+        except NhanVien.DoesNotExist:
+            nhanvien = None
+            has_subordinates = False
 
-    is_kanri = user.username == 'kanri'
     show_pending_reports = is_kanri or has_subordinates
 
     # --- XỬ LÝ UPLOAD BÁO CÁO ---
@@ -707,7 +747,7 @@ def training_report(request):
 
 @login_required_ma_nv
 def mark_completed(request, enrollment_id):
-    if request.user.is_authenticated and request.user.username == 'kanri':
+    if is_kanri_account(request.user):
         enrollment = get_object_or_404(Enrollment, id=enrollment_id)
     else:
         enrollment = get_object_or_404(Enrollment, id=enrollment_id, user__username=request.session['ma_nv'])
@@ -726,7 +766,8 @@ def login_admin(request):
 
 @login_required_ma_nv
 def approve_enrollments(request):
-    if request.user.is_authenticated and request.user.username == 'kanri':
+    is_kanri = is_kanri_account(request.user)
+    if is_kanri:
         # Kanri xem tất cả pending_kanri
         enrollments = Enrollment.objects.filter(status='pending_kanri').select_related('user', 'course')
     else:
@@ -744,18 +785,22 @@ def approve_enrollments(request):
         comment = request.POST.get('comment', '')
         enrollment = get_object_or_404(Enrollment, id=enrollment_id)
         if action == 'approve':
-            if request.user.username == 'kanri' and enrollment.status == 'pending_kanri':
+            if is_kanri and enrollment.status == 'pending_kanri':
                 enrollment.status = 'approved'
-                enrollment.kanri_comment = comment  # Lưu comment của 管理者
             elif enrollment.status == 'pending_supervisor':
                 enrollment.status = 'pending_kanri'
-                enrollment.supervisor_comment = comment  # Lưu comment của 上司
         elif action == 'reject':
-            if request.user.username == 'kanri':
-                enrollment.kanri_comment = comment
-            else:
-                enrollment.supervisor_comment = comment
+            if is_kanri and enrollment.status == 'pending_kanri':
+                enrollment.status = 'rejected_by_kanri'
+            elif enrollment.status == 'pending_supervisor':
+                enrollment.status = 'rejected_by_supervisor'
         enrollment.save()
+        ApprovalHistory.objects.create(
+            enrollment=enrollment,
+            action='reject_enrollment' if action == 'reject' else 'approve_enrollment',
+            comment=comment,
+            acted_by=None if is_kanri else request.user,
+        )
         return redirect('learn:approve_enrollments')
     return render(request, 'learn/approve_enrollments.html', {'enrollments': enrollments})
 
@@ -1040,14 +1085,15 @@ def course_edit(request, pk):
     # Chỉ cho phép kanri hoặc người tạo
     if not (request.user.username == 'kanri' or course.creator == request.user):
         return HttpResponseForbidden("権限がありません。")
+    can_edit_start_date = is_kanri_account(request.user)
     if request.method == 'POST':
-        form = CourseForm(request.POST, instance=course)
+        form = CourseForm(request.POST, request.FILES, instance=course, can_edit_start_date=can_edit_start_date)
         if form.is_valid():
             form.save()
             return redirect('learn:course_list')
     else:
-        form = CourseForm(instance=course)
-    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集'})
+        form = CourseForm(instance=course, can_edit_start_date=can_edit_start_date)
+    return render(request, 'learn/course_create.html', {'form': form, 'title': '研修・講習編集', 'can_edit_start_date': can_edit_start_date})
 
 @login_required_ma_nv
 def bangcap_list(request):
@@ -1055,7 +1101,11 @@ def bangcap_list(request):
         bangcaps = BangCap.objects.select_related('nhan_vien').all().order_by('-id')
     else:
         ma_nv = request.session.get('ma_nv')
-        nhanvien = NhanVien.objects.get(ma_so=ma_nv)
+        nhanvien = NhanVien.objects.filter(ma_so=ma_nv).first()
+        if not nhanvien:
+            request.session.pop('ma_nv', None)
+            request.session.pop('ten', None)
+            return redirect('learn:dangnhap')
         bangcaps = BangCap.objects.filter(nhan_vien=nhanvien).order_by('-id')
     query = request.GET.get('q', '')
     radar_data = None
@@ -1112,7 +1162,7 @@ def bangcap_list(request):
 
 @login_required_ma_nv
 def bangcap_upload(request):
-    is_kanri = bool(request.user.is_authenticated and request.user.username == 'kanri')
+    is_kanri = is_kanri_account(request.user)
     ma_nv = request.session.get('ma_nv')
     nhanvien = NhanVien.objects.filter(ma_so=ma_nv).first()
     nhanvien_list = []
@@ -1242,9 +1292,11 @@ def send_reject_notification(enrollment):
     if nv and nv.email:
         subject = "【申請通知】申請は今回は見送られました。"
         if enrollment.status == 'rejected_by_supervisor':
-            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {enrollment.supervisor_comment}"
+            comment = getattr(enrollment, 'supervisor_comment', '') or ''
+            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {comment}"
         elif enrollment.status == 'rejected_by_kanri':
-            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {enrollment.kanri_comment}"
+            comment = getattr(enrollment, 'kanri_comment', '') or ''
+            message = f"{nv.ten}さんの申請は今回は見送られました。説明: {comment}"
         else:
             message = f"{nv.ten}さんの申請は今回は見送られました。"
         send_mail(

@@ -29,12 +29,114 @@
         .lot-black { background: #111111; }
         .lot-blue { background: #2f80ed; }
         .lot-red { background: #e53935; }
+        .ledger-table td {
+            vertical-align: middle;
+            padding-top: .38rem;
+            padding-bottom: .38rem;
+        }
+        .ledger-clamp-2 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
+            line-height: 1.35;
+            max-height: 2.7em;
+        }
+        .ledger-icon-actions {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: center;
+        }
+        .ledger-icon-btn {
+            align-items: center;
+            display: inline-flex;
+            height: 30px;
+            justify-content: center;
+            padding: 0;
+            width: 30px;
+        }
+        .ledger-detail-section {
+            border: 1px solid #e6ebf2;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .ledger-detail-section-title {
+            background: #f8fafc;
+            border-bottom: 1px solid #e6ebf2;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 12px;
+        }
+        .ledger-detail-grid {
+            display: grid;
+            gap: 0;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .ledger-detail-item {
+            border-bottom: 1px solid #edf2f7;
+            min-width: 0;
+            padding: 9px 12px;
+        }
+        .ledger-detail-label {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .ledger-detail-value {
+            color: #111827;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+        @media (max-width: 767.98px) {
+            .ledger-detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .ledger-pagination-wrap {
+            align-items: center;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: space-between;
+            margin-top: 1rem;
+        }
+        .ledger-list-summary {
+            color: #6c757d;
+            font-size: 13px;
+        }
+        .ledger-pagination {
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 0;
+        }
+        .ledger-pagination .page-link {
+            min-width: 36px;
+            text-align: center;
+        }
+        .ledger-pagination .page-item.disabled .page-link {
+            color: #9aa0a6;
+            background: #f8f9fc;
+        }
+        @media (min-width: 768px) {
+            .ledger-pagination-wrap {
+                flex-direction: row;
+            }
+        }
     </style>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">原材料出庫台帳</h2>
         <div class="d-flex gap-2">
             <a href="{% url 'material_inventory_dashboard' %}" class="btn btn-outline-primary">
                 <i class="fas fa-boxes"></i> 在庫管理
+            </a>
+            <a href="{% url 'material_out_stock_ledger_csv' %}?{{ request.GET.urlencode }}" class="btn btn-outline-dark">
+                <i class="fas fa-file-csv"></i> CSV出力
             </a>
             <a href="{% url 'index_qa' %}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> インデックスへ戻る
@@ -57,7 +159,7 @@
         <div class="card-body">
             <form method="get" class="row g-2 mb-3">
                 <div class="col-md-4">
-                    <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名、コード、製品コード、ロット、管理番号">
+                    <input type="text" class="form-control" name="keyword" value="{{ keyword }}" placeholder="原材料名、コード、作業者、ロット、管理番号">
                 </div>
                 <div class="col-md-3">
                     <input type="date" class="form-control" name="date" value="{{ date }}">
@@ -71,39 +173,40 @@
                 </div>
                 <div class="col-md-2">
                     <button class="btn btn-primary w-100" type="submit">検索</button>
+                    <a href="{% url 'material_out_stock_ledger' %}?reset=1" class="btn btn-outline-secondary w-100 mt-2">条件クリア</a>
                 </div>
             </form>
 
             <div class="table-responsive">
-                <table class="table table-bordered table-sm align-middle">
+                <table class="table table-bordered table-hover table-sm align-middle ledger-table">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
+                            <th>出庫日</th>
                             <th>原材料名</th>
                             <th>原材料コード</th>
-                            <th>出庫日</th>
                             <th>識別色</th>
-                            <th>重量(kg)</th>
+                            <th class="text-end">重量(kg)</th>
+                            <th>取引区分</th>
                             <th>袋数</th>
                             <th>ロット番号</th>
-                            <th>製品コード</th>
-                            <th>システムNo.</th>
                             <th>作業者</th>
+                            <th>システムNo.</th>
                             <th>上長確認</th>
-                            <th>確認日時</th>
                             <th>操作</th>
+                            <th>詳細</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in rows %}
                             <tr>
-                                <td>{{ forloop.counter }}</td>
-                                <td>{{ row.material_name }}</td>
-                                <td>{{ row.material_code }}</td>
+                                <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
                                 <td>
                                     {{ row.stock_out_date|date:"Y-m-d" }}
                                     <div class="small text-muted">{{ row.created_at|date:"H:i" }}</div>
                                 </td>
+                                <td><div class="ledger-clamp-2" title="{{ row.material_name }}">{{ row.material_name }}</div></td>
+                                <td><div class="ledger-clamp-2" title="{{ row.material_code }}">{{ row.material_code }}</div></td>
                                 <td>
                                     {% if row.lot_color == "green" %}
                                         <span class="lot-chip"><span class="lot-dot lot-green"></span>緑</span>
@@ -118,74 +221,156 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-end">{{ row.weight_kg }}</td>
+                                <td>
+                                    <span class="badge {% if row.transaction_type == 'ADJ-' %}bg-warning text-dark{% elif row.transaction_type == 'CORR' %}bg-info text-dark{% else %}bg-primary{% endif %}">
+                                        {{ row.transaction_type|default:"OUT" }}
+                                    </span>
+                                    {% if row.transaction_type == "ADJ-" %}
+                                        <div class="small text-muted">在庫調整（減）</div>
+                                    {% endif %}
+                                </td>
                                 <td>{{ row.bag_sequence_no }}</td>
-                                <td>{{ row.lot_number }}</td>
-                                <td>{{ row.product_code }}</td>
-                                <td>{{ row.workstation_management_no }}</td>
-                                <td>{{ row.qa_result.operator_name|default:"-" }}</td>
+                                <td><div class="ledger-clamp-2" title="{{ row.lot_number }}">{{ row.lot_number }}</div></td>
+                                <td>
+                                    <div class="ledger-clamp-2" title="{% if row.operator_name %}{{ row.operator_name }}{% elif row.qa_result and row.qa_result.operator_name %}{{ row.qa_result.operator_name }}{% else %}-{% endif %}">
+                                        {% if row.operator_name %}
+                                            {{ row.operator_name }}
+                                        {% elif row.qa_result and row.qa_result.operator_name %}
+                                            {{ row.qa_result.operator_name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td><div class="ledger-clamp-2" title="{{ row.workstation_management_no }}">{{ row.workstation_management_no }}</div></td>
                                 <td>
                                     {% if can_supervisor_confirm %}
                                         <form method="post" action="{% url 'material_out_stock_ledger_confirm' row.id %}" style="display:inline;">
                                             {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                             {% if row.supervisor_confirmed %}
                                                 <input type="hidden" name="action" value="unconfirm">
-                                                <button type="submit" class="btn btn-sm btn-success">確認済み: {{ row.supervisor_name|default:"-" }}</button>
+                                                <button type="submit" class="btn btn-sm btn-success ledger-icon-btn" title="確認済み: {{ row.supervisor_name|default:'-' }}" aria-label="確認済み">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
                                             {% else %}
-                                                <button type="submit" class="btn btn-sm btn-outline-secondary">未確認</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary ledger-icon-btn" title="未確認" aria-label="未確認">
+                                                    <i class="fas fa-user-check"></i>
+                                                </button>
                                             {% endif %}
                                         </form>
                                     {% else %}
                                         {% if row.supervisor_confirmed %}
-                                            <span class="badge bg-success">確認済み: {{ row.supervisor_name|default:"-" }}</span>
+                                            <span class="badge bg-success">確認済み</span>
                                         {% else %}
                                             <span class="badge bg-secondary">未確認</span>
                                         {% endif %}
                                     {% endif %}
                                 </td>
-                                <td>{% if row.supervisor_confirmed_at %}{{ row.supervisor_confirmed_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
                                 <td>
+                                    <div class="ledger-icon-actions">
                                     {% if can_inventory_adjust %}
-                                        <a href="{% url 'material_out_stock_ledger_edit' row.id %}" class="btn btn-sm btn-warning">編集</a>
-                                        <form method="post" action="{% url 'material_out_stock_ledger_delete' row.id %}" style="display:inline;">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この出庫台帳データを削除しますか？');">削除</button>
-                                        </form>
+                                        <a href="{% url 'material_out_stock_ledger_edit' row.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-warning ledger-icon-btn" title="編集" aria-label="編集">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
                                     {% else %}
-                                        <span class="badge bg-light text-dark border">閲覧のみ</span>
+                                        <span class="badge bg-light text-dark border">閲覧</span>
                                     {% endif %}
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary ledger-icon-btn ledger-detail-open"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#stockOutDetailModal"
+                                        title="詳細"
+                                        aria-label="詳細"
+                                        data-title="出庫詳細 #{{ row.id }}"
+                                        data-material-name="{{ row.material_name }}"
+                                        data-material-code="{{ row.material_code }}"
+                                        data-ledger-date="{{ row.stock_out_date|date:'Y-m-d' }}"
+                                        data-created-at="{{ row.created_at|date:'Y-m-d H:i' }}"
+                                        data-weight="{{ row.weight_kg }} kg"
+                                        data-bags="{{ row.bag_sequence_no }}"
+                                        data-transaction="{{ row.transaction_type|default:'OUT' }}"
+                                        data-stock-flow="{% if row.stock_before_kg != None or row.stock_after_kg != None %}{{ row.stock_before_kg|default:'-' }} → {{ row.stock_after_kg|default:'-' }}{% else %}-{% endif %}"
+                                        data-adjust-label="{% if row.adjustment_reason_code == 'cycle_count' %}棚卸差異{% elif row.adjustment_reason_code == 'input_error' %}入力ミス修正{% elif row.adjustment_reason_code == 'damage' %}廃棄・破損{% elif row.adjustment_reason_code == 'migration' %}移行データ補正{% elif row.adjustment_reason_code == 'customer_approved' %}顧客承認補正{% elif row.adjustment_reason_code == 'other' %}その他{% else %}{{ row.adjustment_reason_code|default:'-' }}{% endif %}"
+                                        data-adjust-memo="{{ row.adjustment_reason|default:row.adjustment_note|default:'-' }}"
+                                        data-lot-number="{{ row.lot_number }}"
+                                        data-product-code="{{ row.product_code }}"
+                                        data-system-no="{{ row.workstation_management_no }}"
+                                        data-operator="{% if row.operator_name %}{{ row.operator_name }}{% elif row.qa_result and row.qa_result.operator_name %}{{ row.qa_result.operator_name }}{% else %}-{% endif %}"
+                                        data-supervisor="{% if row.supervisor_confirmed %}確認済み: {{ row.supervisor_name|default:'-' }}{% else %}未確認{% endif %}"
+                                        data-confirmed-at="{% if row.supervisor_confirmed_at %}{{ row.supervisor_confirmed_at|date:'Y-m-d H:i' }}{% else %}-{% endif %}"
+                                    >
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="14" class="text-center text-muted">データがありません。</td>
+                                <td colspan="13" class="text-center text-muted">データがありません。</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
 
-            <nav aria-label="ページネーション" class="mt-3">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?keyword={{ keyword }}&date={{ date }}&confirmed={{ confirmed }}&page={{ page_obj.previous_page_number }}">前へ</a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled"><span class="page-link">前へ</span></li>
-                    {% endif %}
-                    <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?keyword={{ keyword }}&date={{ date }}&confirmed={{ confirmed }}&page={{ page_obj.next_page_number }}">次へ</a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled"><span class="page-link">次へ</span></li>
-                    {% endif %}
-                </ul>
-            </nav>
+            {% include "quet_anh/_compact_pagination.html" %}
         </div>
     </div>
 </div>
 
 </div>
+<div class="modal fade" id="stockOutDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockOutDetailTitle">出庫詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="stockOutDetailBody"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(() => {
+    const titleEl = document.getElementById("stockOutDetailTitle");
+    const bodyEl = document.getElementById("stockOutDetailBody");
+    const sections = [
+        ["原材料", [["原材料名", "materialName"], ["原材料コード", "materialCode"], ["ロット番号", "lotNumber"], ["製品コード", "productCode"]]],
+        ["出庫情報", [["出庫日", "ledgerDate"], ["登録日時", "createdAt"], ["重量", "weight"], ["袋数", "bags"], ["システムNo.", "systemNo"]]],
+        ["監査・確認", [["取引区分", "transaction"], ["調整前→後(kg)", "stockFlow"], ["ADJ理由", "adjustLabel"], ["ADJメモ", "adjustMemo"], ["作業者", "operator"], ["上長確認", "supervisor"], ["確認日時", "confirmedAt"]]],
+    ];
+
+    function item(label) {
+        return `<div class="ledger-detail-item"><div class="ledger-detail-label">${label}</div><div class="ledger-detail-value"></div></div>`;
+    }
+
+    document.querySelectorAll(".ledger-detail-open").forEach((button) => {
+        button.addEventListener("click", () => {
+            if (titleEl) titleEl.textContent = button.dataset.title || "出庫詳細";
+            if (!bodyEl) return;
+            bodyEl.innerHTML = sections.map(([sectionTitle, fields]) => {
+                const fieldsHtml = fields.map(([label]) => item(label)).join("");
+                return `<section class="ledger-detail-section"><div class="ledger-detail-section-title">${sectionTitle}</div><div class="ledger-detail-grid">${fieldsHtml}</div></section>`;
+            }).join("");
+            const values = bodyEl.querySelectorAll(".ledger-detail-value");
+            let idx = 0;
+            sections.forEach(([, fields]) => {
+                fields.forEach(([, key]) => {
+                    if (values[idx]) values[idx].textContent = button.dataset[key] || "-";
+                    idx += 1;
+                });
+            });
+        });
+    });
+})();
+</script>
 {% endblock %}

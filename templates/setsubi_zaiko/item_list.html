@@ -1,0 +1,517 @@
+{% extends "setsubi_zaiko/base.html" %}
+
+{% block setsubi_content %}
+<div class="space-y-4">
+  <div class="flex flex-col gap-3 border-b border-slate-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <h2 class="mb-0 text-xl font-bold text-slate-900">{{ list_title }}</h2>
+      <div class="text-sm text-slate-500">{{ list_subtitle }}</div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a class="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_create' %}?item_kind={{ filters.item_kind }}">新規登録</a>
+      {% if is_asset_list %}
+        <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:catalog_create' %}?item_kind={{ filters.item_kind }}">カタログ登録</a>
+      {% endif %}
+      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:category_create' %}">分類登録</a>
+      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:master_list' %}{% if is_asset_list %}?type=catalog&item_kind={{ filters.item_kind }}{% endif %}">マスター管理</a>
+      <a class="rounded-lg bg-emerald-50 px-4 py-2 font-semibold text-emerald-800 no-underline ring-1 ring-emerald-200 hover:bg-emerald-100" href="{% url 'setsubi_zaiko:export_items_csv' %}">CSV出力</a>
+    </div>
+  </div>
+
+  <div class="relative z-20 bg-white px-4 py-3 ring-1 ring-slate-200">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div class="group relative">
+      <button class="inline-flex min-h-11 items-center gap-3 rounded bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 focus:bg-blue-700 focus:outline-none" type="button">
+        カテゴリ・分類から探す
+        <span class="text-xs font-black">▼</span>
+      </button>
+      <div class="absolute left-0 right-0 top-full hidden pt-2 group-hover:block group-focus-within:block">
+        <section class="grid max-h-[70vh] overflow-auto bg-white p-4 shadow-xl ring-1 ring-slate-200 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div class="border-b border-slate-200 pb-4 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+            <div class="mb-3 text-base font-black text-slate-950">{% if is_asset_list %}カタログから探す{% else %}カテゴリから探す{% endif %}</div>
+            {% if is_asset_list and catalog_menu_tree %}
+              <div class="grid gap-1">
+                {% for root in catalog_menu_tree %}
+                  <div class="group/root rounded border border-transparent hover:border-blue-100 hover:bg-blue-50">
+                    <a class="flex items-center justify-between rounded px-2 py-2 text-sm font-bold {% if filters.catalog|stringformat:'s' == root.node.id|stringformat:'s' %}bg-blue-100 text-blue-900{% else %}text-slate-900 hover:text-blue-800{% endif %}" href="{{ request.path }}?catalog={{ root.node.id }}">
+                      <span>{{ root.node.name }}</span>
+                      <span class="ml-2 shrink-0 text-xs text-slate-400">({{ root.item_count }})</span>
+                    </a>
+                    {% if root.children %}
+                      <div class="hidden border-l-2 border-blue-100 bg-white/80 py-1 pl-3 group-hover/root:block group-focus-within/root:block">
+                        {% for child in root.children %}
+                          <div class="group/child rounded hover:bg-blue-50">
+                            <a class="flex items-center justify-between rounded px-2 py-1.5 text-sm font-semibold {% if filters.catalog|stringformat:'s' == child.node.id|stringformat:'s' %}bg-blue-50 text-blue-800{% else %}text-slate-800 hover:text-blue-800{% endif %}" href="{{ request.path }}?catalog={{ child.node.id }}">
+                              <span>{{ child.node.name }}</span>
+                              <span class="ml-2 shrink-0 text-xs text-slate-400">({{ child.item_count }})</span>
+                            </a>
+                            {% if child.children %}
+                              <div class="hidden border-l-2 border-slate-100 bg-white py-1 pl-3 group-hover/child:block group-focus-within/child:block">
+                                {% for grand in child.children %}
+                                  <div class="group/grand rounded hover:bg-blue-50">
+                                    <a class="flex items-center justify-between rounded px-2 py-1.5 text-sm font-semibold {% if filters.catalog|stringformat:'s' == grand.node.id|stringformat:'s' %}bg-blue-50 text-blue-800{% else %}text-slate-700 hover:text-blue-800{% endif %}" href="{{ request.path }}?catalog={{ grand.node.id }}">
+                                      <span>{{ grand.node.name }}</span>
+                                      <span class="ml-2 shrink-0 text-xs text-slate-400">({{ grand.item_count }})</span>
+                                    </a>
+                                    {% if grand.children %}
+                                      <div class="hidden border-l-2 border-slate-100 bg-white py-1 pl-3 group-hover/grand:block group-focus-within/grand:block">
+                                        {% for great in grand.children %}
+                                          <a class="flex items-center justify-between rounded px-2 py-1.5 text-sm font-semibold {% if filters.catalog|stringformat:'s' == great.node.id|stringformat:'s' %}bg-blue-50 text-blue-800{% else %}text-slate-600 hover:bg-blue-50 hover:text-blue-800{% endif %}" href="{{ request.path }}?catalog={{ great.node.id }}">
+                                            <span>{{ great.node.name }}</span>
+                                            <span class="ml-2 shrink-0 text-xs text-slate-400">({{ great.item_count }})</span>
+                                          </a>
+                                        {% endfor %}
+                                      </div>
+                                    {% endif %}
+                                  </div>
+                                {% endfor %}
+                              </div>
+                            {% endif %}
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% elif is_asset_list %}
+              <div class="rounded border border-dashed border-slate-300 p-4 text-sm text-slate-500">カタログ未登録です。</div>
+            {% else %}
+              <div class="space-y-4">
+                {% for section in group_sections %}
+                  <div>
+                    <div class="border-b border-slate-200 pb-1 text-sm font-bold text-slate-700">{{ section.label }}</div>
+                    <div class="mt-2 grid gap-1">
+                      {% for category in section.categories %}
+                        <a class="block rounded px-2 py-1 text-sm font-semibold text-blue-800 hover:bg-blue-50" href="{{ request.path }}?category={{ category.id }}">
+                          {{ category.full_name }}
+                        </a>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="pt-4 lg:pl-4 lg:pt-0">
+            <div class="mb-3">
+              <div class="text-base font-black text-slate-950">よく使う分類</div>
+              <div class="text-xs font-semibold text-slate-500">{% if is_asset_list %}顧客・製品・構成品の階層で管理します。{% else %}写真が登録済みの品目は分類カードにも表示されます。{% endif %}</div>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {% if is_asset_list %}
+              {% for tile in catalog_tiles %}
+                <a class="group/tile grid min-h-32 grid-cols-[86px_minmax(0,1fr)] gap-3 rounded border border-slate-200 bg-white p-3 hover:border-blue-500 hover:bg-blue-50" href="{{ request.path }}?catalog={{ tile.node.id }}">
+                  <div class="flex h-24 w-20 items-center justify-center overflow-hidden rounded bg-slate-100 ring-1 ring-slate-200">
+                    {% if tile.sample and tile.sample.item_image %}
+                      <img class="h-full w-full object-cover" src="{{ tile.sample.item_image.url }}" alt="{{ tile.node.name }}">
+                    {% else %}
+                      <div class="px-2 text-center text-xs font-bold text-slate-400">No image</div>
+                    {% endif %}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-bold text-slate-950 group-hover/tile:text-blue-800">{{ tile.node.name }}</div>
+                    {% if tile.node.parent %}<div class="mt-1 text-xs text-slate-500">{{ tile.node.parent.name }}</div>{% endif %}
+                    <div class="mt-3 inline-flex rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{{ tile.item_count }} 件</div>
+                  </div>
+                </a>
+              {% empty %}
+                <div class="rounded border border-dashed border-slate-300 p-8 text-center text-slate-500">カタログデータがありません。</div>
+              {% endfor %}
+              {% else %}
+              {% for tile in category_tiles %}
+                <a class="group/tile grid min-h-32 grid-cols-[86px_minmax(0,1fr)] gap-3 rounded border border-slate-200 bg-white p-3 hover:border-blue-500 hover:bg-blue-50" href="{{ request.path }}?category={{ tile.category.id }}">
+                  <div class="flex h-24 w-20 items-center justify-center overflow-hidden rounded bg-slate-100 ring-1 ring-slate-200">
+                    {% if tile.sample and tile.sample.item_image %}
+                      <img class="h-full w-full object-cover" src="{{ tile.sample.item_image.url }}" alt="{{ tile.category.name }}">
+                    {% else %}
+                      <div class="px-2 text-center text-xs font-bold text-slate-400">No image</div>
+                    {% endif %}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-bold text-slate-950 group-hover/tile:text-blue-800">{{ tile.category.name }}</div>
+                    {% if tile.category.parent %}<div class="mt-1 text-xs text-slate-500">{{ tile.category.parent.name }}</div>{% endif %}
+                    <div class="mt-3 inline-flex rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{{ tile.item_count }} 件</div>
+                  </div>
+                </a>
+              {% empty %}
+                <div class="rounded border border-dashed border-slate-300 p-8 text-center text-slate-500">分類データがありません。</div>
+              {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </section>
+      </div>
+      </div>
+      {% if not is_asset_list %}
+        <div class="flex flex-wrap gap-2 text-xs font-bold">
+          <a class="rounded-full px-3 py-2 {% if filters.alert == 'low_stock' %}bg-red-600 text-white{% else %}bg-red-50 text-red-700 ring-1 ring-red-100{% endif %}" href="{{ request.path }}?alert=low_stock">最低在庫以下 {{ quick_stats.low_stock|default:0 }}</a>
+          <a class="rounded-full px-3 py-2 {% if filters.alert == 'missing_photo' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-800 ring-1 ring-amber-100{% endif %}" href="{{ request.path }}?alert=missing_photo">写真未登録 {{ quick_stats.missing_photo|default:0 }}</a>
+          <a class="rounded-full px-3 py-2 {% if filters.alert == 'missing_shelf' %}bg-slate-700 text-white{% else %}bg-slate-100 text-slate-700 ring-1 ring-slate-200{% endif %}" href="{{ request.path }}?alert=missing_shelf">棚番未設定 {{ quick_stats.missing_shelf|default:0 }}</a>
+          <a class="rounded-full px-3 py-2 {% if filters.alert == 'critical_missing_control' %}bg-blue-700 text-white{% else %}bg-blue-50 text-blue-800 ring-1 ring-blue-100{% endif %}" href="{{ request.path }}?alert=critical_missing_control">Aランク管理不足 {{ quick_stats.critical_missing_control|default:0 }}</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <form class="bg-white p-4 shadow-sm ring-1 ring-slate-200" method="get">
+    <div class="mb-3 flex flex-col gap-1 border-b border-slate-100 pb-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <div class="text-sm font-black text-slate-900">条件で絞り込む</div>
+        <div class="text-xs font-semibold text-slate-500">MISUMIの型番・仕様検索のように、品番、メーカー、棚番、適用先を組み合わせて探せます。</div>
+      </div>
+      <div class="text-xs font-bold text-slate-500">検索結果: <span class="text-base text-slate-950">{{ result_count }}</span> 件</div>
+    </div>
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      {% if not lock_item_kind %}
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">管理区分</label>
+          <select class="w-full" name="item_kind">
+            {% for value,label in item_kind_choices %}
+              <option value="{{ value }}" {% if filters.item_kind == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">大分類</label>
+        <select class="w-full" name="group">
+          <option value="">すべて</option>
+          {% for value,label in group_choices %}
+            <option value="{{ value }}" {% if filters.group == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">分類</label>
+        <select class="w-full" name="category">
+          <option value="">すべて</option>
+          {% for category in category_choices %}
+            <option value="{{ category.id }}" {% if filters.category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
+              {{ category.full_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">種別</label>
+        <select class="w-full" name="equipment_type">
+          <option value="">すべて</option>
+          {% for value,label in type_choices %}
+            <option value="{{ value }}" {% if filters.equipment_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">状態</label>
+        <select class="w-full" name="status">
+          <option value="">すべて</option>
+          {% for value,label in status_choices %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if not is_asset_list %}
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">メーカー/購入先</label>
+          <input class="w-full" list="maker-list" name="maker" value="{{ filters.maker }}" placeholder="例: MISUMI">
+          <datalist id="maker-list">
+            {% for value in maker_choices %}
+              <option value="{{ value }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">棚番</label>
+          <input class="w-full" list="shelf-list" name="shelf" value="{{ filters.shelf }}" placeholder="例: A-01">
+          <datalist id="shelf-list">
+            {% for value in shelf_choices %}
+              <option value="{{ value }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">適用先</label>
+          <input class="w-full" name="application" value="{{ filters.application }}" placeholder="機械No. / 金型No.">
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">品質ランク</label>
+          <select class="w-full" name="quality_rank">
+            <option value="">すべて</option>
+            {% for value,label in quality_rank_choices %}
+              <option value="{{ value }}" {% if filters.quality_rank == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">監査アラート</label>
+          <select class="w-full" name="alert">
+            <option value="">すべて</option>
+            {% for value,label in alert_choices %}
+              <option value="{{ value }}" {% if filters.alert == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div>
+        <label class="mb-1 block text-xs font-bold text-slate-500">検索</label>
+        <input class="w-full" name="q" value="{{ filters.q }}" placeholder="コード・品番・社内呼称・棚番・機械No.">
+      </div>
+      <div class="flex items-end">
+        <button class="w-full rounded-lg bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-700" type="submit">検索</button>
+      </div>
+      <div class="flex items-end">
+        <a class="block w-full rounded-lg bg-white px-5 py-3 text-center font-semibold text-slate-700 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{{ request.path }}">条件クリア</a>
+      </div>
+    </div>
+  </form>
+
+  {% if is_asset_list %}
+    <div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div class="border-b border-slate-100 px-4 py-3">
+        <div class="text-sm font-bold text-slate-800">台帳レコード</div>
+        <div class="text-xs text-slate-500">設備・金型は在庫数ではなく、設置情報・型式・使用部品リンクで管理します。</div>
+      </div>
+      <div class="divide-y divide-slate-100">
+        {% for item in page_obj %}
+          <article class="grid gap-4 p-4 hover:bg-slate-50 lg:grid-cols-[96px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+            <a class="block" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+              {% if item.item_image %}
+                <img src="{{ item.item_image.url }}" alt="{{ item.name }}" class="h-20 w-24 rounded-lg object-cover ring-1 ring-slate-200">
+              {% else %}
+                <div class="flex h-20 w-24 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400 ring-1 ring-slate-200">No image</div>
+              {% endif %}
+            </a>
+
+            <div class="min-w-0">
+              <a class="text-base font-bold text-slate-950 no-underline hover:text-blue-700" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">{{ item.name }}</a>
+              <div class="mt-1 flex flex-wrap gap-2">
+                <code class="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-800">{{ item.code }}</code>
+                <span class="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{{ item.get_item_kind_display }}</span>
+                <span class="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{{ item.get_status_display }}</span>
+              </div>
+              {% if item.item_kind == "mold" and item.mold_hierarchy_label %}
+                <div class="mt-2 text-sm font-semibold text-slate-700">{{ item.mold_hierarchy_label }}</div>
+              {% elif item.catalog_node %}
+                <div class="mt-2 text-sm font-semibold text-slate-700">{{ item.catalog_node.full_name }}</div>
+              {% else %}
+                <div class="mt-2 text-sm text-slate-600">{{ item.equipment_group_name|default:item.category.name }} / {{ item.get_equipment_type_display }}</div>
+              {% endif %}
+              {% if item.equipment_series_name and item.item_kind != "mold" %}
+                <div class="text-xs font-semibold text-slate-500">{{ item.equipment_series_name }}</div>
+              {% endif %}
+            </div>
+
+            <div class="text-sm">
+              <div class="text-xs font-bold text-slate-500">メーカー・型式</div>
+              <div class="mt-1 font-semibold text-slate-900">{{ item.maker|default:"-" }}</div>
+              <div class="text-slate-600">{{ item.model_no|default:"型式なし" }}</div>
+              <div class="text-xs text-slate-500">{{ item.serial_no|default:"Serialなし" }}</div>
+              {% if item.department %}
+                <div class="text-xs text-slate-500">部署: {{ item.department }}</div>
+              {% endif %}
+            </div>
+
+            <div class="text-sm">
+              <div class="text-xs font-bold text-slate-500">使用・設置</div>
+              <div class="mt-1 text-slate-900">機械: {{ item.applicable_machine_no|default:"-" }}</div>
+              <div class="text-slate-600">金型: {{ item.applicable_mold_no|default:"-" }}</div>
+              <div class="text-slate-600">場所: {{ item.location|default:"-" }}</div>
+              {% if item.item_kind == "equipment" and item.equipment_document_folder_path %}
+                <a class="mt-2 inline-flex rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 no-underline ring-1 ring-blue-100 hover:bg-blue-100" href="{{ item.equipment_document_folder_uri }}" target="_blank">資料フォルダ</a>
+              {% endif %}
+              {% if item.item_kind == "mold" and item.mold_drawing_folder_path %}
+                <a class="mt-2 inline-flex rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 no-underline ring-1 ring-blue-100 hover:bg-blue-100" href="{{ item.mold_drawing_folder_uri }}" target="_blank">図面フォルダ</a>
+              {% endif %}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 lg:col-start-2 lg:col-span-3">
+              <a class="rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-100" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">詳細</a>
+              <a class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white no-underline hover:bg-emerald-500" href="{% url 'setsubi_zaiko:part_link_create' item.pk %}">使用部品</a>
+            </div>
+          </article>
+        {% empty %}
+          <div class="px-4 py-8 text-center text-slate-500">データがありません。</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+  <div class="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 lg:hidden">
+    <div class="border-b border-slate-100 px-4 py-3">
+      <div class="text-sm font-bold text-slate-800">部品リスト</div>
+      <div class="text-xs text-slate-500">スマホでは現場操作しやすいカード表示に切り替えます。</div>
+    </div>
+    {% for item in page_obj %}
+      <article class="p-4">
+        <div class="grid grid-cols-[76px_minmax(0,1fr)] gap-3">
+          <a href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+            {% if item.item_image %}
+              <img src="{{ item.item_image.url }}" alt="{{ item.name }}" class="h-16 w-20 rounded-lg object-cover ring-1 ring-slate-200">
+            {% else %}
+              <div class="flex h-16 w-20 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400 ring-1 ring-slate-200">No image</div>
+            {% endif %}
+          </a>
+          <div class="min-w-0">
+            <a class="font-bold text-slate-950 no-underline hover:text-blue-700" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">{{ item.name }}</a>
+            <div class="mt-1 flex flex-wrap gap-1">
+              <code class="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-800">{{ item.code }}</code>
+              <span class="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{{ item.category.name }}</span>
+            </div>
+            <div class="mt-2 text-sm text-slate-600">品番: <span class="font-semibold text-slate-900">{{ item.maker_part_no|default:"-" }}</span></div>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <div class="rounded bg-slate-50 p-2"><div class="font-bold text-slate-500">棚番</div><div class="mt-1 text-slate-950">{{ item.shelf_no|default:"-" }}</div></div>
+          <div class="rounded bg-slate-50 p-2"><div class="font-bold text-slate-500">在庫</div><div class="mt-1 font-bold text-slate-950">{{ item.current_quantity }} {{ item.unit }}</div></div>
+          <div class="rounded bg-slate-50 p-2"><div class="font-bold text-slate-500">機械</div><div class="mt-1 text-slate-950">{{ item.applicable_machine_no|default:"-" }}</div></div>
+          <div class="rounded bg-slate-50 p-2"><div class="font-bold text-slate-500">金型</div><div class="mt-1 text-slate-950">{{ item.applicable_mold_no|default:"-" }}</div></div>
+        </div>
+        {% if item.minimum_stock and item.current_quantity <= item.minimum_stock %}
+          <div class="mt-3 rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700 ring-1 ring-red-100">最低在庫 {{ item.minimum_stock }} 以下</div>
+        {% endif %}
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <a class="rounded bg-white px-2 py-2 text-center text-sm font-bold text-slate-700 ring-1 ring-slate-200" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">詳細</a>
+          <a class="rounded bg-emerald-600 px-2 py-2 text-center text-sm font-bold text-white" href="{% url 'setsubi_zaiko:ledger_in' %}?item={{ item.pk }}">入庫</a>
+          <a class="rounded bg-blue-700 px-2 py-2 text-center text-sm font-bold text-white" href="{% url 'setsubi_zaiko:ledger_out' %}?item={{ item.pk }}">出庫</a>
+        </div>
+      </article>
+    {% empty %}
+      <div class="px-4 py-8 text-center text-slate-500">データがありません。</div>
+    {% endfor %}
+  </div>
+
+  <div class="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 lg:block">
+    <div class="overflow-x-auto">
+      <table class="setsubi-table w-full table-auto">
+        <thead class="bg-slate-50">
+          <tr>
+            {% if is_asset_list %}
+              <th class="px-4 py-3 text-left">写真</th>
+              <th class="px-4 py-3 text-left">管理番号</th>
+              <th class="px-4 py-3 text-left">設備・金型名</th>
+              <th class="px-4 py-3 text-left">分類</th>
+              <th class="px-4 py-3 text-left">種別</th>
+              <th class="px-4 py-3 text-left">メーカー</th>
+              <th class="px-4 py-3 text-left">型式/Serial</th>
+              <th class="px-4 py-3 text-left">対象機械</th>
+              <th class="px-4 py-3 text-left">場所</th>
+              <th class="px-4 py-3 text-left">状態</th>
+            {% else %}
+              <th class="px-4 py-3 text-left">写真</th>
+              <th class="px-4 py-3 text-left">部品コード</th>
+              <th class="px-4 py-3 text-left">部品名</th>
+              <th class="px-4 py-3 text-left">品番</th>
+              <th class="px-4 py-3 text-left">適用</th>
+              <th class="px-4 py-3 text-left">棚番</th>
+              <th class="px-4 py-3 text-left">分類</th>
+              <th class="px-4 py-3 text-left">IATF管理</th>
+              <th class="px-4 py-3 text-left">種別</th>
+              <th class="px-4 py-3 text-left">型式/Serial</th>
+              <th class="px-4 py-3 text-left">場所</th>
+              <th class="px-4 py-3 text-left">状態</th>
+              <th class="px-4 py-3 text-right">在庫数</th>
+              <th class="px-4 py-3 text-left">操作</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in page_obj %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3">
+                <a href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+                  {% if item.item_image %}
+                    <img src="{{ item.item_image.url }}" alt="{{ item.name }}" class="h-12 w-16 rounded-lg object-cover ring-1 ring-slate-200">
+                  {% else %}
+                    <div class="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400 ring-1 ring-slate-200">No image</div>
+                  {% endif %}
+                </a>
+              </td>
+              <td class="px-4 py-3">
+                <a class="no-underline" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">
+                  <code class="rounded bg-slate-100 px-2 py-1 text-slate-900">{{ item.code }}</code>
+                </a>
+              </td>
+              <td class="px-4 py-3">
+                <a class="font-semibold text-slate-900 no-underline hover:text-blue-700" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">{{ item.name }}</a>
+                <div class="text-xs text-slate-500">{{ item.internal_name|default:item.maker|default:"社内呼称なし" }}</div>
+              </td>
+              {% if is_asset_list %}
+                <td class="px-4 py-3">
+                  <div class="font-semibold text-slate-800">{{ item.category.name }}</div>
+                  <div class="text-xs font-bold text-blue-700">{{ item.get_item_kind_display }}</div>
+                  {% if item.category.parent %}
+                    <div class="text-xs text-slate-500">{{ item.category.parent.name }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">{{ item.get_equipment_type_display }}</td>
+                <td class="px-4 py-3">{{ item.maker|default:"-" }}</td>
+                <td class="px-4 py-3">
+                  <div>{{ item.model_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">{{ item.serial_no|default:"Serialなし" }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div>機械: {{ item.applicable_machine_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">金型: {{ item.applicable_mold_no|default:"-" }}</div>
+                  {% if item.item_kind == "mold" and item.mold_drawing_folder_path %}
+                    <a class="mt-1 inline-flex rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 no-underline ring-1 ring-blue-100 hover:bg-blue-100" href="{{ item.mold_drawing_folder_uri }}" target="_blank">図面フォルダ</a>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">{{ item.location|default:"-" }}</td>
+                <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{{ item.get_status_display }}</span></td>
+              {% else %}
+                <td class="px-4 py-3">
+                  <div class="font-semibold text-slate-900">{{ item.maker_part_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">代替: {{ item.alternative_part_no|default:"-" }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div>機械: {{ item.applicable_machine_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">金型: {{ item.applicable_mold_no|default:"-" }}</div>
+                </td>
+                <td class="px-4 py-3"><span class="rounded bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-800">{{ item.shelf_no|default:"-" }}</span></td>
+                <td class="px-4 py-3">
+                  <div class="font-semibold text-slate-800">{{ item.category.name }}</div>
+                  <div class="text-xs font-bold text-blue-700">{{ item.get_item_kind_display }}</div>
+                  {% if item.category.parent %}
+                    <div class="text-xs text-slate-500">{{ item.category.parent.name }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                  <div><span class="rounded-full bg-slate-900 px-2 py-1 text-xs font-bold text-white">{{ item.get_quality_rank_display }}</span></div>
+                  <div class="mt-1 text-xs text-slate-500">CP: {{ item.control_plan_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">責任者: {{ item.process_owner|default:"-" }}</div>
+                </td>
+                <td class="px-4 py-3">{{ item.get_equipment_type_display }}</td>
+                <td class="px-4 py-3">
+                  <div>{{ item.model_no|default:"-" }}</div>
+                  <div class="text-xs text-slate-500">{{ item.serial_no|default:"Serialなし" }}</div>
+                </td>
+                <td class="px-4 py-3">{{ item.location|default:"-" }}</td>
+                <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{{ item.get_status_display }}</span></td>
+                <td class="px-4 py-3 text-right">
+                  <div class="font-bold text-slate-900">{{ item.current_quantity }} {{ item.unit }}</div>
+                  {% if item.minimum_stock and item.current_quantity <= item.minimum_stock %}
+                    <div class="mt-1 inline-flex rounded bg-red-50 px-2 py-1 text-xs font-bold text-red-700 ring-1 ring-red-100">最低 {{ item.minimum_stock }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-col gap-1">
+                    <a class="rounded bg-white px-2 py-1 text-center text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:item_detail' item.pk %}">詳細</a>
+                    <a class="rounded bg-emerald-600 px-2 py-1 text-center text-xs font-bold text-white hover:bg-emerald-500" href="{% url 'setsubi_zaiko:ledger_in' %}?item={{ item.pk }}">入庫</a>
+                    <a class="rounded bg-blue-700 px-2 py-1 text-center text-xs font-bold text-white hover:bg-blue-600" href="{% url 'setsubi_zaiko:ledger_out' %}?item={{ item.pk }}">出庫</a>
+                  </div>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if is_asset_list %}10{% else %}14{% endif %}" class="px-4 py-8 text-center text-slate-500">データがありません。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% include "setsubi_zaiko/pagination.html" %}
+</div>
+{% endblock %}
