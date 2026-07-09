@@ -11,10 +11,15 @@
       </div>
       <div class="flex flex-wrap gap-2">
         {% if is_asset %}
+          <a class="rounded-lg bg-violet-600 px-4 py-2 font-bold text-white no-underline hover:bg-violet-500" href="{% url 'setsubi_zaiko:item_shot_source_edit' item.pk %}">IoT shot連携設定</a>
           <a class="rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white no-underline hover:bg-emerald-500" href="{% url 'setsubi_zaiko:part_link_create' item.pk %}">使用部品をリンク</a>
+          <a class="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_create' %}?item_kind=part&part_scope={{ asset_part_scope }}&asset={{ item.pk }}">新規部品を作成</a>
         {% endif %}
         <a class="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_edit' item.pk %}">編集</a>
-        <a class="rounded-lg bg-white px-4 py-2 font-bold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:item_list' %}">一覧へ</a>
+        {% if request.user.is_staff or request.user.is_superuser %}
+          <a class="rounded-lg bg-rose-600 px-4 py-2 font-bold text-white no-underline hover:bg-rose-500" href="{% url 'setsubi_zaiko:item_delete' item.pk %}">削除</a>
+        {% endif %}
+        <a class="rounded-lg bg-white px-4 py-2 font-bold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url back_url_name %}">一覧へ</a>
       </div>
     </div>
   </section>
@@ -61,6 +66,18 @@
           <dt class="font-bold text-slate-500">型式</dt><dd class="text-slate-900">{{ item.model_no|default:"-" }}</dd>
           <dt class="font-bold text-slate-500">Serial</dt><dd class="text-slate-900">{{ item.serial_no|default:"-" }}</dd>
           <dt class="font-bold text-slate-500">部署</dt><dd class="text-slate-900">{{ item.department|default:"-" }}</dd>
+          <dt class="font-bold text-slate-500">IoT shot連携</dt>
+          <dd class="text-slate-900">
+            {% if item.iot_machine %}
+              <span class="font-bold text-violet-700">{{ item.iot_machine.name|default:item.iot_machine.address }}</span> / {{ item.iot_machine.address }} / 累積 {{ item.iot_machine.shot_total }} shot
+            {% elif item.iot_esp32_machine %}
+              <span class="font-bold text-violet-700">ESP32 {{ item.iot_esp32_machine.address }}</span> / {{ item.iot_esp32_machine.primary_product|default:item.iot_esp32_machine.product_display }} / 累積 {{ item.iot_esp32_machine.total_shot }} shot
+            {% elif item.iot_mold_lifetime %}
+              <span class="font-bold text-violet-700">{{ item.iot_mold_lifetime.mold.code }} {{ item.iot_mold_lifetime.mold.name }}</span> / 累積 {{ item.iot_mold_lifetime.total_shot }} shot
+            {% else %}
+              <a class="font-bold text-rose-700 no-underline" href="{% url 'setsubi_zaiko:item_shot_source_edit' item.pk %}">未設定・手動で連携する</a>
+            {% endif %}
+          </dd>
         {% else %}
           <dt class="font-bold text-slate-500">品質ランク</dt><dd class="text-slate-900">{{ item.get_quality_rank_display }}</dd>
           <dt class="font-bold text-slate-500">メーカー品番</dt><dd class="text-slate-900">{{ item.maker_part_no|default:"-" }}</dd>
@@ -120,7 +137,10 @@
     <section class="rounded-lg bg-white shadow-sm ring-1 ring-emerald-200">
       <div class="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
         <h3 class="mb-0 text-lg font-bold text-emerald-900">この設備・金型で使う部品</h3>
-        <a class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white no-underline hover:bg-emerald-500" href="{% url 'setsubi_zaiko:part_link_create' item.pk %}">追加</a>
+        <div class="flex flex-wrap gap-2">
+          <a class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white no-underline hover:bg-emerald-500" href="{% url 'setsubi_zaiko:part_link_create' item.pk %}">既存部品を追加</a>
+          <a class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_create' %}?item_kind=part&part_scope={{ asset_part_scope }}&asset={{ item.pk }}">新規部品</a>
+        </div>
       </div>
       <div class="overflow-x-auto">
         <table class="setsubi-table w-full table-auto">
@@ -132,6 +152,10 @@
               <th class="px-4 py-3 text-right">標準数</th>
               <th class="px-4 py-3 text-right">在庫</th>
               <th class="px-4 py-3 text-left">棚番</th>
+              <th class="px-4 py-3 text-left">shot寿命</th>
+              <th class="px-4 py-3 text-left">前回交換</th>
+              <th class="px-4 py-3 text-left">交換記録</th>
+              {% if request.user.is_staff or request.user.is_superuser %}<th class="px-4 py-3 text-left">操作</th>{% endif %}
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -146,9 +170,30 @@
                 <td class="px-4 py-3 text-right">{{ link.standard_quantity }}</td>
                 <td class="px-4 py-3 text-right font-bold">{{ link.part.current_quantity }} {{ link.part.unit }}</td>
                 <td class="px-4 py-3">{{ link.part.shelf_no|default:"-" }}</td>
+                <td class="px-4 py-3">
+                  {% if link.lifetime_shots %}
+                    <div class="font-bold {% if link.remaining_shots == 0 %}text-rose-700{% else %}text-slate-900{% endif %}">{{ link.used_shots|default_if_none:"-" }} / {{ link.lifetime_shots }}</div>
+                    <div class="text-xs text-slate-500">残り {{ link.remaining_shots }} shot / {{ link.lifetime_percent }}%</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      {% if link.effective_shot_source_label %}{{ link.effective_shot_source_label }}{% if link.uses_asset_shot_source %} (共通連携){% endif %}{% else %}shot元未設定{% endif %}
+                    </div>
+                  {% else %}
+                    <span class="text-slate-400">未設定</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">{{ link.last_replaced_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                <td class="px-4 py-3"><a class="rounded bg-amber-500 px-2 py-1 text-xs font-bold text-white no-underline hover:bg-amber-400" href="{% url 'setsubi_zaiko:part_replacement_create' link.pk %}">交換する</a></td>
+                {% if request.user.is_staff or request.user.is_superuser %}
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <a class="rounded bg-white px-2 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:part_link_edit' link.pk %}">編集</a>
+                      <a class="rounded bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-500" href="{% url 'setsubi_zaiko:part_link_delete' link.pk %}">削除</a>
+                    </div>
+                  </td>
+                {% endif %}
               </tr>
             {% empty %}
-              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">リンク済み部品がありません</td></tr>
+              <tr><td colspan="{% if request.user.is_staff or request.user.is_superuser %}10{% else %}9{% endif %}" class="px-4 py-6 text-center text-slate-500">リンク済み部品がありません</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -164,6 +209,7 @@
           <a class="block px-4 py-3 no-underline hover:bg-slate-50" href="{% url 'setsubi_zaiko:item_detail' link.asset.pk %}">
             <div class="font-bold text-slate-900">{{ link.asset.code }} {{ link.asset.name }}</div>
             <div class="text-sm text-slate-600">{{ link.usage_location|default:"使用箇所未設定" }} / 標準 {{ link.standard_quantity }}</div>
+            {% if link.lifetime_shots %}<div class="mt-1 text-xs text-slate-500">寿命 {{ link.used_shots|default_if_none:"-" }} / {{ link.lifetime_shots }} shot ・ 前回交換 {{ link.last_replaced_at|date:"Y-m-d"|default:"-" }}</div>{% endif %}
           </a>
         {% empty %}
           <div class="px-4 py-6 text-center text-slate-500">リンク先がありません</div>
@@ -171,6 +217,42 @@
       </div>
     </section>
   {% endif %}
+
+  <section class="rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+    <div class="border-b border-slate-200 px-4 py-3">
+      <h3 class="mb-0 text-lg font-bold text-slate-900">部品交換履歴</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="setsubi-table w-full table-auto">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-4 py-3 text-left">設備・金型</th>
+            <th class="px-4 py-3 text-left">部品</th>
+            <th class="px-4 py-3 text-left">前回交換日</th>
+            <th class="px-4 py-3 text-left">今回交換日</th>
+            <th class="px-4 py-3 text-right">使用shot</th>
+            <th class="px-4 py-3 text-right">交換時累積shot</th>
+            <th class="px-4 py-3 text-left">作業者・メモ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for history in replacement_histories %}
+            <tr>
+              <td class="px-4 py-3">{{ history.link.asset.code }} {{ history.link.asset.name }}</td>
+              <td class="px-4 py-3">{{ history.link.part.code }} {{ history.link.part.name }}</td>
+              <td class="px-4 py-3">{{ history.previous_replaced_at|date:"Y-m-d H:i"|default:"-" }}</td>
+              <td class="px-4 py-3 font-bold">{{ history.replaced_at|date:"Y-m-d H:i" }}</td>
+              <td class="px-4 py-3 text-right">{{ history.used_shots|default_if_none:"-" }}</td>
+              <td class="px-4 py-3 text-right">{{ history.shot_at_replacement|default_if_none:"-" }}</td>
+              <td class="px-4 py-3"><div>{{ history.operator_name|default:"-" }}</div>{% if history.note %}<div class="text-xs text-slate-500">{{ history.note }}</div>{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">交換履歴がありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
   {% if not is_asset %}
     <section class="rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
@@ -188,6 +270,7 @@
               <th class="px-4 py-3 text-left">前後</th>
               <th class="px-4 py-3 text-left">作業者</th>
               <th class="px-4 py-3 text-left">System No.</th>
+              {% if request.user.is_staff or request.user.is_superuser %}<th class="px-4 py-3 text-left">操作</th>{% endif %}
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -200,9 +283,17 @@
                 <td class="px-4 py-3">{{ ledger.quantity_before }} -> {{ ledger.quantity_after }}</td>
                 <td class="px-4 py-3">{{ ledger.operator_name|default:"-" }}</td>
                 <td class="px-4 py-3"><code>{{ ledger.system_no }}</code></td>
+                {% if request.user.is_staff or request.user.is_superuser %}
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <a class="rounded bg-white px-2 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:ledger_edit' ledger.pk %}">編集</a>
+                      <a class="rounded bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-500" href="{% url 'setsubi_zaiko:ledger_delete' ledger.pk %}">削除</a>
+                    </div>
+                  </td>
+                {% endif %}
               </tr>
             {% empty %}
-              <tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">履歴がありません</td></tr>
+              <tr><td colspan="{% if request.user.is_staff or request.user.is_superuser %}8{% else %}7{% endif %}" class="px-4 py-6 text-center text-slate-500">履歴がありません</td></tr>
             {% endfor %}
           </tbody>
         </table>

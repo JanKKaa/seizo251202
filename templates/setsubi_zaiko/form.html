@@ -11,6 +11,10 @@
             入庫・出庫・調整は台帳として履歴保存されます。
           {% elif form_kind == "item" %}
             写真・銘板・メーカー品番・適用機械/金型・棚番を登録できます。
+          {% elif form_kind == "replacement" %}
+            現在のIoT累積shotを保存し、次回交換までの寿命計算をここから再スタートします。
+          {% elif form_kind == "shot_source" %}
+            setsubiとIoTで名称が違っていても、一覧から正しいshot元を手動で紐付けできます。
           {% else %}
             分類は検索・集計・CSV出力の基準になります。
           {% endif %}
@@ -50,6 +54,22 @@
     <div class="font-bold">入力ルール</div>
     <div>履歴データは削除しません。誤りがある場合は訂正・調整台帳で記録します。</div>
   </div>
+
+  {% if replacement_link %}
+    <div class="grid gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-4">
+      <div><div class="text-xs font-bold text-slate-500">設備・金型</div><div class="font-bold">{{ replacement_link.asset.code }} {{ replacement_link.asset.name }}</div></div>
+      <div><div class="text-xs font-bold text-slate-500">部品</div><div class="font-bold">{{ replacement_link.part.code }} {{ replacement_link.part.name }}</div></div>
+      <div><div class="text-xs font-bold text-slate-500">前回交換日</div><div class="font-bold">{{ replacement_link.last_replaced_at|date:"Y-m-d H:i"|default:"-" }}</div></div>
+      <div><div class="text-xs font-bold text-slate-500">現在の使用shot</div><div class="font-bold">{{ replacement_link.used_shots|default_if_none:"shot元未設定" }}</div></div>
+    </div>
+  {% endif %}
+
+  {% if form_kind == "shot_source" %}
+    <div class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+      <div class="font-bold">手動連携のルール</div>
+      <div class="mt-1">保存時点の累積shotを開始値にします。設備はNET100またはESP32のどちらかを選択できます。以後、この設備・金型にリンクした部品は共通のIoT shotを使います。部品リンク側で個別shot元を設定した場合だけ、個別設定を優先します。</div>
+    </div>
+  {% endif %}
 
   <form method="post" enctype="multipart/form-data" class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
     {% csrf_token %}
@@ -158,13 +178,21 @@
         </div>
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.item_image.label }}</label>
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <label class="block text-sm font-bold text-slate-700">{{ form.item_image.label }}</label>
+              <button class="rounded bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700" type="button" data-camera-target="id_item_image" data-camera-preview="item-image-camera-preview">カメラ撮影</button>
+            </div>
             {{ form.item_image }}
+            <div id="item-image-camera-preview" class="mt-2 hidden rounded border border-slate-200 bg-slate-50 p-2 text-xs font-semibold text-slate-600"></div>
             {% for error in form.item_image.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-bold text-slate-700">{{ form.nameplate_image.label }}</label>
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <label class="block text-sm font-bold text-slate-700">{{ form.nameplate_image.label }}</label>
+              <button class="rounded bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700" type="button" data-camera-target="id_nameplate_image" data-camera-preview="nameplate-image-camera-preview">カメラ撮影</button>
+            </div>
             {{ form.nameplate_image }}
+            <div id="nameplate-image-camera-preview" class="mt-2 hidden rounded border border-slate-200 bg-slate-50 p-2 text-xs font-semibold text-slate-600"></div>
             {% for error in form.nameplate_image.errors %}<div class="mt-1 text-sm font-semibold text-rose-600">{{ error }}</div>{% endfor %}
           </div>
         </div>
@@ -260,5 +288,113 @@
       <button class="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-500" type="submit">登録</button>
     </div>
   </form>
+
+  {% if form_kind == "item" %}
+    <div id="setsubi-camera-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 p-4">
+      <div class="mx-auto flex h-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div class="font-bold text-slate-900">カメラ撮影</div>
+          <button class="rounded bg-white px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50" type="button" data-camera-close>閉じる</button>
+        </div>
+        <div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          <video id="setsubi-camera-video" class="min-h-0 flex-1 rounded bg-slate-950 object-contain" autoplay playsinline></video>
+          <canvas id="setsubi-camera-canvas" class="hidden"></canvas>
+          <div id="setsubi-camera-error" class="hidden rounded border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700"></div>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+          <button class="rounded bg-white px-4 py-2 font-semibold text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50" type="button" data-camera-close>キャンセル</button>
+          <button class="rounded bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-500" type="button" data-camera-shot>撮影して使用</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const modal = document.getElementById("setsubi-camera-modal");
+        const video = document.getElementById("setsubi-camera-video");
+        const canvas = document.getElementById("setsubi-camera-canvas");
+        const errorBox = document.getElementById("setsubi-camera-error");
+        if (!modal || !video || !canvas || !errorBox) return;
+
+        let stream = null;
+        let targetInput = null;
+        let previewBox = null;
+
+        const showError = (message) => {
+          errorBox.textContent = message;
+          errorBox.classList.remove("hidden");
+        };
+
+        const stopCamera = () => {
+          if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+            stream = null;
+          }
+          video.srcObject = null;
+        };
+
+        const closeCamera = () => {
+          stopCamera();
+          modal.classList.add("hidden");
+          errorBox.classList.add("hidden");
+          targetInput = null;
+          previewBox = null;
+        };
+
+        const openCamera = async (button) => {
+          targetInput = document.getElementById(button.dataset.cameraTarget);
+          previewBox = document.getElementById(button.dataset.cameraPreview);
+          if (!targetInput) return;
+          modal.classList.remove("hidden");
+          errorBox.classList.add("hidden");
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: "environment" } },
+              audio: false,
+            });
+            video.srcObject = stream;
+            await video.play();
+          } catch (error) {
+            showError("カメラを開けません。ブラウザの権限を確認するか、ファイル選択から写真を登録してください。");
+          }
+        };
+
+        const useSnapshot = () => {
+          if (!targetInput || !video.videoWidth || !video.videoHeight) {
+            showError("カメラ映像を取得できません。もう一度開き直してください。");
+            return;
+          }
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              showError("撮影画像を作成できませんでした。");
+              return;
+            }
+            const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            targetInput.files = transfer.files;
+            targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            if (previewBox) {
+              previewBox.textContent = `${file.name} を選択しました。`;
+              previewBox.classList.remove("hidden");
+            }
+            closeCamera();
+          }, "image/jpeg", 0.9);
+        };
+
+        document.querySelectorAll("[data-camera-target]").forEach((button) => {
+          button.addEventListener("click", () => openCamera(button));
+        });
+        document.querySelectorAll("[data-camera-close]").forEach((button) => {
+          button.addEventListener("click", closeCamera);
+        });
+        const shotButton = document.querySelector("[data-camera-shot]");
+        if (shotButton) shotButton.addEventListener("click", useSnapshot);
+      })();
+    </script>
+  {% endif %}
 </div>
 {% endblock %}

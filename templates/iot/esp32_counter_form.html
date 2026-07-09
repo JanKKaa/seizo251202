@@ -1,0 +1,22 @@
+{% extends "trang_chu/base.html" %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 760px;">
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning-subtle">
+            <h4 class="mb-0"><i class="fas fa-microchip me-2"></i>{{ title }}</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                現在counterを修正すると、同じ値を自動加算の基準として保存します。次回worker実行時に差分を二重加算しません。
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">保存</button>
+                <a href="{% url 'iot:machine_counter' %}" class="btn btn-secondary">戻る</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,12 +9,15 @@ from django.utils import timezone
 from django.urls import reverse
 from openpyxl import Workbook
 
-from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentStockLedger
+from iot.models import Esp32CardSnapshot, Machine, Mold, MoldLifetime
+
+from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentPartReplacementHistory, EquipmentStockLedger
 
 
 class SetsubiZaikoSmokeTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="dev", password="pw")
+        self.admin = get_user_model().objects.create_superuser(username="admin", password="pw", email="admin@example.com")
         self.client.force_login(self.user)
         self.category = EquipmentCategory.objects.create(code="IT-TEST", name="IT端末", group="it_device")
         self.item = EquipmentItem.objects.create(
@@ -33,11 +36,11 @@ class SetsubiZaikoSmokeTests(TestCase):
         )
 
     def test_pages_render(self):
-        for name in ["dashboard", "item_list", "equipment_list", "mold_list", "master_list", "ledger_list", "ledger_create"]:
+        for name in ["dashboard", "item_list", "equipment_list", "mold_list", "equipment_part_list", "mold_part_list", "master_list", "ledger_list", "ledger_create"]:
             response = self.client.get(reverse(f"setsubi_zaiko:{name}"))
             self.assertEqual(response.status_code, 200, name)
         response = self.client.get(reverse("setsubi_zaiko:part_list"))
-        self.assertRedirects(response, reverse("setsubi_zaiko:equipment_list"))
+        self.assertRedirects(response, reverse("setsubi_zaiko:equipment_part_list"))
 
         detail_response = self.client.get(reverse("setsubi_zaiko:item_detail", args=[self.item.pk]))
         self.assertEqual(detail_response.status_code, 200)
@@ -92,6 +95,12 @@ class SetsubiZaikoSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="item_image"')
         self.assertContains(response, 'name="nameplate_image"')
+        self.assertContains(response, 'accept="image/*"')
+        self.assertContains(response, 'capture="environment"')
+        self.assertContains(response, 'data-camera-target="id_item_image"')
+        self.assertContains(response, 'data-camera-target="id_nameplate_image"')
+        self.assertContains(response, 'id="setsubi-camera-modal"')
+        self.assertContains(response, "navigator.mediaDevices.getUserMedia")
         self.assertContains(response, 'name="item_kind"')
         self.assertContains(response, 'name="quality_rank"')
         self.assertNotContains(response, 'name="control_plan_no"')
@@ -201,13 +210,23 @@ class SetsubiZaikoSmokeTests(TestCase):
         self.assertContains(response, self.item.code)
         self.assertNotContains(response, asset.code)
 
-    def test_equipment_and_mold_pages_manage_part_inventory_groups(self):
+    def test_master_and_part_pages_are_split_by_equipment_and_mold(self):
         asset = EquipmentItem.objects.create(
             code="TD-YS-RC70-001",
             name="取出し機",
             category=EquipmentCategory.objects.get(code="EQ-TD"),
             equipment_type="takeout_robot",
             item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+        mold_asset = EquipmentItem.objects.create(
+            code="MOLD-ASSET-001",
+            name="金型A",
+            category=EquipmentCategory.objects.get(code="MOLD"),
+            equipment_type="mold",
+            item_kind=EquipmentItem.KIND_MOLD,
             current_quantity=Decimal("1.00"),
             unit="式",
             created_by=self.user,
@@ -224,19 +243,32 @@ class SetsubiZaikoSmokeTests(TestCase):
         )
         equipment_response = self.client.get(reverse("setsubi_zaiko:equipment_list"))
         self.assertEqual(equipment_response.status_code, 200)
-        self.assertContains(equipment_response, "設備・機械部品")
-        self.assertContains(equipment_response, self.item.code)
-        self.assertNotContains(equipment_response, asset.code)
+        self.assertContains(equipment_response, "設備・機械台帳")
+        self.assertContains(equipment_response, asset.code)
+        self.assertNotContains(equipment_response, self.item.code)
         self.assertNotContains(equipment_response, mold_part.code)
 
         mold_response = self.client.get(reverse("setsubi_zaiko:mold_list"))
         self.assertEqual(mold_response.status_code, 200)
-        self.assertContains(mold_response, "金型部品")
-        self.assertContains(mold_response, mold_part.code)
+        self.assertContains(mold_response, "金型台帳")
+        self.assertContains(mold_response, mold_asset.code)
         self.assertNotContains(mold_response, self.item.code)
+        self.assertNotContains(mold_response, mold_part.code)
+
+        equipment_part_response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"))
+        self.assertEqual(equipment_part_response.status_code, 200)
+        self.assertContains(equipment_part_response, self.item.code)
+        self.assertNotContains(equipment_part_response, asset.code)
+        self.assertNotContains(equipment_part_response, mold_part.code)
+
+        mold_part_response = self.client.get(reverse("setsubi_zaiko:mold_part_list"))
+        self.assertEqual(mold_part_response.status_code, 200)
+        self.assertContains(mold_part_response, mold_part.code)
+        self.assertNotContains(mold_part_response, self.item.code)
+        self.assertNotContains(mold_part_response, mold_asset.code)
 
         part_response = self.client.get(reverse("setsubi_zaiko:part_list"))
-        self.assertRedirects(part_response, reverse("setsubi_zaiko:equipment_list"))
+        self.assertRedirects(part_response, reverse("setsubi_zaiko:equipment_part_list"))
 
     def test_ledger_list_filters_by_three_keywords(self):
         EquipmentStockLedger.objects.create(
@@ -271,6 +303,167 @@ class SetsubiZaikoSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "EQ-0001")
         self.assertContains(response, "A: 品質・安全重要")
+
+    def test_item_list_pagination_keeps_search_filters(self):
+        for index in range(12):
+            EquipmentItem.objects.create(
+                code=f"KEEP-{index:02d}",
+                name="PAGEKEEP target",
+                category=self.category,
+                equipment_type="tablet",
+                item_kind=EquipmentItem.KIND_PART,
+                maker="KeepMaker",
+                current_quantity=Decimal("1.00"),
+                unit="個",
+                created_by=self.user,
+            )
+
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"), {"q": "PAGEKEEP", "maker": "KeepMaker"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "q=PAGEKEEP&amp;maker=KeepMaker&amp;page=2")
+
+    def test_text_search_inputs_wait_for_enter_or_button(self):
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'type="search" name="q"')
+        self.assertNotContains(response, 'name="q" value="" placeholder="コード・品番・社内呼称・棚番・機械No." data-auto-submit-control')
+        self.assertNotContains(response, 'name="maker" value="" placeholder="例: MISUMI" data-auto-submit-control')
+        self.assertContains(response, 'type="submit">検索</button>')
+
+    def test_category_choices_are_scoped_by_large_group(self):
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"), {"group": "it_device"})
+        self.assertEqual(response.status_code, 200)
+        category_choices = list(response.context["category_choices"])
+        self.assertTrue(category_choices)
+        self.assertTrue(all(category.group == "it_device" for category in category_choices))
+
+    def test_mold_master_filters_use_mold_catalog_hierarchy(self):
+        root_023 = EquipmentCatalogNode.objects.create(code="MOLD-CUST-023", name="023", item_kind=EquipmentItem.KIND_MOLD, sort_order=1)
+        root_999 = EquipmentCatalogNode.objects.create(code="MOLD-CUST-999", name="999", item_kind=EquipmentItem.KIND_MOLD, sort_order=2)
+        child_023 = EquipmentCatalogNode.objects.create(code="MOLD-CUST-023-901", name="901", item_kind=EquipmentItem.KIND_MOLD, parent=root_023, sort_order=1)
+        EquipmentCatalogNode.objects.create(code="MOLD-CUST-999-100", name="100", item_kind=EquipmentItem.KIND_MOLD, parent=root_999, sort_order=1)
+        mold = EquipmentItem.objects.create(
+            code="MOLD-901-QMB",
+            name="901 QMB",
+            category=EquipmentCategory.objects.get(code="MOLD"),
+            catalog_node=child_023,
+            equipment_type="mold",
+            item_kind=EquipmentItem.KIND_MOLD,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse("setsubi_zaiko:mold_list"), {"catalog_root": root_023.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="catalog_root"')
+        self.assertContains(response, 'name="catalog"')
+        self.assertContains(response, mold.code)
+        self.assertEqual(list(response.context["catalog_root_choices"]), [root_023, root_999])
+        self.assertEqual(list(response.context["catalog_child_choices"]), [child_023])
+
+        response = self.client.get(reverse("setsubi_zaiko:mold_list"), {"catalog_root": root_999.pk})
+        self.assertNotContains(response, mold.code)
+
+    def test_part_scope_follows_linked_asset_kind(self):
+        equipment_asset = EquipmentItem.objects.create(
+            code="LINK-EQ-ASSET",
+            name="linked equipment",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        mold_asset = EquipmentItem.objects.create(
+            code="LINK-MOLD-ASSET",
+            name="linked mold",
+            category=EquipmentCategory.objects.get(code="MOLD"),
+            equipment_type="mold",
+            item_kind=EquipmentItem.KIND_MOLD,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        mold_linked_spare = EquipmentItem.objects.create(
+            code="LINK-MOLD-SPARE",
+            name="spare used by mold",
+            category=self.category,
+            equipment_type="spare_part",
+            item_kind=EquipmentItem.KIND_PART,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        equipment_linked_mold_type = EquipmentItem.objects.create(
+            code="LINK-EQ-MOLDTYPE",
+            name="mold type used by equipment",
+            category=EquipmentCategory.objects.get(code="MOLD-INSERT"),
+            equipment_type="mold_insert",
+            item_kind=EquipmentItem.KIND_PART,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        EquipmentPartLink.objects.create(asset=mold_asset, part=mold_linked_spare)
+        EquipmentPartLink.objects.create(asset=equipment_asset, part=equipment_linked_mold_type)
+
+        mold_response = self.client.get(reverse("setsubi_zaiko:mold_part_list"))
+        self.assertContains(mold_response, mold_linked_spare.code)
+        self.assertNotContains(mold_response, equipment_linked_mold_type.code)
+
+        equipment_response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"))
+        self.assertContains(equipment_response, equipment_linked_mold_type.code)
+        self.assertNotContains(equipment_response, mold_linked_spare.code)
+
+    def test_part_list_filters_by_linked_asset_catalog(self):
+        root = EquipmentCatalogNode.objects.create(code="EQ-CAT-ROOT", name="machine root", item_kind=EquipmentItem.KIND_EQUIPMENT, sort_order=1)
+        child = EquipmentCatalogNode.objects.create(code="EQ-CAT-CHILD", name="machine child", item_kind=EquipmentItem.KIND_EQUIPMENT, parent=root, sort_order=1)
+        other_root = EquipmentCatalogNode.objects.create(code="EQ-CAT-OTHER", name="other root", item_kind=EquipmentItem.KIND_EQUIPMENT, sort_order=2)
+        asset = EquipmentItem.objects.create(
+            code="CAT-EQ-ASSET",
+            name="catalog equipment",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            catalog_node=child,
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        part = EquipmentItem.objects.create(
+            code="CAT-LINK-PART",
+            name="catalog linked part",
+            category=self.category,
+            equipment_type="spare_part",
+            item_kind=EquipmentItem.KIND_PART,
+            current_quantity=Decimal("1.00"),
+            created_by=self.user,
+        )
+        EquipmentPartLink.objects.create(asset=asset, part=part)
+
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"), {"asset_catalog_root": root.pk})
+        self.assertContains(response, part.code)
+        self.assertContains(response, 'name="asset_catalog_root"')
+        self.assertContains(response, 'name="asset_catalog"')
+        self.assertEqual(list(response.context["asset_catalog_root_choices"]), [root, other_root])
+        self.assertEqual(list(response.context["asset_catalog_child_choices"]), [child])
+
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"), {"asset_catalog_root": other_root.pk})
+        self.assertNotContains(response, part.code)
+
+    def test_keyword_search_covers_linked_asset_information(self):
+        asset = EquipmentItem.objects.create(
+            code="SEARCH-ASSET-001",
+            name="search target machine",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+        EquipmentPartLink.objects.create(asset=asset, part=self.item, usage_location="special chuck")
+
+        response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"), {"q": "SEARCH-ASSET-001"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.item.code)
 
     def test_dashboard_shows_iatf_alert_sections(self):
         response = self.client.get(reverse("setsubi_zaiko:dashboard"))
@@ -319,6 +512,321 @@ class SetsubiZaikoSmokeTests(TestCase):
         detail = self.client.get(reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
         self.assertContains(detail, "この設備・金型で使う部品")
         self.assertContains(detail, "SENSOR-001")
+
+        other_asset = EquipmentItem.objects.create(
+            code="TD-YS-RC70-002",
+            name="取出し機 RC-70D-18",
+            category=asset_category,
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+        EquipmentPartLink.objects.create(asset=other_asset, part=part, usage_location="予備")
+        self.assertEqual(part.used_by_assets.count(), 2)
+
+    def test_equipment_part_lifetime_uses_machine_shot_and_keeps_replacement_history(self):
+        asset = EquipmentItem.objects.create(
+            code="SEIKEI-TEST-01",
+            name="成形機テスト",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="injection_molding_machine",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            created_by=self.user,
+        )
+        machine = Machine.objects.create(address="test-machine", name="テスト成形機", shot_total=1000)
+        response = self.client.post(
+            reverse("setsubi_zaiko:part_link_create", args=[asset.pk]),
+            {
+                "asset": asset.pk,
+                "part": self.item.pk,
+                "usage_location": "油圧部",
+                "standard_quantity": "1",
+                "criticality": "A",
+                "replacement_cycle_days": "",
+                "lifetime_shots": "1000",
+                "shot_source_machine": machine.pk,
+                "shot_source_mold": "",
+                "note": "shot管理",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        link = EquipmentPartLink.objects.get(asset=asset, part=self.item)
+        self.assertEqual(link.baseline_shot, 1000)
+
+        machine.shot_total = 1250
+        machine.save(update_fields=["shot_total"])
+        detail = self.client.get(reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        self.assertContains(detail, "250 / 1000")
+
+        response = self.client.post(
+            reverse("setsubi_zaiko:part_replacement_create", args=[link.pk]),
+            {"replaced_at": "2026-07-03T10:00", "operator_name": "担当者A", "note": "定期交換"},
+        )
+        self.assertRedirects(response, reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        link.refresh_from_db()
+        history = EquipmentPartReplacementHistory.objects.get(link=link)
+        self.assertEqual(history.shot_at_replacement, 1250)
+        self.assertEqual(history.baseline_shot_before, 1000)
+        self.assertEqual(history.used_shots, 250)
+        self.assertIsNone(history.previous_replaced_at)
+        self.assertEqual(link.baseline_shot, 1250)
+        self.assertEqual(link.last_replaced_at, history.replaced_at)
+
+        machine.shot_total = 1400
+        machine.save(update_fields=["shot_total"])
+        response = self.client.post(
+            reverse("setsubi_zaiko:part_replacement_create", args=[link.pk]),
+            {"replaced_at": "2026-07-10T09:00", "operator_name": "担当者B", "note": ""},
+        )
+        self.assertEqual(response.status_code, 302)
+        latest = EquipmentPartReplacementHistory.objects.filter(link=link).first()
+        self.assertEqual(latest.previous_replaced_at, history.replaced_at)
+        self.assertEqual(latest.used_shots, 150)
+
+    def test_mold_part_lifetime_uses_iot_mold_total_shot(self):
+        asset = EquipmentItem.objects.create(
+            code="MOLD-TEST-01",
+            name="金型テスト",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="mold",
+            item_kind=EquipmentItem.KIND_MOLD,
+            created_by=self.user,
+        )
+        mold = Mold.objects.create(code="IOT-MOLD-01", name="IoT金型")
+        source = MoldLifetime.objects.create(mold=mold, total_shot=5000, lifetime=100000)
+        link = EquipmentPartLink.objects.create(
+            asset=asset,
+            part=self.item,
+            lifetime_shots=10000,
+            shot_source_mold=source,
+            baseline_shot=4500,
+        )
+        self.assertEqual(link.current_shot, 5000)
+        self.assertEqual(link.used_shots, 500)
+        self.assertEqual(link.remaining_shots, 9500)
+
+    def test_mold_shot_source_can_be_manually_mapped_when_names_differ(self):
+        asset = EquipmentItem.objects.create(
+            code="SETSUBI-MOLD-DIFFERENT",
+            name="現場呼称 右側金型",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="mold",
+            item_kind=EquipmentItem.KIND_MOLD,
+            created_by=self.user,
+        )
+        link = EquipmentPartLink.objects.create(asset=asset, part=self.item, lifetime_shots=10000)
+        iot_mold = Mold.objects.create(code="50171-API", name="IoT側の全く違う名称")
+        source = MoldLifetime.objects.create(mold=iot_mold, condname="api-condition-x", total_shot=5000)
+
+        response = self.client.post(
+            reverse("setsubi_zaiko:item_shot_source_edit", args=[asset.pk]),
+            {"iot_mold_lifetime": source.pk},
+        )
+        self.assertRedirects(response, reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        asset.refresh_from_db()
+        link.refresh_from_db()
+        self.assertEqual(asset.iot_mold_lifetime, source)
+        self.assertEqual(link.baseline_shot, 5000)
+
+        source.total_shot = 5400
+        source.save(update_fields=["total_shot"])
+        link.refresh_from_db()
+        self.assertEqual(link.current_shot, 5400)
+        self.assertEqual(link.used_shots, 400)
+        detail = self.client.get(reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        self.assertContains(detail, "IoT側の全く違う名称")
+        self.assertContains(detail, "400 / 10000")
+
+    def test_equipment_shot_source_can_be_manually_mapped(self):
+        asset = EquipmentItem.objects.create(
+            code="SETSUBI-EQ-DIFFERENT",
+            name="乾燥機の現場名",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="dryer",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            created_by=self.user,
+        )
+        machine = Machine.objects.create(address="manual-map-machine", name="IoT成形機36", shot_total=8000)
+        response = self.client.post(
+            reverse("setsubi_zaiko:item_shot_source_edit", args=[asset.pk]),
+            {"iot_machine": machine.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        asset.refresh_from_db()
+        self.assertEqual(asset.iot_machine, machine)
+        self.assertEqual(asset.linked_current_shot, 8000)
+
+    def test_equipment_can_use_esp32_machine_total_shot(self):
+        asset = EquipmentItem.objects.create(
+            code="SETSUBI-ESP32-EQ",
+            name="ESP32設備",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="automatic_machine",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            created_by=self.user,
+        )
+        link = EquipmentPartLink.objects.create(asset=asset, part=self.item, lifetime_shots=50000)
+        snapshot = Esp32CardSnapshot.objects.create(address="ESP-SET-01", primary_product="製品A", total_shot=12000)
+        response = self.client.post(
+            reverse("setsubi_zaiko:item_shot_source_edit", args=[asset.pk]),
+            {"iot_machine": "", "iot_esp32_machine": snapshot.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        asset.refresh_from_db()
+        link.refresh_from_db()
+        self.assertEqual(asset.iot_esp32_machine, snapshot)
+        self.assertEqual(link.baseline_shot, 12000)
+        snapshot.total_shot = 12250
+        snapshot.save(update_fields=["total_shot"])
+        link.refresh_from_db()
+        self.assertEqual(link.used_shots, 250)
+
+    def test_new_part_from_asset_is_created_and_linked(self):
+        asset = EquipmentItem.objects.create(
+            code="DR-MATSUI-MJ3-001",
+            name="乾燥機 MJ3-50",
+            category=EquipmentCategory.objects.get(code="EQ-KS"),
+            equipment_type="dryer",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+        response = self.client.post(
+            f"{reverse('setsubi_zaiko:item_create')}?item_kind=part&part_scope=equipment_parts&asset={asset.pk}",
+            {
+                "code": "DR-HEATER-001",
+                "name": "heater",
+                "category": EquipmentCategory.objects.get(code="MOLDING-ELECTRIC").pk,
+                "catalog_node": "",
+                "equipment_type": "spare_part",
+                "item_kind": EquipmentItem.KIND_PART,
+                "current_quantity": "1",
+                "unit": "個",
+                "minimum_stock": "0",
+                "reorder_point": "0",
+                "quality_rank": "C",
+                "status": "in_stock",
+            },
+        )
+        self.assertRedirects(response, reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        part = EquipmentItem.objects.get(code="DR-HEATER-001")
+        self.assertEqual(part.applicable_machine_no, asset.code)
+        self.assertTrue(EquipmentPartLink.objects.filter(asset=asset, part=part).exists())
+
+    def test_admin_can_edit_and_delete_part_link(self):
+        self.client.force_login(self.admin)
+        asset = EquipmentItem.objects.create(
+            code="TD-LINK-001",
+            name="取出し機",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+        link = EquipmentPartLink.objects.create(asset=asset, part=self.item, usage_location="old")
+
+        response = self.client.post(
+            reverse("setsubi_zaiko:part_link_edit", args=[link.pk]),
+            {
+                "asset": asset.pk,
+                "part": self.item.pk,
+                "usage_location": "new",
+                "standard_quantity": "3",
+                "criticality": "A",
+                "replacement_cycle_days": "90",
+                "note": "admin edit",
+            },
+        )
+        self.assertRedirects(response, reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        link.refresh_from_db()
+        self.assertEqual(link.usage_location, "new")
+        self.assertEqual(link.standard_quantity, Decimal("3.00"))
+
+        response = self.client.post(reverse("setsubi_zaiko:part_link_delete", args=[link.pk]))
+        self.assertRedirects(response, reverse("setsubi_zaiko:item_detail", args=[asset.pk]))
+        self.assertFalse(EquipmentPartLink.objects.filter(pk=link.pk).exists())
+
+    def test_admin_can_delete_item_without_ledgers(self):
+        self.client.force_login(self.admin)
+        asset = EquipmentItem.objects.create(
+            code="TD-DELETE-001",
+            name="削除テスト設備",
+            category=EquipmentCategory.objects.get(code="EQ-TD"),
+            equipment_type="takeout_robot",
+            item_kind=EquipmentItem.KIND_EQUIPMENT,
+            current_quantity=Decimal("1.00"),
+            unit="式",
+            created_by=self.user,
+        )
+
+        response = self.client.post(reverse("setsubi_zaiko:item_delete", args=[asset.pk]))
+        self.assertRedirects(response, reverse("setsubi_zaiko:equipment_list"))
+        self.assertFalse(EquipmentItem.objects.filter(pk=asset.pk).exists())
+
+    def test_admin_ledger_edit_and_delete_recalculates_stock(self):
+        self.client.force_login(self.admin)
+        ledger_out = EquipmentStockLedger.objects.create(
+            item=self.item,
+            transaction_type="OUT",
+            reason_code="issue_to_use",
+            reason_label="使用払出",
+            quantity=Decimal("1.00"),
+            quantity_before=Decimal("2.00"),
+            quantity_after=Decimal("1.00"),
+            operator_name="dev",
+            created_by=self.user,
+        )
+        ledger_in = EquipmentStockLedger.objects.create(
+            item=self.item,
+            transaction_type="IN",
+            reason_code="new_purchase",
+            reason_label="新規購入",
+            quantity=Decimal("2.00"),
+            quantity_before=Decimal("1.00"),
+            quantity_after=Decimal("3.00"),
+            operator_name="dev",
+            created_by=self.user,
+        )
+        self.item.current_quantity = Decimal("3.00")
+        self.item.save(update_fields=["current_quantity"])
+
+        response = self.client.post(
+            reverse("setsubi_zaiko:ledger_edit", args=[ledger_out.pk]),
+            {
+                "item": self.item.pk,
+                "transaction_type": "OUT",
+                "reason_code": "issue_to_use",
+                "quantity": "2",
+                "lot_no": "",
+                "from_location": "",
+                "to_location": "",
+                "memo": "edited",
+                "operator_name": "admin",
+                "supervisor_name": "",
+            },
+        )
+        self.assertRedirects(response, reverse("setsubi_zaiko:ledger_list"))
+        ledger_out.refresh_from_db()
+        ledger_in.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(ledger_out.quantity_after, Decimal("0.00"))
+        self.assertEqual(ledger_in.quantity_before, Decimal("0.00"))
+        self.assertEqual(ledger_in.quantity_after, Decimal("2.00"))
+        self.assertEqual(self.item.current_quantity, Decimal("2.00"))
+
+        response = self.client.post(reverse("setsubi_zaiko:ledger_delete", args=[ledger_out.pk]))
+        self.assertRedirects(response, reverse("setsubi_zaiko:ledger_list"))
+        ledger_in.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertFalse(EquipmentStockLedger.objects.filter(pk=ledger_out.pk).exists())
+        self.assertEqual(ledger_in.quantity_before, Decimal("2.00"))
+        self.assertEqual(ledger_in.quantity_after, Decimal("4.00"))
+        self.assertEqual(self.item.current_quantity, Decimal("4.00"))
 
     def test_mold_drawing_folder_link_renders(self):
         mold = EquipmentItem.objects.create(
@@ -407,11 +915,11 @@ class SetsubiZaikoSmokeTests(TestCase):
             created_by=self.user,
         )
 
-        response = self.client.get(reverse("setsubi_zaiko:mold_list"))
+        response = self.client.get(reverse("setsubi_zaiko:mold_part_list"))
         self.assertContains(response, mold.code)
         self.assertContains(response, "linh kien Z")
 
-        equipment_response = self.client.get(reverse("setsubi_zaiko:equipment_list"))
+        equipment_response = self.client.get(reverse("setsubi_zaiko:equipment_part_list"))
         self.assertNotContains(equipment_response, mold.code)
 
     def test_catalog_create_keeps_asset_catalog_form_available(self):

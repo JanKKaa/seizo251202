@@ -1,5 +1,6 @@
 import base64
 import csv
+import hashlib
 import os
 from io import BytesIO
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
@@ -44,6 +45,7 @@ from django.db import OperationalError, ProgrammingError, IntegrityError, transa
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.core.files.storage import default_storage
+from django.core.cache import cache
 
 from PIL import Image
 import cv2
@@ -98,6 +100,33 @@ def _display_login_name(user):
     if full_name:
         return full_name
     return (user.username or "").strip()
+
+
+def _outstock_idempotency_cache_key(
+    *,
+    device_id,
+    machine_number,
+    expected_text,
+    input_weight,
+    lot_color,
+    lot_number,
+    product_code,
+    captured_image,
+):
+    payload = "||".join(
+        [
+            str(device_id or "").strip(),
+            str(machine_number or "").strip(),
+            str(expected_text or "").strip(),
+            str(input_weight or "").strip(),
+            str(lot_color or "").strip(),
+            str(lot_number or "").strip(),
+            str(product_code or "").strip(),
+            str(captured_image or "").strip(),
+        ]
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"qa_outstock_submit:{digest}"
 
 
 def _can_supervisor_confirm(user):
@@ -1216,6 +1245,32 @@ def upload_image(request):
             })
         # ==== END kiểm tra ===
 
+        submit_lock_key = _outstock_idempotency_cache_key(
+            device_id=getattr(device, "id", ""),
+            machine_number=machine_number,
+            expected_text=expected_text,
+            input_weight=input_weight,
+            lot_color=lot_color,
+            lot_number=lot_number,
+            product_code=product_code,
+            captured_image=captured_image,
+        )
+        existing_submit_state = cache.get(submit_lock_key)
+        if existing_submit_state:
+            if existing_submit_state.get("status") == "done":
+                return render(
+                    request,
+                    "quet_anh/auto_success.html",
+                    {
+                        "flow_name": existing_submit_state.get("flow_name") or "蜃ｺ蠎ｫ蜃ｦ逅・,
+                        "registration_code": existing_submit_state.get("registration_code") or "",
+                        "detail_message": existing_submit_state.get("detail_message") or "同じ内容はすでに処理済みです。履歴をご確認ください。",
+                    },
+                )
+            messages.warning(request, "同じ内容の送信がすでに処理中です。しばらく待って履歴を確認してください。")
+            return redirect("qa_history")
+        cache.set(submit_lock_key, {"status": "processing"}, timeout=300)
+
         if captured_image:
             format, imgstr = captured_image.split(';base64,')
             ext = format.split('/')[-1]
@@ -1224,8 +1279,10 @@ def upload_image(request):
 
             form = QAResultForm(request.POST)
             if not form.is_valid():
+                cache.delete(submit_lock_key)
                 messages.error(request, f"フォームエラー: {form.errors}")
                 device_list = QADeviceInfo.objects.all()
+                cache.delete(submit_lock_key)
                 return render(request, 'quet_anh/upload.html', {
                     'form': form,
                     'message': message,
@@ -1346,6 +1403,7 @@ def upload_image(request):
                 messages.error(request, "一致しません。再スキャンしてください。データは保存されません。")
                 form = QAResultForm()
                 device_list = QADeviceInfo.objects.all()
+                cache.delete(submit_lock_key)
                 return render(request, 'quet_anh/upload.html', {
                     'form': form,
                     'expected_text': expected_text,
@@ -1397,6 +1455,7 @@ def upload_image(request):
                         messages.error(request, f"{auto_msg} / 保存しません。再スキャンしてください。")
                         form = QAResultForm()
                         device_list = QADeviceInfo.objects.all()
+                        cache.delete(submit_lock_key)
                         return render(request, 'quet_anh/upload.html', {
                             'form': form,
                             'expected_text': expected_text,

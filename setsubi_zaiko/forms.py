@@ -1,7 +1,23 @@
 from django import forms
 from django.db.models import Q
 
-from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentStockLedger
+from iot.models import Esp32CardSnapshot, Machine, MoldLifetime
+
+from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentPartReplacementHistory, EquipmentStockLedger
+
+
+MOLD_PART_TYPES = {
+    "mold_part",
+    "mold_insert",
+    "mold_core_pin",
+    "mold_ejector_pin",
+    "mold_slide_core",
+    "mold_guide_part",
+    "mold_spring",
+    "mold_cooling_part",
+    "mold_plate",
+    "mold_hot_runner_part",
+}
 
 
 class EquipmentCategoryForm(forms.ModelForm):
@@ -83,10 +99,36 @@ class EquipmentItemForm(forms.ModelForm):
             "note",
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, fixed_item_kind=None, part_scope=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["category"].queryset = EquipmentCategory.objects.filter(is_active=True).select_related("parent").order_by("group", "parent__code", "code")
-        self.fields["catalog_node"].queryset = EquipmentCatalogNode.objects.filter(is_active=True).select_related("parent").order_by("item_kind", "sort_order", "code")
+        category_queryset = EquipmentCategory.objects.filter(is_active=True).select_related("parent").order_by("group", "parent__code", "code")
+        catalog_queryset = EquipmentCatalogNode.objects.filter(is_active=True).select_related("parent").order_by("item_kind", "sort_order", "code")
+        if fixed_item_kind == EquipmentItem.KIND_EQUIPMENT:
+            category_queryset = category_queryset.filter(Q(code="EQUIPMENT-LEDGER") | Q(parent__code="EQUIPMENT-LEDGER"))
+            catalog_queryset = catalog_queryset.filter(item_kind=EquipmentItem.KIND_EQUIPMENT)
+        elif fixed_item_kind == EquipmentItem.KIND_MOLD:
+            category_queryset = category_queryset.filter(Q(code="MOLD") | Q(parent__code="MOLD"))
+            catalog_queryset = catalog_queryset.filter(item_kind=EquipmentItem.KIND_MOLD)
+        elif fixed_item_kind == EquipmentItem.KIND_PART:
+            category_queryset = category_queryset.exclude(Q(code="EQUIPMENT-LEDGER") | Q(parent__code="EQUIPMENT-LEDGER"))
+            catalog_queryset = catalog_queryset.none()
+            if part_scope == "mold_parts":
+                category_queryset = category_queryset.filter(Q(code="MOLD") | Q(parent__code="MOLD"))
+            elif part_scope == "equipment_parts":
+                category_queryset = category_queryset.exclude(Q(code="MOLD") | Q(parent__code="MOLD"))
+        self.fields["category"].queryset = category_queryset
+        self.fields["catalog_node"].queryset = catalog_queryset
+        if fixed_item_kind in {EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD, EquipmentItem.KIND_PART}:
+            self.fields["item_kind"].initial = fixed_item_kind
+            self.fields["item_kind"].widget = forms.HiddenInput()
+        if fixed_item_kind == EquipmentItem.KIND_MOLD:
+            self.fields["equipment_type"].choices = [choice for choice in EquipmentItem.TYPE_CHOICES if choice[0] == "mold"]
+        elif fixed_item_kind == EquipmentItem.KIND_PART and part_scope == "mold_parts":
+            self.fields["equipment_type"].choices = [choice for choice in EquipmentItem.TYPE_CHOICES if choice[0] in MOLD_PART_TYPES]
+        elif fixed_item_kind == EquipmentItem.KIND_PART and part_scope == "equipment_parts":
+            self.fields["equipment_type"].choices = [
+                choice for choice in EquipmentItem.TYPE_CHOICES if choice[0] not in MOLD_PART_TYPES and choice[0] != "mold"
+            ]
         self.fields["code"].help_text = "例: MOLD-PIN-001, JSW-HEATER-001"
         self.fields["name"].help_text = "現場で分かる名称を入力してください。"
         self.fields["maker_part_no"].help_text = "MISUMI/メーカー品番があれば入力します。"
@@ -103,12 +145,17 @@ class EquipmentItemForm(forms.ModelForm):
         self.fields["equipment_document_subfolder_path"].help_text = "例: MATSUI MJ3-50 21号機"
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
+        for image_field in ["item_image", "nameplate_image"]:
+            self.fields[image_field].widget.attrs.update({
+                "accept": "image/*",
+                "capture": "environment",
+            })
 
 
 class EquipmentPartLinkForm(forms.ModelForm):
     class Meta:
         model = EquipmentPartLink
-        fields = ["asset", "part", "usage_location", "standard_quantity", "criticality", "replacement_cycle_days", "note"]
+        fields = ["asset", "part", "usage_location", "standard_quantity", "criticality", "replacement_cycle_days", "lifetime_shots", "shot_source_machine", "shot_source_mold", "note"]
         widgets = {
             "note": forms.Textarea(attrs={"rows": 3}),
         }
@@ -122,6 +169,95 @@ class EquipmentPartLinkForm(forms.ModelForm):
         if asset is not None:
             self.fields["asset"].initial = asset
             self.fields["asset"].widget = forms.HiddenInput()
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned = super().clean()
+        asset = cleaned.get("asset")
+        machine = cleaned.get("shot_source_machine")
+        mold = cleaned.get("shot_source_mold")
+        if machine and mold:
+            raise forms.ValidationError("shot元は成形機または金型のどちらか一つを選択してください。")
+        if asset and asset.item_kind == EquipmentItem.KIND_EQUIPMENT and mold:
+            self.add_error("shot_source_mold", "設備部品は成形機shot元を選択してください。")
+        if asset and asset.item_kind == EquipmentItem.KIND_MOLD and machine:
+            self.add_error("shot_source_machine", "金型部品は金型shot元を選択してください。")
+        return cleaned
+
+
+class IoTMachineChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return " / ".join(filter(None, [obj.setsubi_no, obj.name, obj.address, f"累積 {obj.shot_total} shot"]))
+
+
+class IoTMoldLifetimeChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return " / ".join(filter(None, [obj.mold.code, obj.mold.name, obj.condname, obj.esp32_machine, f"累積 {obj.total_shot} shot"]))
+
+
+class IoTEsp32MachineChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        product = obj.primary_product or obj.product_display
+        return " / ".join(filter(None, [f"ESP32 {obj.address}", product, f"累積 {obj.total_shot} shot"]))
+
+
+class EquipmentShotSourceForm(forms.ModelForm):
+    iot_machine = IoTMachineChoiceField(
+        label="IoT側の成形機",
+        queryset=Machine.objects.none(),
+        required=False,
+        help_text="名前が違っていても、アドレス・設備No.を確認して手動で選択します。",
+    )
+    iot_mold_lifetime = IoTMoldLifetimeChoiceField(
+        label="IoT側の金型",
+        queryset=MoldLifetime.objects.none(),
+        required=False,
+        help_text="setsubiの金型名と一致する必要はありません。正しいIoT金型を手動で選択します。",
+    )
+    iot_esp32_machine = IoTEsp32MachineChoiceField(
+        label="IoT側のESP32成形機",
+        queryset=Esp32CardSnapshot.objects.none(),
+        required=False,
+        help_text="ESP32でshotを取得する設備はこちらを選択します。",
+    )
+
+    class Meta:
+        model = EquipmentItem
+        fields = ["iot_machine", "iot_esp32_machine", "iot_mold_lifetime"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["iot_machine"].queryset = Machine.objects.filter(active=True).order_by("setsubi_no", "name", "address")
+        self.fields["iot_esp32_machine"].queryset = Esp32CardSnapshot.objects.order_by("address")
+        self.fields["iot_mold_lifetime"].queryset = MoldLifetime.objects.select_related("mold").order_by("mold__code", "mold__name", "condname")
+        if self.instance.item_kind == EquipmentItem.KIND_EQUIPMENT:
+            self.fields.pop("iot_mold_lifetime")
+        elif self.instance.item_kind == EquipmentItem.KIND_MOLD:
+            self.fields.pop("iot_machine")
+            self.fields.pop("iot_esp32_machine")
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("iot_machine") and cleaned.get("iot_esp32_machine"):
+            raise forms.ValidationError("成形機shot元はNET100またはESP32のどちらか一つを選択してください。")
+        return cleaned
+
+
+class EquipmentPartReplacementForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentPartReplacementHistory
+        fields = ["replaced_at", "operator_name", "note"]
+        widgets = {
+            "replaced_at": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "note": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["replaced_at"].input_formats = ["%Y-%m-%dT%H:%M"]
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
 
@@ -161,6 +297,35 @@ class EquipmentStockLedgerForm(forms.Form):
         if transaction_type:
             self.fields["transaction_type"].initial = transaction_type
             self.fields["transaction_type"].widget = forms.HiddenInput()
+        for field in self.fields.values():
+            css = "form-check-input" if isinstance(field.widget, forms.CheckboxInput) else "form-control"
+            field.widget.attrs["class"] = css
+
+
+class EquipmentStockLedgerEditForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentStockLedger
+        fields = [
+            "item",
+            "transaction_type",
+            "reason_code",
+            "quantity",
+            "lot_no",
+            "from_location",
+            "to_location",
+            "memo",
+            "operator_name",
+            "supervisor_confirmed",
+            "supervisor_name",
+        ]
+        widgets = {
+            "memo": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["item"].queryset = EquipmentItem.objects.filter(item_kind=EquipmentItem.KIND_PART).order_by("code")
+        self.fields["item"].disabled = True
         for field in self.fields.values():
             css = "form-check-input" if isinstance(field.widget, forms.CheckboxInput) else "form-control"
             field.widget.attrs["class"] = css

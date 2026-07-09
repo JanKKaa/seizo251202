@@ -10,11 +10,16 @@
   <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
     <div class="rounded-lg bg-slate-50 p-4">
       <div class="text-xs font-bold text-slate-500">対象</div>
-      <div class="mt-1 text-lg font-bold text-slate-950">{{ object.code }} {{ object.name }}</div>
+      <div class="mt-1 text-lg font-bold text-slate-950">{% if object_label %}{{ object_label }}{% else %}{{ object.code }} {{ object.name }}{% endif %}</div>
       {% if object.parent %}<div class="mt-1 text-sm text-slate-600">親階層: {{ object.parent.full_name }}</div>{% endif %}
+      {% if dependency_text %}<div class="mt-2 text-sm font-semibold text-amber-800">{{ dependency_text }}</div>{% endif %}
     </div>
 
-    {% if has_dependencies %}
+    {% if warning_text %}
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        {{ warning_text }}
+      </div>
+    {% elif has_dependencies %}
       <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
         このマスターは品目または子階層で使用中です。履歴とリンクを守るため、完全削除ではなく「無効」にします。
       </div>
@@ -26,8 +31,8 @@
 
     <form class="mt-4 flex flex-wrap justify-end gap-2" method="post">
       {% csrf_token %}
-      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% if cancel_url_name %}{% url cancel_url_name %}{% else %}{% url 'setsubi_zaiko:dashboard' %}{% endif %}">キャンセル</a>
-      <button class="rounded-lg bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-500" type="submit">{% if has_dependencies %}無効にする{% else %}削除する{% endif %}</button>
+      <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% if cancel_url %}{{ cancel_url }}{% elif cancel_url_name %}{% url cancel_url_name %}{% else %}{% url 'setsubi_zaiko:dashboard' %}{% endif %}">キャンセル</a>
+      <button class="rounded-lg bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-500" type="submit">{% if action_label %}{{ action_label }}{% elif has_dependencies %}無効にする{% else %}削除する{% endif %}</button>
     </form>
   </section>
 </div>

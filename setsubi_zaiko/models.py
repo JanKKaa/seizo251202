@@ -200,6 +200,30 @@ class EquipmentItem(models.Model):
     )
     equipment_type = models.CharField("機器種別", max_length=40, choices=TYPE_CHOICES, default="other")
     item_kind = models.CharField("管理区分", max_length=20, choices=ITEM_KIND_CHOICES, default=KIND_PART, db_index=True)
+    iot_machine = models.ForeignKey(
+        "iot.Machine",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="setsubi_assets",
+        verbose_name="IoT成形機shot連携",
+    )
+    iot_esp32_machine = models.ForeignKey(
+        "iot.Esp32CardSnapshot",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="setsubi_assets",
+        verbose_name="ESP32成形機shot連携",
+    )
+    iot_mold_lifetime = models.ForeignKey(
+        "iot.MoldLifetime",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="setsubi_assets",
+        verbose_name="IoT金型shot連携",
+    )
     internal_name = models.CharField("社内呼称", max_length=160, blank=True)
     maker_part_no = models.CharField("メーカー品番", max_length=120, blank=True)
     alternative_part_no = models.CharField("代替品番", max_length=120, blank=True)
@@ -258,6 +282,17 @@ class EquipmentItem(models.Model):
     @property
     def is_part_master(self):
         return self.item_kind == self.KIND_PART
+
+    @property
+    def linked_current_shot(self):
+        if self.item_kind == self.KIND_EQUIPMENT:
+            if self.iot_machine_id:
+                return self.iot_machine.shot_total
+            if self.iot_esp32_machine_id:
+                return self.iot_esp32_machine.total_shot
+        if self.item_kind == self.KIND_MOLD and self.iot_mold_lifetime_id:
+            return self.iot_mold_lifetime.total_shot
+        return None
 
     @property
     def mold_drawing_folder_path(self):
@@ -333,6 +368,25 @@ class EquipmentPartLink(models.Model):
     standard_quantity = models.DecimalField("標準使用数", max_digits=10, decimal_places=2, default=1)
     criticality = models.CharField("重要度", max_length=1, choices=CRITICALITY_CHOICES, default="B")
     replacement_cycle_days = models.PositiveIntegerField("交換目安(日)", null=True, blank=True)
+    lifetime_shots = models.PositiveBigIntegerField("交換目安(shot)", null=True, blank=True)
+    shot_source_machine = models.ForeignKey(
+        "iot.Machine",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="setsubi_part_links",
+        verbose_name="成形機shot元",
+    )
+    shot_source_mold = models.ForeignKey(
+        "iot.MoldLifetime",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="setsubi_part_links",
+        verbose_name="金型shot元",
+    )
+    baseline_shot = models.PositiveBigIntegerField("交換時累積shot", default=0)
+    last_replaced_at = models.DateTimeField("最終交換日", null=True, blank=True)
     note = models.TextField("備考", blank=True)
     created_at = models.DateTimeField("作成日時", auto_now_add=True)
     updated_at = models.DateTimeField("更新日時", auto_now=True)
@@ -345,6 +399,83 @@ class EquipmentPartLink(models.Model):
 
     def __str__(self):
         return f"{self.asset.code} -> {self.part.code}"
+
+    @property
+    def current_shot(self):
+        if self.shot_source_machine_id:
+            return self.shot_source_machine.shot_total
+        if self.shot_source_mold_id:
+            return self.shot_source_mold.total_shot
+        return self.asset.linked_current_shot
+
+    @property
+    def effective_shot_source_label(self):
+        machine = self.shot_source_machine or self.asset.iot_machine
+        if machine:
+            return machine.name or machine.address
+        if self.asset.iot_esp32_machine_id:
+            return f"ESP32 {self.asset.iot_esp32_machine.address}"
+        mold_lifetime = self.shot_source_mold or self.asset.iot_mold_lifetime
+        if mold_lifetime:
+            return mold_lifetime.mold.name
+        return ""
+
+    @property
+    def uses_asset_shot_source(self):
+        return not self.shot_source_machine_id and not self.shot_source_mold_id and (
+            self.asset.iot_machine_id or self.asset.iot_esp32_machine_id or self.asset.iot_mold_lifetime_id
+        )
+
+    @property
+    def used_shots(self):
+        current = self.current_shot
+        if current is None:
+            return None
+        return max(int(current) - int(self.baseline_shot or 0), 0)
+
+    @property
+    def remaining_shots(self):
+        if not self.lifetime_shots:
+            return None
+        return max(int(self.lifetime_shots) - int(self.used_shots or 0), 0)
+
+    @property
+    def lifetime_percent(self):
+        if not self.lifetime_shots:
+            return None
+        return min(round((self.used_shots or 0) / self.lifetime_shots * 100, 1), 100.0)
+
+
+class EquipmentPartReplacementHistory(models.Model):
+    link = models.ForeignKey(
+        EquipmentPartLink,
+        on_delete=models.PROTECT,
+        related_name="replacement_histories",
+        verbose_name="設備・金型 使用部品",
+    )
+    replaced_at = models.DateTimeField("今回交換日", default=timezone.now)
+    previous_replaced_at = models.DateTimeField("前回交換日", null=True, blank=True)
+    shot_at_replacement = models.PositiveBigIntegerField("交換時累積shot", null=True, blank=True)
+    baseline_shot_before = models.PositiveBigIntegerField("前回基準shot", default=0)
+    used_shots = models.PositiveBigIntegerField("使用shot数", null=True, blank=True)
+    note = models.TextField("交換メモ", blank=True)
+    operator_name = models.CharField("交換作業者", max_length=120, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="equipment_part_replacement_histories",
+    )
+    created_at = models.DateTimeField("記録日時", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-replaced_at", "-id"]
+        verbose_name = "部品交換履歴"
+        verbose_name_plural = "部品交換履歴"
+
+    def __str__(self):
+        return f"{self.link} / {self.replaced_at:%Y-%m-%d}"
 
 
 class EquipmentStockLedger(models.Model):

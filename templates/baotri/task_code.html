@@ -21,6 +21,9 @@
                 <input type="text" class="form-control" value="{{ task.machine_count }}" readonly>
             </div>
             <input type="hidden" name="task_id" value="{{ task.id }}">
+            {% if force_new %}
+            <input type="hidden" name="force_new" value="1">
+            {% endif %}
             
             <!-- Hiển thị mã nhiệm vụ -->
             <div class="form-group">

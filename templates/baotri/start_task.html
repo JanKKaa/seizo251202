@@ -22,9 +22,10 @@
 
     <div class="card shadow mb-4">
         <div class="card-body">
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" id="maintenance-form">
                 {% csrf_token %}
                 <input type="hidden" name="end_time" id="end-time">
+                <input type="hidden" name="save_mode" id="save-mode" value="complete">
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover table-sm align-middle">
                         <thead class="table-light">
@@ -92,11 +93,67 @@
                         </tbody>
                     </table>
                 </div>
-                <button type="submit" class="btn btn-success w-100" id="save-button">保存</button>
+                <div class="row g-2">
+                    <div class="col-12 col-md-4">
+                        <button type="submit" class="btn btn-outline-primary w-100" id="draft-save-button">
+                            一時保存
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <button type="submit" class="btn btn-success w-100" id="save-button">保存</button>
+                    </div>
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('maintenance-form');
+    const saveModeInput = document.getElementById('save-mode');
+    const draftButton = document.getElementById('draft-save-button');
+    const completeButton = document.getElementById('save-button');
+
+    if (!form || !saveModeInput) return;
+
+    draftButton?.addEventListener('click', function () {
+        saveModeInput.value = 'draft';
+        window.isFormSubmitted = true;
+    });
+
+    completeButton?.addEventListener('click', function () {
+        saveModeInput.value = 'complete';
+    });
+
+    async function autosaveDraft() {
+        if (window.isFormSubmitted) return;
+        const data = new FormData(form);
+        data.set('save_mode', 'draft');
+        try {
+            await fetch(window.location.href, {
+                method: 'POST',
+                body: data,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+        } catch (error) {
+            // Autosave is best-effort; manual draft save remains available.
+        }
+    }
+
+    let autosaveTimer = null;
+    function scheduleAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(autosaveDraft, 3000);
+    }
+
+    form.addEventListener('input', scheduleAutosave);
+    form.addEventListener('change', scheduleAutosave);
+    window.baotriAutosaveDraft = autosaveDraft;
+    setInterval(autosaveDraft, 2 * 60 * 1000);
+});
+</script>
 
 <!-- Modal Camera -->
 <div id="camera-modal" class="camera-modal" style="display: none;">
@@ -402,6 +459,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     photoPreview.style.display = 'block';
                     hiddenInput.value = imageData;
                     row.classList.add('photo-taken');
+                    window.baotriAutosaveDraft?.();
                     closeModal();
                 } catch (error) {
                     alert('写真の取得に失敗しました。もう一度撮影してください。');
@@ -1146,6 +1204,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (elapsed >= 21600 && !isAutoSaved) { // 6 tiếng
                 isAutoSaved = true;
                 if (form) {
+                    const saveModeInput = document.getElementById('save-mode');
+                    if (saveModeInput) saveModeInput.value = 'draft';
                     form.submit();
                 }
             }

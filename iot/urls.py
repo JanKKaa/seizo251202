@@ -32,6 +32,9 @@ urlpatterns = [
     # --- Counter ---
     path('machine-counter/', views.machine_counter, name='machine_counter'),
     path('machine/<int:pk>/edit_shot_total/', edit_shot_total, name='edit_shot_total'),
+    path('machine-counter/esp32/add/', views.esp32_counter_create, name='esp32_counter_create'),
+    path('machine-counter/esp32/<int:pk>/edit/', views.esp32_counter_edit, name='esp32_counter_edit'),
+    path('machine-counter/esp32/<int:pk>/delete/', views.esp32_counter_delete, name='esp32_counter_delete'),
     path('manual-machine/add/', manual_machine_add, name='manual_machine_add'),
 
     # --- Device CRUD ---

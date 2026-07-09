@@ -8,7 +8,7 @@
       <div class="text-sm text-slate-500">{{ list_subtitle }}</div>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a class="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_create' %}?item_kind={{ filters.item_kind }}">新規登録</a>
+      <a class="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white no-underline hover:bg-blue-500" href="{% url 'setsubi_zaiko:item_create' %}?item_kind={{ filters.item_kind }}{% if filters.part_scope %}&part_scope={{ filters.part_scope }}{% endif %}">新規登録</a>
       {% if is_asset_list %}
         <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:catalog_create' %}?item_kind={{ filters.item_kind }}">カタログ登録</a>
       {% endif %}
@@ -155,7 +155,7 @@
     </div>
   </div>
 
-  <form class="bg-white p-4 shadow-sm ring-1 ring-slate-200" method="get">
+  <form id="setsubi-filter-form" class="bg-white p-4 shadow-sm ring-1 ring-slate-200" method="get" data-auto-submit="1">
     <div class="mb-3 flex flex-col gap-1 border-b border-slate-100 pb-3 md:flex-row md:items-end md:justify-between">
       <div>
         <div class="text-sm font-black text-slate-900">条件で絞り込む</div>
@@ -167,36 +167,77 @@
       {% if not lock_item_kind %}
         <div>
           <label class="mb-1 block text-xs font-bold text-slate-500">管理区分</label>
-          <select class="w-full" name="item_kind">
+          <select class="w-full" name="item_kind" data-auto-submit-control>
             {% for value,label in item_kind_choices %}
               <option value="{{ value }}" {% if filters.item_kind == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
       {% endif %}
-      <div>
-        <label class="mb-1 block text-xs font-bold text-slate-500">大分類</label>
-        <select class="w-full" name="group">
-          <option value="">すべて</option>
-          {% for value,label in group_choices %}
-            <option value="{{ value }}" {% if filters.group == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="mb-1 block text-xs font-bold text-slate-500">分類</label>
-        <select class="w-full" name="category">
-          <option value="">すべて</option>
-          {% for category in category_choices %}
-            <option value="{{ category.id }}" {% if filters.category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
-              {{ category.full_name }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
+      {% if is_asset_list %}
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">大分類</label>
+          <select class="w-full" name="catalog_root" data-auto-submit-control data-reset-target="catalog">
+            <option value="">すべて</option>
+            {% for node in catalog_root_choices %}
+              <option value="{{ node.id }}" {% if filters.catalog_root|stringformat:"s" == node.id|stringformat:"s" %}selected{% endif %}>{{ node.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">分類</label>
+          <select class="w-full" name="catalog" data-auto-submit-control {% if not filters.catalog_root %}disabled{% endif %}>
+            <option value="">すべて</option>
+            {% for node in catalog_child_choices %}
+              <option value="{{ node.id }}" {% if filters.catalog|stringformat:"s" == node.id|stringformat:"s" %}selected{% endif %}>{{ node.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% else %}
+        {% if filters.part_scope %}
+          <div>
+            <label class="mb-1 block text-xs font-bold text-slate-500">使用先 大分類</label>
+            <select class="w-full" name="asset_catalog_root" data-auto-submit-control data-reset-target="asset_catalog">
+              <option value="">すべて</option>
+              {% for node in asset_catalog_root_choices %}
+                <option value="{{ node.id }}" {% if filters.asset_catalog_root|stringformat:"s" == node.id|stringformat:"s" %}selected{% endif %}>{{ node.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold text-slate-500">使用先 分類</label>
+            <select class="w-full" name="asset_catalog" data-auto-submit-control {% if not filters.asset_catalog_root %}disabled{% endif %}>
+              <option value="">すべて</option>
+              {% for node in asset_catalog_child_choices %}
+                <option value="{{ node.id }}" {% if filters.asset_catalog|stringformat:"s" == node.id|stringformat:"s" %}selected{% endif %}>{{ node.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">大分類</label>
+          <select class="w-full" name="group" data-auto-submit-control data-reset-target="category">
+            <option value="">すべて</option>
+            {% for value,label in group_choices %}
+              <option value="{{ value }}" {% if filters.group == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-slate-500">分類</label>
+          <select class="w-full" name="category" data-auto-submit-control>
+            <option value="">すべて</option>
+            {% for category in category_choices %}
+              <option value="{{ category.id }}" {% if filters.category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
+                {{ category.full_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
       <div>
         <label class="mb-1 block text-xs font-bold text-slate-500">種別</label>
-        <select class="w-full" name="equipment_type">
+        <select class="w-full" name="equipment_type" data-auto-submit-control>
           <option value="">すべて</option>
           {% for value,label in type_choices %}
             <option value="{{ value }}" {% if filters.equipment_type == value %}selected{% endif %}>{{ label }}</option>
@@ -205,7 +246,7 @@
       </div>
       <div>
         <label class="mb-1 block text-xs font-bold text-slate-500">状態</label>
-        <select class="w-full" name="status">
+        <select class="w-full" name="status" data-auto-submit-control>
           <option value="">すべて</option>
           {% for value,label in status_choices %}
             <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
@@ -237,7 +278,7 @@
         </div>
         <div>
           <label class="mb-1 block text-xs font-bold text-slate-500">品質ランク</label>
-          <select class="w-full" name="quality_rank">
+          <select class="w-full" name="quality_rank" data-auto-submit-control>
             <option value="">すべて</option>
             {% for value,label in quality_rank_choices %}
               <option value="{{ value }}" {% if filters.quality_rank == value %}selected{% endif %}>{{ label }}</option>
@@ -246,7 +287,7 @@
         </div>
         <div>
           <label class="mb-1 block text-xs font-bold text-slate-500">監査アラート</label>
-          <select class="w-full" name="alert">
+          <select class="w-full" name="alert" data-auto-submit-control>
             <option value="">すべて</option>
             {% for value,label in alert_choices %}
               <option value="{{ value }}" {% if filters.alert == value %}selected{% endif %}>{{ label }}</option>
@@ -256,7 +297,7 @@
       {% endif %}
       <div>
         <label class="mb-1 block text-xs font-bold text-slate-500">検索</label>
-        <input class="w-full" name="q" value="{{ filters.q }}" placeholder="コード・品番・社内呼称・棚番・機械No.">
+        <input class="w-full" type="search" name="q" value="{{ filters.q }}" placeholder="コード・品番・社内呼称・棚番・機械No.">
       </div>
       <div class="flex items-end">
         <button class="w-full rounded-lg bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-700" type="submit">検索</button>
@@ -514,4 +555,36 @@
 
   {% include "setsubi_zaiko/pagination.html" %}
 </div>
+
+<script>
+  (() => {
+    const form = document.getElementById("setsubi-filter-form");
+    if (!form || form.dataset.autoSubmitBound === "1") return;
+    form.dataset.autoSubmitBound = "1";
+    let timer = null;
+    const submitForm = (delay = 0) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const pageField = form.querySelector('[name="page"]');
+        if (pageField) pageField.remove();
+        if (form.requestSubmit) {
+          form.requestSubmit();
+        } else {
+          form.submit();
+        }
+      }, delay);
+    };
+    form.querySelectorAll("[data-auto-submit-control]").forEach((control) => {
+      const eventName = control.tagName === "SELECT" ? "change" : "input";
+      control.addEventListener(eventName, () => {
+        const resetTarget = control.dataset.resetTarget;
+        if (resetTarget) {
+          const target = form.querySelector(`[name="${resetTarget}"]`);
+          if (target) target.value = "";
+        }
+        submitForm(control.tagName === "SELECT" ? 0 : 450);
+      });
+    });
+  })();
+</script>
 {% endblock %}

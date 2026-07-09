@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from .models import (
     Machine, Component, ComponentReplacementHistory,
-    MoldLifetime, ManualMachine
+    MoldLifetime, ManualMachine, Esp32CardSnapshot
 )
 
 # -------- MACHINE (Thiết bị) --------
@@ -137,6 +137,26 @@ class MachineShotTotalForm(forms.ModelForm):
         model = Machine
         fields = ['shot_total']
         labels = {'shot_total': 'Tổng số shot'}
+
+
+class Esp32MachineCounterForm(forms.ModelForm):
+    class Meta:
+        model = Esp32CardSnapshot
+        fields = ['address', 'primary_product', 'shot', 'total_shot', 'cycletime']
+        labels = {
+            'address': 'ESP32機械名',
+            'primary_product': '現在製品',
+            'shot': '現在counter',
+            'total_shot': '累積ショット数',
+            'cycletime': 'サイクルタイム',
+        }
+        widgets = {
+            'shot': forms.NumberInput(attrs={'min': 0}),
+            'total_shot': forms.NumberInput(attrs={'min': 0}),
+        }
+
+    def clean_shot(self):
+        return max(self.cleaned_data['shot'], 0)
 
 # -------- MANUAL MACHINE (nếu còn dùng) --------
 class ManualMachineForm(forms.ModelForm):

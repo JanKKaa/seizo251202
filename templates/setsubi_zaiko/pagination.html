@@ -1,12 +1,11 @@
 {% if page_obj.paginator.num_pages > 1 %}
 <nav class="mt-4 flex items-center justify-center gap-2">
   {% if page_obj.has_previous %}
-    <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="?page={{ page_obj.previous_page_number }}">前へ</a>
+    <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="?{% if page_querystring %}{{ page_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">前へ</a>
   {% endif %}
   <span class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
   {% if page_obj.has_next %}
-    <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="?page={{ page_obj.next_page_number }}">次へ</a>
+    <a class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-800 no-underline ring-1 ring-slate-200 hover:bg-slate-50" href="?{% if page_querystring %}{{ page_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">次へ</a>
   {% endif %}
 </nav>
 {% endif %}
-

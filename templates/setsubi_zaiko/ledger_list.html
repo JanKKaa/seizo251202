@@ -76,6 +76,7 @@
             <th class="px-4 py-3 text-left">作業者</th>
             <th class="px-4 py-3 text-left">確認</th>
             <th class="px-4 py-3 text-left">System No.</th>
+            {% if request.user.is_staff or request.user.is_superuser %}<th class="px-4 py-3 text-left">操作</th>{% endif %}
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -101,9 +102,17 @@
                 {% endif %}
               </td>
               <td class="px-4 py-3"><code>{{ ledger.system_no }}</code></td>
+              {% if request.user.is_staff or request.user.is_superuser %}
+                <td class="px-4 py-3">
+                  <div class="flex gap-1">
+                    <a class="rounded bg-white px-2 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50" href="{% url 'setsubi_zaiko:ledger_edit' ledger.pk %}">編集</a>
+                    <a class="rounded bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-500" href="{% url 'setsubi_zaiko:ledger_delete' ledger.pk %}">削除</a>
+                  </div>
+                </td>
+              {% endif %}
             </tr>
           {% empty %}
-            <tr><td colspan="9" class="px-4 py-8 text-center text-slate-500">台帳データがありません</td></tr>
+            <tr><td colspan="{% if request.user.is_staff or request.user.is_superuser %}10{% else %}9{% endif %}" class="px-4 py-8 text-center text-slate-500">台帳データがありません</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -58,6 +58,53 @@
     {% block content %}
     <script defer src="{% static 'quet_anh/js/stage_audio.js' %}"></script>
     <div class="container py-4">
+        {% if open_task_codes %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                作業中 / Dang bao tri
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Product</th>
+                                <th>Started by</th>
+                                <th>Started at</th>
+                                <th>Elapsed</th>
+                                <th>Progress</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for open_code in open_task_codes %}
+                            <tr>
+                                <td>{{ open_code.code }}</td>
+                                <td>{{ open_code.task.name }}</td>
+                                <td>
+                                    {% if open_code.created_by %}
+                                        {{ open_code.created_by.last_name|default:open_code.created_by.username }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ open_code.created_at|date:"Y/m/d H:i" }}</td>
+                                <td>{{ open_code.elapsed_text }}</td>
+                                <td>{{ open_code.progress_text }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'start_task' open_code.code %}" class="btn btn-warning btn-sm">
+                                        続きから
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <h1 class="text-center text-primary mb-4" style="font-size:2.2rem;font-weight:bold;">金型メンテナンス</h1>
 
         <div class="mb-3 text-end">
@@ -135,9 +182,18 @@
                         <p><strong>製品コード:</strong> {{ selected_task.product_code }}</p>
                         {% endif %}
                         <p><strong>金型番号:</strong> {{ selected_task.code }}</p>
+                        {% if selected_open_task_code %}
+                        <a href="{% url 'start_task' selected_open_task_code.code %}" class="btn btn-warning btn-lg mt-3">
+                            <i class="fas fa-play"></i> 続きから
+                        </a>
+                        <a href="{% url 'task_code' %}?task_id={{ selected_task.id }}&force_new=1" class="btn btn-outline-secondary btn-sm mt-3">
+                            新規開始
+                        </a>
+                        {% else %}
                         <a href="{% url 'task_code' %}?task_id={{ selected_task.id }}" class="btn btn-warning btn-lg mt-3">
                             <i class="fas fa-play"></i> スタート
                         </a>
+                        {% endif %}
                         {% else %}
                         <p class="text-center">製品名を選んでください</p>
                         {% endif %}

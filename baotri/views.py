@@ -16,7 +16,7 @@ import pytz
 from django.db.models import Count, F, ExpressionWrapper, DurationField, Min, Avg
 from django.db.models import F
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.contrib.auth.decorators import login_required
 from weasyprint import HTML
@@ -44,9 +44,43 @@ def index(request):
         except MaintenanceTask.DoesNotExist:
             selected_task = None
 
+    open_task_codes = []
+    selected_open_task_code = None
+    if request.user.is_authenticated:
+        open_qs = (
+            TaskCode.objects
+            .filter(end_time__isnull=True)
+            .select_related('task', 'created_by')
+            .prefetch_related('details')
+            .order_by('-created_at')
+        )
+        if not request.user.is_staff and not request.user.is_superuser:
+            open_qs = open_qs.filter(created_by=request.user)
+
+        for open_code in open_qs[:20]:
+            detail_list = list(open_code.details.all())
+            total_count = len(detail_list)
+            image_count = sum(1 for detail in detail_list if detail.actual_image)
+            ok_count = sum(1 for detail in detail_list if detail.is_confirmed)
+            elapsed_seconds = max(0, int((timezone.now() - open_code.created_at).total_seconds()))
+            hours, remainder = divmod(elapsed_seconds, 3600)
+            minutes = remainder // 60
+            open_code.progress_text = f"{image_count}/{total_count} photos, {ok_count}/{total_count} OK"
+            open_code.elapsed_text = f"{hours}h {minutes}m"
+            open_task_codes.append(open_code)
+            if (
+                selected_task
+                and open_code.task_id == selected_task.id
+                and open_code.created_by_id == request.user.id
+                and selected_open_task_code is None
+            ):
+                selected_open_task_code = open_code
+
     return render(request, 'baotri/index.html', {
         'tasks': tasks,
         'selected_task': selected_task,
+        'open_task_codes': open_task_codes,
+        'selected_open_task_code': selected_open_task_code,
     })
 
 @login_required
@@ -80,7 +114,6 @@ def add_task(request):
 @login_required
 def task_detail(request, task_id):
     task = get_object_or_404(MaintenanceTask, id=task_id)
-    
     task_details = TaskDetail.objects.filter(task=task).order_by('order')
 
     if request.method == 'POST':
@@ -151,6 +184,18 @@ def task_code(request):
         return redirect('baotri_index')  # Nếu không có nhiệm vụ, quay lại trang index
 
     task = get_object_or_404(MaintenanceTask, id=task_id)
+    force_new = request.GET.get('force_new') == '1' or request.POST.get('force_new') == '1'
+
+    if not force_new:
+        existing_open = (
+            TaskCode.objects
+            .filter(task=task, created_by=request.user, end_time__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+        if existing_open:
+            messages.info(request, "作業中の保全があります。続きから再開します。")
+            return redirect('start_task', task_code=existing_open.code)
 
     # Tạo mã nhiệm vụ dựa trên thời gian
     task_code = f"MT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -173,10 +218,11 @@ def task_code(request):
     return render(request, 'baotri/task_code.html', {
         'task': task,
         'task_code': task_code,
+        'force_new': force_new,
     })
 
 @login_required
-def start_task(request, task_code):
+def _legacy_start_task(request, task_code):
     try:
         task_code_obj = TaskCode.objects.get(code=task_code)
         task = task_code_obj.task
@@ -330,6 +376,114 @@ def start_task(request, task_code):
         'counter_total': counter_total,  # Truyền vào context
         'start_time_ts': start_time_ts,
     })
+
+
+@login_required
+def start_task(request, task_code):
+    task_code_obj = get_object_or_404(
+        TaskCode.objects.select_related('task'),
+        code=task_code,
+    )
+    task = task_code_obj.task
+
+    def find_counter_total(task):
+        task_name_norm = normalize_name(task.name)
+        for mold_lifetime in MoldLifetime.objects.select_related('mold').all():
+            mold_name_norm = normalize_name(mold_lifetime.mold.name)
+            if task_name_norm == mold_name_norm:
+                return mold_lifetime.total_shot
+        return None
+
+    counter_total = find_counter_total(task)
+    if counter_total is not None and (
+        task_code_obj.counter_total is None
+        or counter_total > task_code_obj.counter_total
+    ):
+        task_code_obj.counter_total = counter_total
+        task_code_obj.save(update_fields=['counter_total'])
+
+    task_details = TaskDetail.objects.filter(task=task).order_by('order')
+    for detail in task_details:
+        TaskCodeDetail.objects.get_or_create(
+            task_code=task_code_obj,
+            detail=detail,
+            defaults={
+                'result': '',
+                'actual_size': '',
+                'is_confirmed': False,
+                'maintainer': request.user,
+            },
+        )
+
+    task_code_details = (
+        TaskCodeDetail.objects
+        .filter(task_code=task_code_obj)
+        .select_related('detail')
+        .order_by('detail__order')
+    )
+
+    if request.method == 'POST':
+        save_mode = request.POST.get('save_mode', 'complete')
+        counter_total = find_counter_total(task)
+
+        for detail in task_code_details:
+            result_value = request.POST.get(f'result_{detail.detail.id}', detail.result)
+            actual_size = request.POST.get(f'actual_size_{detail.detail.id}', detail.actual_size)
+            actual_image_data = request.POST.get(f'actual_image_{detail.detail.id}')
+
+            detail.result = result_value
+            detail.actual_size = actual_size
+            detail.is_confirmed = request.POST.get(f'confirm_{detail.detail.id}') == 'on'
+            if not detail.maintainer:
+                detail.maintainer = request.user
+
+            if actual_image_data:
+                try:
+                    image_format, imgstr = actual_image_data.split(';base64,')
+                    ext = image_format.split('/')[-1]
+                    file_name = f"actual_image_{detail.detail.id}.{ext}"
+                    detail.actual_image.save(
+                        file_name,
+                        ContentFile(base64.b64decode(imgstr)),
+                        save=False,
+                    )
+                except Exception:
+                    pass
+            detail.save()
+
+        task_code_obj.counter_total = counter_total if counter_total is not None else 0
+        if save_mode == 'draft':
+            task_code_obj.save(update_fields=['counter_total'])
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'ok': True,
+                    'mode': 'draft',
+                    'saved_at': timezone.now().isoformat(),
+                })
+            messages.success(request, "一時保存しました。続きから再開できます。")
+            return redirect('start_task', task_code=task_code)
+
+        missing_image = any(not detail.actual_image for detail in task_code_details)
+        if missing_image:
+            messages.error(request, "すべての項目で実際の写真を撮影してください。入力済みの内容は一時保存されています。")
+            task_code_obj.save(update_fields=['counter_total'])
+            return redirect('start_task', task_code=task_code)
+
+        task_code_obj.end_time = timezone.now()
+        task_code_obj.save(update_fields=['counter_total', 'end_time'])
+        messages.success(request, "結果が正常に保存されました。")
+        return redirect('baotri_index')
+
+    return render(request, 'baotri/start_task.html', {
+        'task_code': task_code,
+        'task': task,
+        'task_details': task_details,
+        'task_code_details': task_code_details,
+        'counter_total': counter_total,
+        'start_time_ts': int(task_code_obj.created_at.timestamp()),
+        'is_open_task_code': task_code_obj.end_time is None,
+    })
+
 
 @login_required
 def task_code_list(request):

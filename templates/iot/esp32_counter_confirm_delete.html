@@ -1,0 +1,18 @@
+{% extends "trang_chu/base.html" %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 680px;">
+    <div class="card border-danger shadow-sm">
+        <div class="card-header bg-danger text-white"><h4 class="mb-0">ESP32データ削除確認</h4></div>
+        <div class="card-body">
+            <p><strong>{{ snapshot.address }}</strong> のショットデータを削除しますか？</p>
+            <p class="text-danger">実機から再受信すると、この機械データは自動作成されます。累積ショットは0から再開始します。</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">削除する</button>
+                <a href="{% url 'iot:machine_counter' %}" class="btn btn-secondary">キャンセル</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

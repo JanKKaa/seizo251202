@@ -818,6 +818,10 @@
 <script>
 document.getElementById('upload-form').addEventListener('submit', function(e) {
     const uploadForm = document.getElementById('upload-form');
+    if (uploadForm.dataset.submitting === '1') {
+        e.preventDefault();
+        return false;
+    }
     const autoInputOn = (uploadForm?.dataset?.autoInputOn || '0') === '1';
     const inputWeight = document.getElementById('input_weight');
     const capturedImage = document.getElementById('captured_image');
@@ -910,6 +914,12 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
         return false;
     }
     window.QAStageAudio?.play('submit_start');
+    uploadForm.dataset.submitting = '1';
+    uploadForm.querySelectorAll('button[type="submit"]').forEach((btn) => {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中';
+    });
     document.getElementById('loading-overlay').style.display = 'block';
 });
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentStockLedger
+from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentPartReplacementHistory, EquipmentStockLedger
 
 
 @admin.register(EquipmentCategory)
@@ -19,7 +19,7 @@ class EquipmentCatalogNodeAdmin(admin.ModelAdmin):
 
 @admin.register(EquipmentItem)
 class EquipmentItemAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "maker_part_no", "quality_rank", "category", "equipment_type", "status", "current_quantity", "unit", "shelf_no", "minimum_stock", "reorder_point", "next_inventory_check_date", "has_item_image")
+    list_display = ("code", "name", "maker_part_no", "category", "equipment_type", "iot_machine", "iot_esp32_machine", "iot_mold_lifetime", "status", "current_quantity", "unit", "shelf_no", "has_item_image")
     list_filter = ("quality_rank", "category__group", "category", "equipment_type", "status", "location", "department")
     search_fields = (
         "code",
@@ -58,9 +58,17 @@ class EquipmentItemAdmin(admin.ModelAdmin):
 
 @admin.register(EquipmentPartLink)
 class EquipmentPartLinkAdmin(admin.ModelAdmin):
-    list_display = ("asset", "part", "usage_location", "standard_quantity", "criticality", "replacement_cycle_days", "updated_at")
+    list_display = ("asset", "part", "usage_location", "criticality", "lifetime_shots", "baseline_shot", "last_replaced_at", "updated_at")
     list_filter = ("criticality", "asset__category", "part__category")
     search_fields = ("asset__code", "asset__name", "part__code", "part__name", "usage_location", "note")
+
+
+@admin.register(EquipmentPartReplacementHistory)
+class EquipmentPartReplacementHistoryAdmin(admin.ModelAdmin):
+    list_display = ("link", "previous_replaced_at", "replaced_at", "shot_at_replacement", "used_shots", "operator_name", "created_at")
+    list_filter = ("replaced_at",)
+    search_fields = ("link__asset__code", "link__part__code", "link__part__name", "operator_name", "note")
+    readonly_fields = ("previous_replaced_at", "shot_at_replacement", "baseline_shot_before", "used_shots", "created_by", "created_at")
 
 
 @admin.register(EquipmentStockLedger)

@@ -7,15 +7,19 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0"><i class="fas fa-industry me-2"></i>機械ショット数監視</h2>
-        <button class="btn btn-outline-primary" onclick="location.reload()">
-            <i class="fas fa-sync-alt"></i> 更新
-        </button>
+        <div class="d-flex gap-2">
+            {% if request.user.is_superuser %}
+                <a class="btn btn-warning" href="{% url 'iot:esp32_counter_create' %}"><i class="fas fa-plus"></i> ESP32手動登録</a>
+            {% endif %}
+            <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync-alt"></i> 更新</button>
+        </div>
     </div>
     <div class="table-responsive shadow rounded">
         <table class="table table-hover table-bordered align-middle bg-white">
             <thead class="table-primary">
                 <tr>
                     <th class="text-center">#</th>
+                    <th>取得元</th>
                     <th>IPアドレス</th>
                     <th>機械名</th>
                     <th>ショット数</th>
@@ -29,9 +33,17 @@
                 {% for m in machines %}
                 <tr>
                     <td class="text-center fw-bold">{{ forloop.counter }}</td>
+                    <td>
+                        {% if m.source == "ESP32" %}
+                            <span class="badge bg-warning text-dark">ESP32</span>
+                        {% else %}
+                            <span class="badge bg-primary">NET100</span>
+                        {% endif %}
+                    </td>
                     <td class="text-monospace">{{ m.address }}</td>
                     <td>
                         <span class="fw-semibold">{{ m.name }}</span>
+                        {% if m.condname %}<div class="small text-muted">{{ m.condname }}</div>{% endif %}
                     </td>
                     <td>
                         <span class="badge bg-info text-white fs-6">{{ m.shot_total|intcomma }}</span>
@@ -39,6 +51,8 @@
                     <td>
                         {% if m.status == "production" %}
                             <span class="badge bg-success text-white fs-6"><i class="fas fa-play-circle"></i> 生産中</span>
+                        {% elif m.source == "ESP32" %}
+                            <span class="badge bg-warning text-dark fs-6"><i class="fas fa-microchip"></i> ESP32連携</span>
                         {% else %}
                             <span class="badge bg-secondary text-white fs-6"><i class="fas fa-pause-circle"></i> 停止</span>
                         {% endif %}
@@ -58,16 +72,21 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if request.user.is_superuser %}
-                            <a href="{% url 'iot:edit_shot_total' m.pk %}" class="btn btn-sm btn-info">
-                                <i class="fas fa-edit"></i> ショットを編集
-                            </a>
+                        {% if request.user.is_superuser and m.pk %}
+                            {% if m.source == "ESP32" %}
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'iot:esp32_counter_edit' m.pk %}" class="btn btn-sm btn-info"><i class="fas fa-edit"></i> 編集</a>
+                                    <a href="{% url 'iot:esp32_counter_delete' m.pk %}" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> 削除</a>
+                                </div>
+                            {% else %}
+                                <a href="{% url 'iot:edit_shot_total' m.pk %}" class="btn btn-sm btn-info"><i class="fas fa-edit"></i> ショットを編集</a>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-danger">データがありません。</td>
+                    <td colspan="9" class="text-center text-danger">データがありません。</td>
                 </tr>
                 {% endfor %}
             </tbody>

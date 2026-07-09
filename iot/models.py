@@ -327,6 +327,8 @@ class Esp32CardSnapshot(models.Model):
     product_display = models.CharField(max_length=255, blank=True, default="")
     primary_product = models.CharField(max_length=150, blank=True, default="")
     shot = models.IntegerField(default=0)
+    total_shot = models.PositiveBigIntegerField(default=0, help_text="Shot tích lũy của máy ESP32, cộng theo shot khuôn đang chạy")
+    last_counted_shot = models.PositiveIntegerField(default=0, help_text="Counter ESP32 đã dùng ở lần cộng dồn gần nhất")
     cycletime = models.CharField(max_length=20, blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 

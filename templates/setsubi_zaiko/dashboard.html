@@ -10,15 +10,15 @@
         <h2 class="mb-0 mt-1 text-2xl font-bold">設備・金型から部品在庫まで一画面で確認</h2>
         <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:equipment_list' %}">
-            <div class="text-xs font-bold text-slate-300">設備・金型</div>
-            <div class="text-2xl font-bold text-white">{{ asset_count }}</div>
+            <div class="text-xs font-bold text-slate-300">設備マスター</div>
+            <div class="text-2xl font-bold text-white">{{ equipment_count }}</div>
           </a>
-          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:part_list' %}">
-            <div class="text-xs font-bold text-slate-300">部品マスター</div>
+          <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:equipment_part_list' %}">
+            <div class="text-xs font-bold text-slate-300">設備部品</div>
             <div class="text-2xl font-bold text-white">{{ part_count }}</div>
           </a>
           <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:mold_list' %}">
-            <div class="text-xs font-bold text-slate-300">金型</div>
+            <div class="text-xs font-bold text-slate-300">金型マスター</div>
             <div class="text-2xl font-bold text-white">{{ mold_count }}</div>
           </a>
           <a class="rounded-lg bg-white/10 px-3 py-3 no-underline ring-1 ring-white/15 hover:bg-white/15" href="{% url 'setsubi_zaiko:part_link_create_any' %}">
@@ -31,7 +31,7 @@
   </section>
 
   <section class="grid gap-3 lg:grid-cols-4">
-    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-rose-200 hover:bg-rose-50" href="{% url 'setsubi_zaiko:part_list' %}?alert=low_stock">
+    <a class="rounded-lg bg-white p-4 no-underline shadow-sm ring-1 ring-rose-200 hover:bg-rose-50" href="{% url 'setsubi_zaiko:equipment_part_list' %}?alert=low_stock">
       <div class="text-sm font-bold text-rose-700">在庫アラート</div>
       <div class="mt-2 text-3xl font-bold text-slate-900">{{ low_stock_items|length }}</div>
       <div class="text-sm text-slate-500">最低在庫以下</div>
@@ -56,7 +56,7 @@
   <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
     <div class="rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
       <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <h3 class="mb-0 text-lg font-bold text-slate-900">設備・金型</h3>
+        <h3 class="mb-0 text-lg font-bold text-slate-900">設備マスター</h3>
         <a class="text-sm font-bold text-blue-700 no-underline" href="{% url 'setsubi_zaiko:equipment_list' %}">一覧</a>
       </div>
       <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">

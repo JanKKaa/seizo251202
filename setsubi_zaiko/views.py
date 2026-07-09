@@ -3,8 +3,10 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.db.models import Count, F, Sum
 from django.db.models import Q
 from django.http import HttpResponse
@@ -12,8 +14,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import EquipmentCatalogNodeForm, EquipmentCategoryForm, EquipmentItemForm, EquipmentPartLinkForm, EquipmentStockLedgerForm
-from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentStockLedger
+from .forms import EquipmentCatalogNodeForm, EquipmentCategoryForm, EquipmentItemForm, EquipmentPartLinkForm, EquipmentPartReplacementForm, EquipmentShotSourceForm, EquipmentStockLedgerEditForm, EquipmentStockLedgerForm
+from .models import EquipmentCatalogNode, EquipmentCategory, EquipmentItem, EquipmentPartLink, EquipmentPartReplacementHistory, EquipmentStockLedger
 
 
 MOLD_PART_TYPES = {
@@ -28,6 +30,13 @@ MOLD_PART_TYPES = {
     "mold_plate",
     "mold_hot_runner_part",
 }
+
+
+def _is_setsubi_admin(user):
+    return user.is_authenticated and (user.is_staff or user.is_superuser)
+
+
+admin_required = user_passes_test(_is_setsubi_admin)
 
 
 def _operator_name(request):
@@ -52,10 +61,40 @@ def _catalog_descendant_ids(node):
 
 def _apply_part_scope(queryset, part_scope):
     if part_scope == "mold_parts":
-        return queryset.filter(equipment_type__in=MOLD_PART_TYPES)
+        return queryset.filter(
+            Q(used_by_assets__asset__item_kind=EquipmentItem.KIND_MOLD)
+            | (Q(used_by_assets__isnull=True) & Q(equipment_type__in=MOLD_PART_TYPES))
+        ).distinct()
     if part_scope == "equipment_parts":
-        return queryset.exclude(equipment_type__in=MOLD_PART_TYPES)
+        return queryset.filter(
+            Q(used_by_assets__asset__item_kind=EquipmentItem.KIND_EQUIPMENT)
+            | (Q(used_by_assets__isnull=True) & ~Q(equipment_type__in=MOLD_PART_TYPES))
+        ).distinct()
     return queryset
+
+
+def _asset_kind_for_part_scope(part_scope):
+    if part_scope == "mold_parts":
+        return EquipmentItem.KIND_MOLD
+    if part_scope == "equipment_parts":
+        return EquipmentItem.KIND_EQUIPMENT
+    return ""
+
+
+def _part_scope_for_item(item):
+    if item.item_kind == EquipmentItem.KIND_MOLD or item.equipment_type in MOLD_PART_TYPES:
+        return "mold_parts"
+    return "equipment_parts"
+
+
+def _list_url_name(item_kind, part_scope=None):
+    if item_kind == EquipmentItem.KIND_EQUIPMENT:
+        return "setsubi_zaiko:equipment_list"
+    if item_kind == EquipmentItem.KIND_MOLD:
+        return "setsubi_zaiko:mold_list"
+    if part_scope == "mold_parts":
+        return "setsubi_zaiko:mold_part_list"
+    return "setsubi_zaiko:equipment_part_list"
 
 
 def _part_scope_type_choices(part_scope):
@@ -65,6 +104,109 @@ def _part_scope_type_choices(part_scope):
     if part_scope == "equipment_parts":
         return [choice for choice in choices if choice[0] not in MOLD_PART_TYPES and choice[0] != "mold"]
     return choices
+
+
+def _choice_label_q(field_name, choices, keyword):
+    keyword_lower = keyword.lower()
+    matched_values = [value for value, label in choices if keyword_lower in str(label).lower()]
+    if not matched_values:
+        return Q()
+    return Q(**{f"{field_name}__in": matched_values})
+
+
+def _item_keyword_q(keyword):
+    return (
+        Q(code__icontains=keyword)
+        | Q(name__icontains=keyword)
+        | Q(internal_name__icontains=keyword)
+        | Q(maker_part_no__icontains=keyword)
+        | Q(alternative_part_no__icontains=keyword)
+        | Q(control_plan_no__icontains=keyword)
+        | Q(process_owner__icontains=keyword)
+        | Q(supplier_name__icontains=keyword)
+        | Q(supplier_part_url__icontains=keyword)
+        | Q(applicable_machine_no__icontains=keyword)
+        | Q(applicable_mold_no__icontains=keyword)
+        | Q(shelf_no__icontains=keyword)
+        | Q(serial_no__icontains=keyword)
+        | Q(model_no__icontains=keyword)
+        | Q(maker__icontains=keyword)
+        | Q(location__icontains=keyword)
+        | Q(department__icontains=keyword)
+        | Q(unit__icontains=keyword)
+        | Q(status__icontains=keyword)
+        | Q(equipment_type__icontains=keyword)
+        | Q(item_kind__icontains=keyword)
+        | Q(note__icontains=keyword)
+        | Q(category__code__icontains=keyword)
+        | Q(category__name__icontains=keyword)
+        | Q(category__description__icontains=keyword)
+        | Q(category__parent__code__icontains=keyword)
+        | Q(category__parent__name__icontains=keyword)
+        | Q(catalog_node__code__icontains=keyword)
+        | Q(catalog_node__name__icontains=keyword)
+        | Q(catalog_node__note__icontains=keyword)
+        | Q(catalog_node__parent__code__icontains=keyword)
+        | Q(catalog_node__parent__name__icontains=keyword)
+        | Q(equipment_group_name__icontains=keyword)
+        | Q(equipment_series_name__icontains=keyword)
+        | Q(equipment_document_root_path__icontains=keyword)
+        | Q(equipment_document_subfolder_path__icontains=keyword)
+        | Q(mold_drawing_root_path__icontains=keyword)
+        | Q(mold_drawing_subfolder_path__icontains=keyword)
+        | Q(mold_customer_code__icontains=keyword)
+        | Q(mold_customer_name__icontains=keyword)
+        | Q(mold_product_code__icontains=keyword)
+        | Q(mold_product_name__icontains=keyword)
+        | Q(mold_component_name__icontains=keyword)
+        | Q(linked_parts__part__code__icontains=keyword)
+        | Q(linked_parts__part__name__icontains=keyword)
+        | Q(linked_parts__usage_location__icontains=keyword)
+        | Q(used_by_assets__asset__code__icontains=keyword)
+        | Q(used_by_assets__asset__name__icontains=keyword)
+        | Q(used_by_assets__usage_location__icontains=keyword)
+        | _choice_label_q("status", EquipmentItem.STATUS_CHOICES, keyword)
+        | _choice_label_q("equipment_type", EquipmentItem.TYPE_CHOICES, keyword)
+        | _choice_label_q("item_kind", EquipmentItem.ITEM_KIND_CHOICES, keyword)
+        | _choice_label_q("quality_rank", EquipmentItem.QUALITY_RANK_CHOICES, keyword)
+        | _choice_label_q("category__group", EquipmentCategory.GROUP_CHOICES, keyword)
+    )
+
+
+def _querystring_without_page(request):
+    params = request.GET.copy()
+    params.pop("page", None)
+    return params.urlencode()
+
+
+def _signed_ledger_quantity(transaction_type, quantity):
+    quantity = quantity or Decimal("0")
+    if transaction_type in ("OUT", "ADJ-", "SCRAP"):
+        return -quantity
+    return quantity
+
+
+def _recalculate_item_stock(item_id, fallback_quantity=None):
+    item = EquipmentItem.objects.select_for_update().get(pk=item_id)
+    ledgers = list(EquipmentStockLedger.objects.select_for_update().filter(item_id=item_id).order_by("created_at", "id"))
+    if not ledgers:
+        if fallback_quantity is not None:
+            item.current_quantity = fallback_quantity
+            item.save(update_fields=["current_quantity", "updated_at"])
+        return
+    before = fallback_quantity if fallback_quantity is not None else ledgers[0].quantity_before
+    for ledger in ledgers:
+        after = before + _signed_ledger_quantity(ledger.transaction_type, ledger.quantity)
+        if after < 0:
+            raise ValueError(f"{item.code} の在庫がマイナスになります。台帳の順序と数量を確認してください。")
+        if ledger.quantity_before != before or ledger.quantity_after != after:
+            ledger.quantity_before = before
+            ledger.quantity_after = after
+            ledger.save(update_fields=["quantity_before", "quantity_after"])
+        before = after
+    if item.current_quantity != before:
+        item.current_quantity = before
+        item.save(update_fields=["current_quantity", "updated_at"])
 
 
 def _catalog_flat_tree(item_kind):
@@ -93,6 +235,20 @@ def _catalog_nested_tree(item_kind):
         }
 
     return [build(root) for root in roots]
+
+
+def _catalog_root_choices(item_kind):
+    return list(
+        EquipmentCatalogNode.objects.filter(item_kind=item_kind, is_active=True, parent__isnull=True).order_by("sort_order", "code")
+    )
+
+
+def _catalog_child_choices(root_id, item_kind):
+    if not root_id:
+        return []
+    return list(
+        EquipmentCatalogNode.objects.filter(item_kind=item_kind, is_active=True, parent_id=root_id).order_by("sort_order", "code")
+    )
 
 
 def _csv_response(filename):
@@ -133,11 +289,12 @@ def dashboard(request):
     active_items = EquipmentItem.objects.filter(part_filter).exclude(status__in=["scrapped", "lost"]).count()
     ledger_count = EquipmentStockLedger.objects.count()
     asset_count = EquipmentItem.objects.filter(asset_filter).count()
+    equipment_count = EquipmentItem.objects.filter(item_kind=EquipmentItem.KIND_EQUIPMENT).count()
     mold_count = EquipmentItem.objects.filter(item_kind=EquipmentItem.KIND_MOLD).count()
     part_count = EquipmentItem.objects.filter(part_filter).count()
     linked_part_count = EquipmentPartLink.objects.count()
     asset_cards = (
-        EquipmentItem.objects.filter(asset_filter)
+        EquipmentItem.objects.filter(item_kind=EquipmentItem.KIND_EQUIPMENT)
         .select_related("category")
         .annotate(part_link_count=Count("linked_parts"))
         .order_by("code")[:12]
@@ -168,6 +325,7 @@ def dashboard(request):
         "active_items": active_items,
         "ledger_count": ledger_count,
         "asset_count": asset_count,
+        "equipment_count": equipment_count,
         "mold_count": mold_count,
         "part_count": part_count,
         "linked_part_count": linked_part_count,
@@ -193,25 +351,84 @@ def item_list(request, forced_item_kind=None, part_scope=None):
     category_id = request.GET.get("category") or ""
     status = request.GET.get("status") or ""
     equipment_type = request.GET.get("equipment_type") or ""
+    catalog_root_id = request.GET.get("catalog_root") or ""
     catalog_id = request.GET.get("catalog") or ""
+    part_asset_kind = _asset_kind_for_part_scope(part_scope) if item_kind == EquipmentItem.KIND_PART else ""
+    asset_catalog_root_id = request.GET.get("asset_catalog_root") or ""
+    asset_catalog_id = request.GET.get("asset_catalog") or ""
     quality_rank = request.GET.get("quality_rank") or ""
     alert = request.GET.get("alert") or ""
     maker = request.GET.get("maker") or ""
     shelf = request.GET.get("shelf") or ""
     application = request.GET.get("application") or ""
     q = request.GET.get("q") or ""
+    page_querystring = _querystring_without_page(request)
     if item_kind:
         items = items.filter(item_kind=item_kind)
+    if is_asset_list:
+        group = ""
+        category_id = ""
     if group:
         items = items.filter(category__group=group)
     if category_id:
-        category_ids = [category_id]
-        category_ids += list(EquipmentCategory.objects.filter(parent_id=category_id).values_list("id", flat=True))
-        items = items.filter(category_id__in=category_ids)
+        selected_category = EquipmentCategory.objects.filter(pk=category_id, is_active=True).first()
+        if selected_category and (not group or selected_category.group == group):
+            category_ids = [category_id]
+            category_ids += list(EquipmentCategory.objects.filter(parent_id=category_id).values_list("id", flat=True))
+            items = items.filter(category_id__in=category_ids)
+        else:
+            category_id = ""
+    catalog_root = None
+    if is_asset_list and catalog_root_id:
+        catalog_root = EquipmentCatalogNode.objects.filter(
+            id=catalog_root_id,
+            item_kind=item_kind,
+            is_active=True,
+            parent__isnull=True,
+        ).first()
+        if not catalog_root:
+            catalog_root_id = ""
     if catalog_id:
         catalog_node = EquipmentCatalogNode.objects.filter(id=catalog_id, item_kind=item_kind, is_active=True).first()
         if catalog_node:
-            items = items.filter(catalog_node_id__in=_catalog_descendant_ids(catalog_node))
+            if catalog_root and catalog_node.id not in _catalog_descendant_ids(catalog_root):
+                catalog_id = ""
+            else:
+                items = items.filter(catalog_node_id__in=_catalog_descendant_ids(catalog_node))
+        else:
+            catalog_id = ""
+    elif catalog_root:
+        items = items.filter(catalog_node_id__in=_catalog_descendant_ids(catalog_root))
+    asset_catalog_root = None
+    if not part_asset_kind:
+        asset_catalog_root_id = ""
+        asset_catalog_id = ""
+    if part_asset_kind and asset_catalog_root_id:
+        asset_catalog_root = EquipmentCatalogNode.objects.filter(
+            id=asset_catalog_root_id,
+            item_kind=part_asset_kind,
+            is_active=True,
+            parent__isnull=True,
+        ).first()
+        if not asset_catalog_root:
+            asset_catalog_root_id = ""
+    if part_asset_kind and asset_catalog_id:
+        asset_catalog_node = EquipmentCatalogNode.objects.filter(id=asset_catalog_id, item_kind=part_asset_kind, is_active=True).first()
+        if asset_catalog_node:
+            if asset_catalog_root and asset_catalog_node.id not in _catalog_descendant_ids(asset_catalog_root):
+                asset_catalog_id = ""
+            else:
+                items = items.filter(
+                    used_by_assets__asset__item_kind=part_asset_kind,
+                    used_by_assets__asset__catalog_node_id__in=_catalog_descendant_ids(asset_catalog_node),
+                )
+        else:
+            asset_catalog_id = ""
+    elif part_asset_kind and asset_catalog_root:
+        items = items.filter(
+            used_by_assets__asset__item_kind=part_asset_kind,
+            used_by_assets__asset__catalog_node_id__in=_catalog_descendant_ids(asset_catalog_root),
+        )
     if status:
         items = items.filter(status=status)
     if equipment_type:
@@ -241,34 +458,9 @@ def item_list(request, forced_item_kind=None, part_scope=None):
     elif alert == "missing_shelf":
         items = items.filter(Q(shelf_no="") | Q(shelf_no__isnull=True))
     if q:
-        items = items.filter(
-            Q(code__icontains=q)
-            | Q(name__icontains=q)
-            | Q(internal_name__icontains=q)
-            | Q(maker_part_no__icontains=q)
-            | Q(alternative_part_no__icontains=q)
-            | Q(control_plan_no__icontains=q)
-            | Q(process_owner__icontains=q)
-            | Q(supplier_name__icontains=q)
-            | Q(applicable_machine_no__icontains=q)
-            | Q(applicable_mold_no__icontains=q)
-            | Q(shelf_no__icontains=q)
-            | Q(serial_no__icontains=q)
-            | Q(model_no__icontains=q)
-            | Q(maker__icontains=q)
-            | Q(department__icontains=q)
-            | Q(equipment_group_name__icontains=q)
-            | Q(equipment_series_name__icontains=q)
-            | Q(equipment_document_root_path__icontains=q)
-            | Q(equipment_document_subfolder_path__icontains=q)
-            | Q(mold_drawing_root_path__icontains=q)
-            | Q(mold_drawing_subfolder_path__icontains=q)
-            | Q(mold_customer_code__icontains=q)
-            | Q(mold_customer_name__icontains=q)
-            | Q(mold_product_code__icontains=q)
-            | Q(mold_product_name__icontains=q)
-            | Q(mold_component_name__icontains=q)
-        )
+        for keyword in q.split():
+            items = items.filter(_item_keyword_q(keyword))
+    items = items.distinct()
     result_count = items.count()
     page_obj = Paginator(items, 10).get_page(request.GET.get("page"))
     category_queryset = EquipmentCategory.objects.filter(is_active=True).select_related("parent").order_by("group", "parent__code", "code")
@@ -282,6 +474,8 @@ def item_list(request, forced_item_kind=None, part_scope=None):
             category_queryset = category_queryset.filter(Q(code="MOLD") | Q(parent__code="MOLD"))
         elif part_scope == "equipment_parts":
             category_queryset = category_queryset.exclude(Q(code="MOLD") | Q(parent__code="MOLD"))
+    if group:
+        category_queryset = category_queryset.filter(group=group)
     category_choices = list(category_queryset)
     group_labels = dict(EquipmentCategory.GROUP_CHOICES)
     group_sections = []
@@ -303,6 +497,10 @@ def item_list(request, forced_item_kind=None, part_scope=None):
             break
     catalog_tree = _catalog_flat_tree(item_kind) if item_kind in {EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD} else []
     catalog_menu_tree = _catalog_nested_tree(item_kind) if item_kind in {EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD} else []
+    catalog_root_choices = _catalog_root_choices(item_kind) if is_asset_list else []
+    catalog_child_choices = _catalog_child_choices(catalog_root_id, item_kind) if is_asset_list else []
+    asset_catalog_root_choices = _catalog_root_choices(part_asset_kind) if part_asset_kind else []
+    asset_catalog_child_choices = _catalog_child_choices(asset_catalog_root_id, part_asset_kind) if part_asset_kind else []
     catalog_tiles = []
     for row in catalog_tree:
         if row["depth"] > 1:
@@ -369,10 +567,15 @@ def item_list(request, forced_item_kind=None, part_scope=None):
             "category_tiles": category_tiles,
             "catalog_tree": catalog_tree,
             "catalog_menu_tree": catalog_menu_tree,
+            "catalog_root_choices": catalog_root_choices,
+            "catalog_child_choices": catalog_child_choices,
+            "asset_catalog_root_choices": asset_catalog_root_choices,
+            "asset_catalog_child_choices": asset_catalog_child_choices,
             "catalog_tiles": catalog_tiles,
             "group_sections": group_sections,
             "group_labels": group_labels,
             "result_count": result_count,
+            "page_querystring": page_querystring,
             "quick_stats": quick_stats,
             "maker_choices": maker_choices,
             "shelf_choices": shelf_choices,
@@ -387,49 +590,144 @@ def item_list(request, forced_item_kind=None, part_scope=None):
                 ("missing_photo", "写真未登録"),
                 ("missing_shelf", "棚番未設定"),
             ],
-            "filters": {"item_kind": item_kind, "part_scope": part_scope, "group": group, "category": category_id, "catalog": catalog_id, "status": status, "equipment_type": equipment_type, "quality_rank": quality_rank, "alert": alert, "maker": maker, "shelf": shelf, "application": application, "q": q},
+            "filters": {"item_kind": item_kind, "part_scope": part_scope, "group": group, "category": category_id, "catalog_root": catalog_root_id, "catalog": catalog_id, "asset_catalog_root": asset_catalog_root_id, "asset_catalog": asset_catalog_id, "status": status, "equipment_type": equipment_type, "quality_rank": quality_rank, "alert": alert, "maker": maker, "shelf": shelf, "application": application, "q": q},
         },
     )
 
 
 @login_required
 def equipment_list(request):
-    return item_list(request, forced_item_kind=EquipmentItem.KIND_PART, part_scope="equipment_parts")
+    return item_list(request, forced_item_kind=EquipmentItem.KIND_EQUIPMENT)
 
 
 @login_required
 def mold_list(request):
+    return item_list(request, forced_item_kind=EquipmentItem.KIND_MOLD)
+
+
+@login_required
+def equipment_part_list(request):
+    return item_list(request, forced_item_kind=EquipmentItem.KIND_PART, part_scope="equipment_parts")
+
+
+@login_required
+def mold_part_list(request):
     return item_list(request, forced_item_kind=EquipmentItem.KIND_PART, part_scope="mold_parts")
 
 
 @login_required
 def part_list(request):
-    return redirect("setsubi_zaiko:equipment_list")
+    return redirect("setsubi_zaiko:equipment_part_list")
 
 
 @login_required
 def item_create(request):
-    form = EquipmentItemForm(request.POST or None, request.FILES or None)
+    asset = None
+    asset_id = request.GET.get("asset") or ""
+    if asset_id:
+        asset = get_object_or_404(EquipmentItem, pk=asset_id, item_kind__in=[EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD])
+    requested_kind = request.GET.get("item_kind") or ""
+    fixed_item_kind = requested_kind if requested_kind in {EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD, EquipmentItem.KIND_PART} else None
+    part_scope = request.GET.get("part_scope") or ""
+    if part_scope not in {"equipment_parts", "mold_parts"}:
+        part_scope = ""
+    if asset:
+        fixed_item_kind = EquipmentItem.KIND_PART
+        part_scope = _part_scope_for_item(asset)
+    initial = {}
+    if fixed_item_kind:
+        initial["item_kind"] = fixed_item_kind
+    if fixed_item_kind == EquipmentItem.KIND_MOLD:
+        initial["equipment_type"] = "mold"
+    elif fixed_item_kind == EquipmentItem.KIND_PART and part_scope == "mold_parts":
+        initial["equipment_type"] = "mold_part"
+    elif fixed_item_kind == EquipmentItem.KIND_PART and part_scope == "equipment_parts":
+        initial["equipment_type"] = "spare_part"
+    if asset and asset.item_kind == EquipmentItem.KIND_EQUIPMENT:
+        initial["applicable_machine_no"] = asset.code
+    elif asset and asset.item_kind == EquipmentItem.KIND_MOLD:
+        initial["applicable_mold_no"] = asset.code
+    form = EquipmentItemForm(request.POST or None, request.FILES or None, initial=initial, fixed_item_kind=fixed_item_kind, part_scope=part_scope)
     if request.method == "POST" and form.is_valid():
         item = form.save(commit=False)
         item.created_by = request.user
+        if asset and asset.item_kind == EquipmentItem.KIND_EQUIPMENT and not item.applicable_machine_no:
+            item.applicable_machine_no = asset.code
+        elif asset and asset.item_kind == EquipmentItem.KIND_MOLD and not item.applicable_mold_no:
+            item.applicable_mold_no = asset.code
         item.save()
+        if asset and item.item_kind == EquipmentItem.KIND_PART:
+            EquipmentPartLink.objects.get_or_create(asset=asset, part=item, usage_location="")
         messages.success(request, "機器・部品マスターを登録しました。")
-        return redirect("setsubi_zaiko:item_list")
-    return render(request, "setsubi_zaiko/form.html", {"form": form, "title": "機器・部品マスター登録", "form_kind": "item"})
+        if asset:
+            return redirect("setsubi_zaiko:item_detail", pk=asset.pk)
+        return redirect(_list_url_name(item.item_kind, part_scope or _part_scope_for_item(item)))
+    return render(
+        request,
+        "setsubi_zaiko/form.html",
+        {"form": form, "title": "機器・部品マスター登録", "form_kind": "item", "item": asset},
+    )
 
 
 @login_required
 def item_detail(request, pk):
-    item = get_object_or_404(EquipmentItem.objects.select_related("category", "category__parent", "catalog_node", "catalog_node__parent"), pk=pk)
+    item = get_object_or_404(EquipmentItem.objects.select_related("category", "category__parent", "catalog_node", "catalog_node__parent", "iot_machine", "iot_esp32_machine", "iot_mold_lifetime", "iot_mold_lifetime__mold"), pk=pk)
     ledgers = item.ledgers.select_related("item").order_by("-created_at")[:20]
-    linked_parts = item.linked_parts.select_related("part", "part__category").order_by("criticality", "part__code")
-    used_by_assets = item.used_by_assets.select_related("asset", "asset__category").order_by("asset__code")
+    linked_parts = item.linked_parts.select_related("asset", "asset__iot_machine", "asset__iot_esp32_machine", "asset__iot_mold_lifetime", "asset__iot_mold_lifetime__mold", "part", "part__category", "shot_source_machine", "shot_source_mold", "shot_source_mold__mold").order_by("criticality", "part__code")
+    used_by_assets = item.used_by_assets.select_related("asset", "asset__category", "asset__iot_machine", "asset__iot_esp32_machine", "asset__iot_mold_lifetime", "asset__iot_mold_lifetime__mold", "shot_source_machine", "shot_source_mold", "shot_source_mold__mold").order_by("asset__code")
     is_asset = item.is_asset_master
+    part_scope = _part_scope_for_item(item)
+    history_filter = Q(link__asset=item) if is_asset else Q(link__part=item)
+    replacement_histories = EquipmentPartReplacementHistory.objects.filter(history_filter).select_related(
+        "link", "link__asset", "link__part"
+    )[:50]
     return render(
         request,
         "setsubi_zaiko/item_detail.html",
-        {"item": item, "ledgers": ledgers, "linked_parts": linked_parts, "used_by_assets": used_by_assets, "is_asset": is_asset},
+        {
+            "item": item,
+            "ledgers": ledgers,
+            "linked_parts": linked_parts,
+            "used_by_assets": used_by_assets,
+            "replacement_histories": replacement_histories,
+            "is_asset": is_asset,
+            "asset_part_scope": part_scope if is_asset else "",
+            "back_url_name": _list_url_name(item.item_kind, part_scope),
+        },
+    )
+
+
+@login_required
+def item_shot_source_edit(request, pk):
+    item = get_object_or_404(
+        EquipmentItem.objects.select_related("iot_machine", "iot_esp32_machine", "iot_mold_lifetime"),
+        pk=pk,
+        item_kind__in=[EquipmentItem.KIND_EQUIPMENT, EquipmentItem.KIND_MOLD],
+    )
+    old_source = (item.iot_machine_id, item.iot_esp32_machine_id, item.iot_mold_lifetime_id)
+    form = EquipmentShotSourceForm(request.POST or None, instance=item)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            item = form.save()
+            new_source = (item.iot_machine_id, item.iot_esp32_machine_id, item.iot_mold_lifetime_id)
+            reset_count = 0
+            if new_source != old_source:
+                current_shot = item.linked_current_shot or 0
+                reset_count = item.linked_parts.filter(
+                    shot_source_machine__isnull=True,
+                    shot_source_mold__isnull=True,
+                ).update(baseline_shot=current_shot)
+        messages.success(request, f"IoT shot連携を保存しました。共通連携を使う部品 {reset_count} 件の開始shotを更新しました。")
+        return redirect("setsubi_zaiko:item_detail", pk=item.pk)
+    return render(
+        request,
+        "setsubi_zaiko/form.html",
+        {
+            "form": form,
+            "title": f"IoT shot連携設定: {item.code} {item.name}",
+            "form_kind": "shot_source",
+            "item": item,
+        },
     )
 
 
@@ -439,10 +737,107 @@ def part_link_create(request, pk=None):
     form = EquipmentPartLinkForm(request.POST or None, asset=asset)
     if request.method == "POST" and form.is_valid():
         link = form.save()
+        current_shot = link.current_shot
+        if current_shot is not None:
+            link.baseline_shot = current_shot
+            link.save(update_fields=["baseline_shot"])
         messages.success(request, "使用部品をリンクしました。")
         return redirect("setsubi_zaiko:item_detail", pk=link.asset_id)
     title = "使用部品リンク登録"
     return render(request, "setsubi_zaiko/form.html", {"form": form, "title": title, "form_kind": "part_link", "item": asset})
+
+
+@login_required
+@admin_required
+def part_link_edit(request, pk):
+    link = get_object_or_404(EquipmentPartLink.objects.select_related("asset", "part"), pk=pk)
+    old_source = (link.shot_source_machine_id, link.shot_source_mold_id)
+    form = EquipmentPartLinkForm(request.POST or None, instance=link)
+    if request.method == "POST" and form.is_valid():
+        link = form.save()
+        new_source = (link.shot_source_machine_id, link.shot_source_mold_id)
+        if new_source != old_source:
+            link.baseline_shot = link.current_shot or 0
+            link.save(update_fields=["baseline_shot"])
+        messages.success(request, "使用部品リンクを更新しました。")
+        return redirect("setsubi_zaiko:item_detail", pk=link.asset_id)
+    return render(
+        request,
+        "setsubi_zaiko/form.html",
+        {"form": form, "title": "使用部品リンク編集", "form_kind": "part_link", "item": link.asset},
+    )
+
+
+@login_required
+def part_replacement_create(request, pk):
+    link = get_object_or_404(
+        EquipmentPartLink.objects.select_related("asset", "part", "shot_source_machine", "shot_source_mold"),
+        pk=pk,
+    )
+    initial = {
+        "replaced_at": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+        "operator_name": _operator_name(request),
+    }
+    form = EquipmentPartReplacementForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            locked_link = EquipmentPartLink.objects.select_for_update().select_related(
+                "shot_source_machine", "shot_source_mold"
+            ).get(pk=link.pk)
+            current_shot = locked_link.current_shot
+            history = form.save(commit=False)
+            history.link = locked_link
+            history.previous_replaced_at = locked_link.last_replaced_at
+            history.shot_at_replacement = current_shot
+            history.baseline_shot_before = locked_link.baseline_shot
+            history.used_shots = locked_link.used_shots
+            history.created_by = request.user
+            history.save()
+            locked_link.last_replaced_at = history.replaced_at
+            update_fields = ["last_replaced_at"]
+            if current_shot is not None:
+                locked_link.baseline_shot = current_shot
+                update_fields.append("baseline_shot")
+            locked_link.save(update_fields=update_fields)
+        messages.success(request, "部品交換を履歴に記録し、寿命shotをリセットしました。")
+        return redirect("setsubi_zaiko:item_detail", pk=link.asset_id)
+    return render(
+        request,
+        "setsubi_zaiko/form.html",
+        {
+            "form": form,
+            "title": f"部品交換記録: {link.part.code} {link.part.name}",
+            "form_kind": "replacement",
+            "item": link.asset,
+            "replacement_link": link,
+        },
+    )
+
+
+@login_required
+@admin_required
+def part_link_delete(request, pk):
+    link = get_object_or_404(EquipmentPartLink.objects.select_related("asset", "part"), pk=pk)
+    asset_id = link.asset_id
+    if request.method == "POST":
+        try:
+            link.delete()
+            messages.success(request, "使用部品リンクを削除しました。")
+        except ProtectedError:
+            messages.error(request, "交換履歴があるためリンクは削除できません。履歴を保持したまま設定を編集してください。")
+        return redirect("setsubi_zaiko:item_detail", pk=asset_id)
+    return render(
+        request,
+        "setsubi_zaiko/confirm_delete.html",
+        {
+            "object": link,
+            "object_label": f"{link.asset.code} -> {link.part.code} {link.usage_location}",
+            "title": "使用部品リンク削除",
+            "cancel_url": reverse("setsubi_zaiko:item_detail", args=[asset_id]),
+            "warning_text": "リンクだけを削除します。部品マスターと在庫台帳は残ります。",
+            "action_label": "削除する",
+        },
+    )
 
 
 @login_required
@@ -457,6 +852,54 @@ def item_edit(request, pk):
         request,
         "setsubi_zaiko/form.html",
         {"form": form, "title": "機器・部品マスター編集", "form_kind": "item", "item": item},
+    )
+
+
+@login_required
+@admin_required
+def item_delete(request, pk):
+    item = get_object_or_404(
+        EquipmentItem.objects.annotate(
+            ledger_count=Count("ledgers", distinct=True),
+            linked_part_count=Count("linked_parts", distinct=True),
+            used_by_count=Count("used_by_assets", distinct=True),
+        ),
+        pk=pk,
+    )
+    back_url_name = _list_url_name(item.item_kind, _part_scope_for_item(item))
+    if request.method == "POST":
+        if item.ledger_count:
+            messages.error(request, "入出庫台帳があるため、このマスターは先に台帳を整理してから削除してください。")
+            return redirect("setsubi_zaiko:item_detail", pk=item.pk)
+        try:
+            with transaction.atomic():
+                EquipmentPartLink.objects.filter(Q(asset=item) | Q(part=item)).delete()
+                item.delete()
+        except ProtectedError:
+            messages.error(request, "関連データが残っているため削除できません。リンクまたは台帳を確認してください。")
+            return redirect("setsubi_zaiko:item_detail", pk=item.pk)
+        messages.success(request, "機器・部品マスターを削除しました。")
+        return redirect(back_url_name)
+    dependency_notes = []
+    if item.ledger_count:
+        dependency_notes.append(f"台帳 {item.ledger_count} 件")
+    if item.linked_part_count:
+        dependency_notes.append(f"使用部品リンク {item.linked_part_count} 件")
+    if item.used_by_count:
+        dependency_notes.append(f"使用先リンク {item.used_by_count} 件")
+    return render(
+        request,
+        "setsubi_zaiko/confirm_delete.html",
+        {
+            "object": item,
+            "object_label": f"{item.code} {item.name}",
+            "title": "機器・部品マスター削除",
+            "cancel_url": reverse("setsubi_zaiko:item_detail", args=[item.pk]),
+            "has_dependencies": bool(dependency_notes),
+            "warning_text": "関連リンクは同時に削除されます。台帳がある場合は削除できません。",
+            "dependency_text": " / ".join(dependency_notes),
+            "action_label": "削除する",
+        },
     )
 
 
@@ -701,6 +1144,65 @@ def ledger_create(request, mode=None):
     if workflow:
         return render(request, "setsubi_zaiko/ledger_workflow.html", {"form": form, "workflow": workflow, "mode": mode})
     return render(request, "setsubi_zaiko/form.html", {"form": form, "title": "入出庫・調整登録", "form_kind": "ledger"})
+
+
+@login_required
+@admin_required
+def ledger_edit(request, pk):
+    ledger = get_object_or_404(EquipmentStockLedger.objects.select_related("item"), pk=pk)
+    form = EquipmentStockLedgerEditForm(request.POST or None, instance=ledger)
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                updated = form.save(commit=False)
+                updated.reason_label = dict(EquipmentStockLedger.REASON_CHOICES).get(updated.reason_code, updated.reason_code)
+                updated.confirmed_at = timezone.now() if updated.supervisor_confirmed else None
+                updated.save()
+                _recalculate_item_stock(updated.item_id)
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, "台帳を更新し、在庫数量を再計算しました。")
+            return redirect("setsubi_zaiko:ledger_list")
+    return render(
+        request,
+        "setsubi_zaiko/form.html",
+        {"form": form, "title": "入出庫台帳編集", "form_kind": "ledger", "cancel_url_name": "setsubi_zaiko:ledger_list"},
+    )
+
+
+@login_required
+@admin_required
+def ledger_delete(request, pk):
+    ledger = get_object_or_404(EquipmentStockLedger.objects.select_related("item"), pk=pk)
+    if request.method == "POST":
+        try:
+            with transaction.atomic():
+                locked = EquipmentStockLedger.objects.select_for_update().select_related("item").get(pk=pk)
+                item_id = locked.item_id
+                first_ledger_id = (
+                    EquipmentStockLedger.objects.filter(item_id=item_id).order_by("created_at", "id").values_list("id", flat=True).first()
+                )
+                fallback_quantity = locked.quantity_before if locked.id == first_ledger_id else None
+                locked.delete()
+                _recalculate_item_stock(item_id, fallback_quantity=fallback_quantity)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect("setsubi_zaiko:ledger_list")
+        messages.success(request, "台帳を削除し、在庫数量を再計算しました。")
+        return redirect("setsubi_zaiko:ledger_list")
+    return render(
+        request,
+        "setsubi_zaiko/confirm_delete.html",
+        {
+            "object": ledger,
+            "object_label": f"{ledger.system_no} {ledger.item.code} {ledger.transaction_type} {ledger.quantity}",
+            "title": "入出庫台帳削除",
+            "cancel_url_name": "setsubi_zaiko:ledger_list",
+            "warning_text": "この台帳を削除したあと、同じ部品の前後数量と現在在庫を自動で再計算します。",
+            "action_label": "削除する",
+        },
+    )
 
 
 @login_required

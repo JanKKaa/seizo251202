@@ -18,6 +18,168 @@ Tai lieu nay chi ghi thay doi lon de handoff nhanh.
 
 ---
 
+### [2026-07-09] Chặn submit trùng luồng xuất kho quét ảnh
+- Phạm vi: `quet_anh/views.py`, `templates/quet_anh/upload.html`
+- Nội dung:
+  - Thêm khóa submit phía frontend để nút `送信` không gửi lặp khi người dùng chạm nhiều lần hoặc mạng chậm.
+  - Thêm khóa idempotency ngắn hạn phía backend cho luồng `/quet_anh/upload/`, dựa trên ảnh đã chụp + dữ liệu lot/kg/thiết bị để chặn tạo lặp `QAResult` và xuất kho tự động.
+  - Dọn dữ liệu lỗi phát sinh 2 lần liên tiếp trong ca ngày 2026-07-08 cho cùng một lần quét.
+- Ảnh hưởng/rủi ro:
+  - Nếu người dùng cố gửi lại đúng cùng một ảnh và cùng dữ liệu trong vài phút, hệ thống sẽ chặn như một lần gửi trùng.
+  - Không đổi cấu trúc DB, không có migration.
+- Lệnh đã chạy / cần chạy:
+  - `docker exec seizo0-django python -m py_compile quet_anh/views.py` -> OK.
+  - Nên kiểm tra lại thực tế 1 ca xuất kho trên tablet sau deploy.
+- Rollback:
+  - Revert các file trên; nếu cần hoàn tác dữ liệu phải kiểm tra lại sổ xuất kho và chuỗi `QAResult/PhienNhapLieu/QAAutoInputLedger`.
+
+### [2026-07-06] CRUD thủ công shot máy ESP32
+- Phạm vi: `iot/forms.py`, `iot/views.py`, `iot/urls.py`, `iot/tests.py`, `templates/iot/machine.html`, `esp32_counter_form.html`, `esp32_counter_confirm_delete.html`.
+- Nội dung:
+  - Thêm nút đăng ký mới, sửa và xóa dữ liệu máy ESP32 tại `/iot/machine-counter/`.
+  - Cho phép sửa tên máy ESP32, sản phẩm, counter hiện tại, tổng shot tích lũy và cycle time khi dữ liệu có sai số.
+  - Khi sửa counter hiện tại, đồng bộ `last_counted_shot` để worker chỉ cộng shot mới, không cộng bù sai sau thao tác tay.
+  - Chỉ superuser được thực hiện thao tác ghi; link shot đang được master setsubi sử dụng sẽ chặn xóa.
+  - Bổ sung kiểm tra quyền và bảo vệ luôn URL sửa tổng shot NET100 hiện có.
+- Ảnh hưởng/rủi ro:
+  - Dữ liệu xóa có thể được ESP32 tự tạo lại khi nhận snapshot mới, với tổng shot bắt đầu lại từ 0.
+  - Nhập tay sai tổng shot sẽ ảnh hưởng trực tiếp tới tính tuổi thọ linh kiện đã liên kết.
+- Lệnh đã chạy:
+  - `python manage.py check` -> OK.
+  - `python manage.py test iot` -> OK, 12 tests.
+- Rollback:
+  - Revert các file trên; không có migration DB.
+
+### [2026-07-03] Cộng dồn shot máy ESP32 theo shot khuôn đang chạy
+- Phạm vi: `iot/models.py`, `iot/views.py`, `iot/tests.py`, `setsubi_zaiko/models.py`, `forms.py`, `views.py`, `admin.py`, `tests.py`, template chi tiết/form, migration `iot 0073-0074`, `setsubi_zaiko 0020`.
+- Nội dung:
+  - Thêm `Esp32CardSnapshot.total_shot` làm bộ đếm tích lũy riêng cho từng máy ESP32.
+  - Worker cộng chênh lệch từ counter snapshot của khuôn đang chạy trên từng máy; không phụ thuộc tên/mapping khuôn, không cộng trùng và xử lý counter reset.
+  - Migration ưu tiên khởi tạo tổng shot ESP32 từ khuôn đang map; nếu chưa map thì lấy counter snapshot hiện tại, đồng thời lưu checkpoint để lần chạy sau chỉ cộng shot mới.
+  - Màn hình `IoT shot連携設定` của thiết bị cho phép chọn thủ công nguồn NET100 hoặc ESP32; linh kiện dùng tổng shot của nguồn đã chọn.
+  - Trang `/iot/machine-counter/` hiển thị chung NET100 và ESP32, có nhãn nguồn, sản phẩm, tổng shot, counter hiện tại và thời gian cập nhật; ESP32 vẫn hiện khi NET100 tạm offline.
+- Ảnh hưởng/rủi ro:
+  - Tổng shot máy vẫn tăng khi chưa map tên khuôn; riêng tuổi thọ khuôn vẫn cần cấu hình `MoldLifetime.esp32_machine`/tên sản phẩm đúng như trước.
+- Lệnh đã chạy / cần chạy:
+  - `python manage.py migrate iot setsubi_zaiko`
+  - `python manage.py test iot` -> OK, 10 tests; tổng `iot + setsubi_zaiko` hiện có 49 tests.
+- Rollback:
+  - Revert các file trên và migrate `setsubi_zaiko` về `0019`, `iot` về `0072` (sẽ xóa tổng shot ESP32 đã tích lũy).
+
+### [2026-07-03] Quản lý tuổi thọ và lịch sử thay linh kiện setsubi theo shot IoT
+- Phạm vi: `setsubi_zaiko/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`, `tests.py`, `templates/setsubi_zaiko/*`, migration `0018`, `0019`.
+- Nội dung:
+  - Mỗi liên kết thiết bị/khuôn với linh kiện có thể đặt tuổi thọ shot và nguồn shot riêng.
+  - Linh kiện thiết bị lấy shot tích lũy từ `iot.Machine.shot_total`; linh kiện khuôn lấy từ `iot.MoldLifetime.total_shot`.
+  - Sửa worker counter máy seikei để cộng đủ chênh lệch shot giữa hai lần đọc và xử lý khi counter reset, thay cho cách cộng cố định `+1`.
+  - Thêm thao tác ghi nhận thay linh kiện, lưu ngày thay trước/lần này, shot tại lúc thay, shot đã sử dụng, người thao tác và ghi chú.
+  - Sau khi thay, hệ thống tự đặt shot hiện tại làm mốc mới và hiển thị shot đã dùng/còn lại cùng lịch sử trên trang chi tiết.
+  - Thêm màn hình `IoT shot連携設定` tại master thiết bị/khuôn để map thủ công với nguồn IoT khi tên giữa hai app khác nhau.
+  - Nguồn shot chung ở master tự áp dụng cho các linh kiện bên dưới; cấu hình riêng trên từng liên kết linh kiện vẫn được ưu tiên.
+  - Khi đổi nguồn map thủ công, shot hiện tại được dùng làm mốc mới để không cộng nhầm shot lịch sử trước lúc liên kết.
+  - Không cho xóa liên kết đã có lịch sử thay để bảo toàn truy vết.
+- Ảnh hưởng/rủi ro:
+  - Liên kết cũ không thay đổi dữ liệu; cần sửa từng liên kết để chọn nguồn shot và nhập tuổi thọ shot.
+  - Độ chính xác phụ thuộc worker IoT đang cập nhật `Machine.shot_total` và `MoldLifetime.total_shot`.
+- Lệnh đã chạy / cần chạy:
+  - `python manage.py migrate setsubi_zaiko` -> OK trên PostgreSQL.
+  - `python manage.py test setsubi_zaiko` -> OK, 38 tests.
+  - `python manage.py test iot` -> OK, 6 tests.
+  - Rebuild/recreate `web`, `iot-worker-serial`; restart nginx sau 502 transient; `/setsubi-zaiko/` trả `302` đúng về login.
+- Rollback:
+  - Revert các file trên và migrate `setsubi_zaiko` về `0017` (sẽ xóa dữ liệu lịch sử thay mới).
+
+### [2026-06-26] Dong bo phan chia buhin theo link thiet bi/khuon
+- Pham vi: `setsubi_zaiko/views.py`, `templates/setsubi_zaiko/item_list.html`, `setsubi_zaiko/tests.py`.
+- Noi dung:
+  - Danh sach `設備部品` / `金型部品` uu tien phan loai theo `EquipmentPartLink` toi master thiet bi hoac khuon.
+  - Buhin chua co link van fallback theo `equipment_type` cu de khong mat du lieu master hien co.
+  - Them filter `使用先 大分類/分類` tren man hinh buhin, lay theo catalog cua thiet bi/khuon da link.
+- Anh huong:
+  - Buhin dung chung nhieu thiet bi/khuon co the hien trong dung cac luong da link; du lieu da link se dong bo chat hon voi master thiet bi/khuon.
+- Lenh da chay:
+  - `docker compose run --rm --no-deps -e DB_ENGINE=sqlite -e SQLITE_DB_NAME=/tmp/setsubi_test.sqlite3 -v ${PWD}:/app-src web sh -c "cd /app-src && python manage.py test setsubi_zaiko"` -> OK, 34 tests.
+- Rollback:
+  - Revert 3 file tren; khong co migration DB.
+
+### [2026-06-26] Cai tien tim kiem va phan trang setsubi zaiko
+- Pham vi: `setsubi_zaiko/views.py`, `tests.py`, `templates/setsubi_zaiko/item_list.html`, `pagination.html`.
+- Noi dung:
+  - O tim kiem `q` tim rong tren item, category, catalog, trang thai, loai thiet bi, ghi chu, folder va link thiet bi/khuon.
+  - Chon `大分類` se thu hep danh sach `分類` trong pham vi do; neu doi `大分類`, UI tu reset `分類`.
+  - Man hinh master thiet bi/khuon dung catalog rieng (`catalog_root/catalog`) cho `大分類/分類`, khong dung nhom category chung cua linh kien.
+  - Dropdown filter tu dong submit khi chon dieu kien; rieng cac o nhap chu chi submit khi bam Enter hoac nut `検索`.
+  - Link phan trang giu nguyen query/filter hien tai thay vi reset dieu kien.
+- Anh huong:
+  - Nguoi dung co the go ky tu va thay ket qua nhanh hon; query co join link nen dung `distinct()` de tranh trung dong.
+- Lenh da chay:
+  - `docker compose run --rm --no-deps -e DB_ENGINE=sqlite -e SQLITE_DB_NAME=/tmp/setsubi_test.sqlite3 -v ${PWD}:/app-src web sh -c "cd /app-src && python manage.py test setsubi_zaiko"` -> OK, 32 tests.
+- Rollback:
+  - Revert cac file tren; khong co migration DB.
+
+### [2026-06-26] Them chup anh truc tiep cho master setsubi
+- Pham vi: `setsubi_zaiko/forms.py`, `tests.py`, `templates/setsubi_zaiko/form.html`.
+- Noi dung:
+  - Them `accept="image/*"` va `capture="environment"` cho anh ngoai quan va anh nhan/mac.
+  - Them nut `カメラ撮影` tren form tao/sua thiet bi, khuon, linh kien.
+  - Dung `getUserMedia` de chup anh truc tiep, gan anh chup vao file input de luu cung form.
+- Anh huong:
+  - Nhap lieu bang tablet/phone nhanh hon; neu browser khong cho mo camera thi van upload file anh binh thuong.
+- Lenh da chay:
+  - `docker compose run --rm --no-deps -e DB_ENGINE=sqlite -e SQLITE_DB_NAME=/tmp/setsubi_test.sqlite3 -v ${PWD}:/app-src web sh -c "cd /app-src && python manage.py test setsubi_zaiko"` -> OK, 32 tests.
+- Rollback:
+  - Revert cac file tren; khong co migration DB.
+
+### [2026-06-25] Tach luong master thiet bi/khuon va linh kien setsubi
+- Pham vi: `setsubi_zaiko/views.py`, `forms.py`, `urls.py`, `tests.py`, `templates/setsubi_zaiko/*`.
+- Noi dung:
+  - Doi `/setsubi-zaiko/equipment/` thanh danh sach master thiet bi va `/setsubi-zaiko/molds/` thanh danh sach master khuon.
+  - Them `/setsubi-zaiko/equipment-parts/` cho linh kien thiet bi va `/setsubi-zaiko/mold-parts/` cho linh kien khuon.
+  - Khi tao linh kien moi tu man hinh chi tiet thiet bi/khuon, he thong tu dien ma may/khuon va tao `EquipmentPartLink`.
+  - Form dang ky loc category/type theo dung luong dang dung; linh kien van co the link toi nhieu thiet bi hoac nhieu khuon qua bang link hien co.
+  - Them CRUD admin cho item, link su dung linh kien va ledger; sua/xoa ledger se tinh lai `quantity_before/after` va `current_quantity`.
+- Anh huong:
+  - Luong master va luong ton kho linh kien ro rang hon; route `/parts/` cu redirect ve linh kien thiet bi.
+  - Item co ledger khong bi xoa truc tiep de giu lich su; admin can xu ly ledger truoc neu muon xoa master.
+- Lenh da chay:
+  - `docker compose run --rm --no-deps -e DB_ENGINE=sqlite -e SQLITE_DB_NAME=/tmp/setsubi_test.sqlite3 -v ${PWD}:/app-src web sh -c "cd /app-src && python manage.py test setsubi_zaiko"` -> OK, 27 tests.
+- Rollback:
+  - Revert cac file tren; khong co migration DB.
+
+### [2026-06-24] Cho phep tiep tuc phien bao tri dang do
+- Pham vi: `baotri/views.py`, `templates/baotri/index.html`, `templates/baotri/task_code.html`, `templates/baotri/start_task.html`.
+- Noi dung:
+  - Dung `TaskCode.end_time is null` lam phien bao tri dang do.
+  - Trang `/baotri/` hien danh sach phien dang lam va nut `続きから`.
+  - Khi chon san pham da co phien dang do cua user, he thong mo lai phien cu thay vi tao ma moi; van co `force_new=1` de tao phien moi.
+  - Man hinh checklist co `一時保存` va autosave draft qua AJAX; draft khong set `end_time`.
+  - Timer bao tri lay moc tu `TaskCode.created_at`, vi vay mo lai hom sau van cong don thoi gian gian doan.
+- Anh huong:
+  - Du lieu checklist co the duoc luu nhap trong khi lam, giam mat du lieu khi gian doan.
+  - Thoi gian bao tri tinh ca thoi gian nghi/gian doan cho den khi bam hoan thanh.
+- Lenh da chay:
+  - `docker compose exec -T web python manage.py check` -> OK.
+  - `docker compose exec -T web python -m py_compile baotri/views.py` -> OK.
+  - Compile templates `baotri/index.html`, `task_code.html`, `start_task.html` -> OK.
+  - Django client GET `/baotri/` voi host `192.168.10.250` -> `200`.
+- Rollback:
+  - Revert cac file tren; cac phien dang do van la `TaskCode` co `end_time` trong DB.
+
+### [2026-06-23] Tu dong cong don shot khuon Pinion Gear may 36
+- Pham vi: `iot/views.py`, `iot/tests.py`, du lieu cau hinh `Machine`.
+- Noi dung:
+  - Khi NET100 khong tra `condname`, worker `update_mold_shot` dung dieu kien da cau hinh trong DB theo dia chi may.
+  - Doi cach cong tuoi tho khuon tu `+1` moi lan counter thay doi sang cong dung chenh lech counter, co xu ly counter reset.
+  - Lan dau gan khuon voi may chi luu counter lam moc, khong cong nham shot lich su.
+  - Gan may 36 (`192.168.10.243`) voi dieu kien `pinion gear`.
+- Anh huong:
+  - Khuon `50171-00111-04 / ピニオンギア-4号型` tu dong cong shot tu may 36.
+- Lenh da chay / can chay:
+  - `python manage.py test iot`
+  - Recreate `web` va `iot-worker-serial`.
+- Rollback:
+  - Revert thay doi `iot/views.py`, xoa `iot/tests.py`, va xoa cau hinh `Machine.condname` cua may 36 neu khong dung.
+
 ### [2026-06-19] Hien thi thong bao 4M ngay khi co tin moi
 - Pham vi: `static/iot/js/applyData.js`, `templates/base_dashboard.html`, `templates/iot/partials/_center_panel.html`.
 - Noi dung:

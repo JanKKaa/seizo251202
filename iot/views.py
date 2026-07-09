@@ -1,13 +1,16 @@
 import csv
 import json
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import user_passes_test
+from django.db.models import ProtectedError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 import requests
 import xml.etree.ElementTree as ET
 from .models import Machine, Component, MoldLifetime, Mold, ManualMachine, ProductionPlan, Esp32CycleShot, Esp32CardSnapshot
 from django.utils.dateparse import parse_datetime
-from .forms import MachineForm, ComponentFormSet, ComponentReplacementForm, MachineShotTotalForm, ManualMachineForm
+from .forms import MachineForm, ComponentFormSet, ComponentReplacementForm, MachineShotTotalForm, ManualMachineForm, Esp32MachineCounterForm
 from django import forms
 from datetime import datetime, timedelta
 from django.core.cache import cache
@@ -387,6 +390,36 @@ def molding_delete(request, pk):
     molding.delete()
     return redirect('iot:molding')
 
+def _update_mold_lifetime_counter(mold_lifetime, current_shot, updated_at=None):
+    current_shot = max(int(current_shot or 0), 0)
+    previous_shot = max(int(mold_lifetime.last_shot or 0), 0)
+    updated_at = updated_at or timezone.now()
+
+    # On the first mapping, use the current machine counter as the baseline.
+    if previous_shot == 0 and (mold_lifetime.total_shot or 0) == 0:
+        mold_lifetime.last_shot = current_shot
+        mold_lifetime.last_update = updated_at
+        mold_lifetime.save(update_fields=["last_shot", "last_update"])
+        return 0
+
+    if current_shot >= previous_shot:
+        delta = current_shot - previous_shot
+    else:
+        # The machine counter was reset.
+        delta = current_shot
+
+    update_fields = ["last_update"]
+    mold_lifetime.last_update = updated_at
+    if delta > 0:
+        mold_lifetime.total_shot = (mold_lifetime.total_shot or 0) + delta
+        update_fields.append("total_shot")
+    if mold_lifetime.last_shot != current_shot:
+        mold_lifetime.last_shot = current_shot
+        update_fields.append("last_shot")
+    mold_lifetime.save(update_fields=update_fields)
+    return delta
+
+
 def update_mold_shot():
     url_machine = 'http://192.168.10.220/net100/machine'
     url_live = 'http://192.168.10.220/net100/livelist'
@@ -418,21 +451,38 @@ def update_mold_shot():
     except Exception as e:
         machines = []
 
-    moldlifetimes = MoldLifetime.objects.select_related('mold').all()
-    for m in machines:
-        condname = m.get('condname', '')
-        shotno = int(m.get('shotno', 0) or 0)
-        ml = moldlifetimes.filter(condname=condname).first()
-        if ml:
-            last_shot = getattr(ml, 'last_shot', None)
-            if last_shot is None:
-                ml.last_shot = shotno
-            elif shotno != last_shot:
-                ml.total_shot += 1
-                ml.last_shot = shotno
-            # Nếu shotno không đổi thì chỉ cập nhật thời gian
-            ml.last_update = timezone.now()
-            ml.save()
+    moldlifetimes = list(MoldLifetime.objects.select_related('mold').all())
+    mold_by_condition = {
+        (ml.condname or "").strip().casefold(): ml
+        for ml in moldlifetimes
+        if (ml.condname or "").strip()
+    }
+    machine_by_address = {
+        machine.address: machine
+        for machine in Machine.objects.filter(
+            address__in=[m.get("address", "") for m in machines]
+        )
+    }
+
+    for machine_data in machines:
+        address = (machine_data.get("address") or "").strip()
+        runtime_condname = (machine_data.get("condname") or "").strip()
+        configured_machine = machine_by_address.get(address)
+        configured_condname = (
+            (configured_machine.condname or "").strip()
+            if configured_machine
+            else ""
+        )
+        shotno = int(machine_data.get('shotno', 0) or 0)
+
+        mold_lifetime = None
+        for condname in (runtime_condname, configured_condname):
+            if condname:
+                mold_lifetime = mold_by_condition.get(condname.casefold())
+                if mold_lifetime:
+                    break
+        if mold_lifetime:
+            _update_mold_lifetime_counter(mold_lifetime, shotno)
     print("Đã cập nhật shot molding tự động!")
 
 def machine_counter(request):
@@ -471,6 +521,7 @@ def machine_counter(request):
                 pk = machine_obj.pk if machine_obj else ''
                 last_shot = machine_obj.last_shot if machine_obj else None
                 machines.append({
+                    'source': 'NET100',
                     'address': address,
                     'name': name,
                     'condname': condname,
@@ -484,7 +535,42 @@ def machine_counter(request):
     except Exception as e:
         machines = []
 
+    for snapshot in Esp32CardSnapshot.objects.order_by('address'):
+        product_name = snapshot.primary_product or snapshot.product_display or ''
+        machines.append({
+            'source': 'ESP32',
+            'address': snapshot.address,
+            'name': f"ESP32 {snapshot.address}",
+            'condname': product_name,
+            'cycletime': snapshot.cycletime,
+            'shot_total': snapshot.total_shot,
+            'status': 'esp32',
+            'last_update': snapshot.updated_at,
+            'last_shot': snapshot.shot,
+            'pk': snapshot.pk,
+        })
+
     return render(request, 'iot/machine.html', {'machines': machines})
+
+def _update_machine_lifetime_counter(machine, current_shot, updated_at=None):
+    current_shot = max(int(current_shot or 0), 0)
+    previous_shot = max(int(machine.last_shot or 0), 0)
+    updated_at = updated_at or timezone.now()
+
+    # Lần đầu liên kết chỉ lấy counter hiện tại làm mốc, không cộng shot lịch sử.
+    if previous_shot == 0 and (machine.shot_total or 0) == 0:
+        machine.last_shot = current_shot
+        machine.last_update = updated_at
+        machine.save(update_fields=["last_shot", "last_update"])
+        return 0
+
+    delta = current_shot - previous_shot if current_shot >= previous_shot else current_shot
+    machine.shot_total = (machine.shot_total or 0) + delta
+    machine.last_shot = current_shot
+    machine.last_update = updated_at
+    machine.save(update_fields=["shot_total", "last_shot", "last_update"])
+    return delta
+
 
 def update_machine_counter():
     """
@@ -517,20 +603,13 @@ def update_machine_counter():
                 name = info.get('name', '')
                 shotno = live_dict.get(address, 0)
                 machine_obj, _ = Machine.objects.get_or_create(address=address, defaults={'name': name})
-                last_shot = getattr(machine_obj, 'last_shot', None)
-                if last_shot is None:
-                    machine_obj.last_shot = shotno
-                elif shotno != last_shot:
-                    machine_obj.shot_total += 1
-                    machine_obj.last_shot = shotno
-                # Nếu shotno không đổi thì chỉ cập nhật thời gian
-                machine_obj.last_update = timezone.now()
-                machine_obj.save()
+                _update_machine_lifetime_counter(machine_obj, shotno)
     except Exception as e:
         print(f"Lỗi cập nhật counter máy: {e}")
 
     print("Đã cập nhật counter máy tự động!")
 
+@user_passes_test(lambda user: user.is_superuser)
 def edit_shot_total(request, pk):
     machine = get_object_or_404(Machine, pk=pk)
     if request.method == 'POST':
@@ -541,6 +620,44 @@ def edit_shot_total(request, pk):
     else:
         form = MachineShotTotalForm(instance=machine)
     return render(request, 'iot/edit_shot_total.html', {'form': form, 'machine': machine})
+
+
+@user_passes_test(lambda user: user.is_superuser)
+def esp32_counter_create(request):
+    form = Esp32MachineCounterForm(request.POST or None, initial={'shot': 0, 'total_shot': 0})
+    if request.method == 'POST' and form.is_valid():
+        snapshot = form.save(commit=False)
+        snapshot.last_counted_shot = snapshot.shot
+        snapshot.save()
+        messages.success(request, 'ESP32機械ショットデータを登録しました。')
+        return redirect('iot:machine_counter')
+    return render(request, 'iot/esp32_counter_form.html', {'form': form, 'title': 'ESP32機械ショット登録'})
+
+
+@user_passes_test(lambda user: user.is_superuser)
+def esp32_counter_edit(request, pk):
+    snapshot = get_object_or_404(Esp32CardSnapshot, pk=pk)
+    form = Esp32MachineCounterForm(request.POST or None, instance=snapshot)
+    if request.method == 'POST' and form.is_valid():
+        snapshot = form.save(commit=False)
+        snapshot.last_counted_shot = snapshot.shot
+        snapshot.save()
+        messages.success(request, 'ESP32機械ショットデータを修正しました。')
+        return redirect('iot:machine_counter')
+    return render(request, 'iot/esp32_counter_form.html', {'form': form, 'title': 'ESP32機械ショット修正', 'snapshot': snapshot})
+
+
+@user_passes_test(lambda user: user.is_superuser)
+def esp32_counter_delete(request, pk):
+    snapshot = get_object_or_404(Esp32CardSnapshot, pk=pk)
+    if request.method == 'POST':
+        try:
+            snapshot.delete()
+            messages.success(request, 'ESP32機械ショットデータを削除しました。')
+        except ProtectedError:
+            messages.error(request, '設備在庫マスターで使用中のため削除できません。先にshot連携を解除してください。')
+        return redirect('iot:machine_counter')
+    return render(request, 'iot/esp32_counter_confirm_delete.html', {'snapshot': snapshot})
 
 def manual_machine_add(request):
     if request.method == 'POST':
@@ -593,6 +710,23 @@ def _esp32_extract_devices():
     return [d for d in devices if isinstance(d, dict)]
 
 
+def _update_esp32_machine_total(snapshot):
+    current_shot = max(int(snapshot.shot or 0), 0)
+    previous_shot = max(int(snapshot.last_counted_shot or 0), 0)
+
+    if (snapshot.total_shot or 0) == 0 and previous_shot == 0:
+        snapshot.total_shot = current_shot
+        snapshot.last_counted_shot = current_shot
+        snapshot.save(update_fields=["total_shot", "last_counted_shot"])
+        return current_shot
+
+    delta = current_shot - previous_shot if current_shot >= previous_shot else current_shot
+    snapshot.total_shot = (snapshot.total_shot or 0) + delta
+    snapshot.last_counted_shot = current_shot
+    snapshot.save(update_fields=["total_shot", "last_counted_shot"])
+    return delta
+
+
 def update_esp32_shot():
     snapshot_map = {
         (s.address or "").strip(): s
@@ -617,6 +751,7 @@ def update_esp32_shot():
 
     now = timezone.now()
     for machine, snapshot in snapshot_map.items():
+        _update_esp32_machine_total(snapshot)
         ml = mold_map_machine.get(machine)
         if not ml:
             product_key = (snapshot.primary_product or snapshot.product_display or "").strip().lower()
